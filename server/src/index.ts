@@ -6,6 +6,13 @@ import { WebSocketServer, WebSocket } from "ws";
 import fs from "fs";
 import path from "path";
 
+// Agent Imports
+import { contextAgent } from "../../agents/context";
+import { riskAgent } from "../../agents/risk";
+import { plannerAgent } from "../../agents/planner";
+import { guardianAgent } from "../../agents/guardian";
+import { heartbeatAgent } from "../../agents/heartbeat";
+
 dotenv.config();
 
 const app = express();
@@ -21,6 +28,10 @@ const HOST = process.env.PULSE_HTTP_HOST || "0.0.0.0";
 const rootDir = path.resolve(__dirname, "..", "..");
 const dataDir = path.join(rootDir, "data");
 const openclawDir = path.join(dataDir, "openclaw");
+
+// State Management
+let isPulseRunning = false;
+let lastInterventionText = "";
 
 type JsonObject = Record<string, unknown>;
 
@@ -44,6 +55,106 @@ function broadcast(message: unknown) {
         if (client.readyState === WebSocket.OPEN) {
             client.send(payload);
         }
+    }
+}
+
+async function runAgentPulseFlow(initialContext: any) {
+    isPulseRunning = true;
+    try {
+        console.log("[Pulse] Starting deterministic agent flow orchestration...");
+
+        // 1. Heartbeat
+        await heartbeatAgent();
+        broadcast({
+            type: "heartbeat.tick",
+            eventId: `tick_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            data: { userId: initialContext.userId, sequence: 1 }
+        });
+        await new Promise(r => setTimeout(r, 1000));
+
+        // 2. Context Agent
+        await contextAgent(initialContext);
+        broadcast({
+            type: "context.updated",
+            eventId: `ctx_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            data: initialContext
+        });
+        await new Promise(r => setTimeout(r, 1000));
+
+        // 3. Risk Agent
+        await riskAgent(initialContext);
+        broadcast({
+            type: "risk.updated",
+            eventId: `risk_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            data: {
+                userId: initialContext.userId,
+                timestamp: new Date().toISOString(),
+                scenario: "COMMUTE_LATE",
+                score: 0.84,
+                label: "HIGH",
+                reasons: ["Traffic worsening", "Battery at 17%", "25 minutes to lab"]
+            }
+        });
+        await new Promise(r => setTimeout(r, 1000));
+
+        // 4. Planner Agent
+        await plannerAgent({});
+        broadcast({
+            type: "planner.suggested",
+            eventId: `plan_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            data: {
+                userId: initialContext.userId,
+                timestamp: new Date().toISOString(),
+                actionId: "ACTION_LEAVE_NOW",
+                title: "Leave now for campus",
+                description: "Leave now and enable Battery Saver to stay on time for lab.",
+                recommendedAtMinutesToEvent: 25,
+                sideEffects: ["Enable Battery Saver", "Prepare delay note"]
+            }
+        });
+        await new Promise(r => setTimeout(r, 1000));
+
+        // 5. Guardian Agent
+        await guardianAgent({});
+        broadcast({
+            type: "guardian.decided",
+            eventId: `guard_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            data: {
+                userId: initialContext.userId,
+                actionId: "ACTION_LEAVE_NOW",
+                timestamp: new Date().toISOString(),
+                mode: "ASK_FIRST",
+                rationale: "This action affects commute timing and may notify others."
+            }
+        });
+        await new Promise(r => setTimeout(r, 1000));
+
+        // 6. Final Intervention
+        lastInterventionText = "Leave now and enable Battery Saver";
+        broadcast({
+            type: "intervention.created",
+            eventId: `int_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            data: {
+                userId: initialContext.userId,
+                actionId: "ACTION_LEAVE_NOW",
+                timestamp: new Date().toISOString(),
+                headline: lastInterventionText,
+                body: "Traffic is worsening and your phone is at 17%. Pulse recommends leaving now so you reach lab on time.",
+                ctaLabel: "Start commute",
+                secondaryCtaLabel: "Dismiss"
+            }
+        });
+        
+        console.log("[Pulse] Agent flow orchestration completed.");
+        return { alert: lastInterventionText };
+    } finally {
+        isPulseRunning = false;
     }
 }
 
@@ -96,6 +207,13 @@ app.get("/demo/state", (_req: Request, res: Response) => {
 });
 
 app.post("/demo/trigger", async (_req: Request, res: Response) => {
+    if (isPulseRunning) {
+        return res.status(429).json({
+            ok: false,
+            error: "A demo run is already in progress. Trigger skipped."
+        });
+    }
+
     res.json({
         ok: true,
         data: {
@@ -104,9 +222,51 @@ app.post("/demo/trigger", async (_req: Request, res: Response) => {
     });
 
     try {
-        await replayDemoFlow();
+        const scenarioPath = path.join(dataDir, "demo-scenario.json");
+        const scenario = readJson(scenarioPath) as JsonObject;
+        await runAgentPulseFlow(scenario.context);
     } catch (error) {
-        console.error("[Pulse] replay error:", error);
+        console.error("[Pulse] demo error:", error);
+    }
+});
+
+app.post("/heartbeat/manual", async (req: Request, res: Response) => {
+    console.log("[Pulse] Manual heartbeat wake requested.");
+
+    if (isPulseRunning) {
+        return res.json({
+            ok: true,
+            data: {
+                status: "skipped",
+                reason: "Pulse run already in progress"
+            }
+        });
+    }
+
+    // Capture the result of the flow
+    try {
+        const scenarioPath = path.join(dataDir, "demo-scenario.json");
+        const scenario = readJson(scenarioPath) as JsonObject;
+        
+        // Return immediate ACK
+        res.json({
+            ok: true,
+            data: {
+                status: "HEARTBEAT_OK",
+                timestamp: new Date().toISOString()
+            }
+        });
+
+        // Run the flow in background
+        const result = await runAgentPulseFlow(scenario.context);
+        if (result && result.alert) {
+            console.log(`[Pulse] Manual run produced alert: ${result.alert}`);
+        }
+    } catch (error) {
+        console.error("[Pulse] Manual heartbeat error:", error);
+        if (!res.headersSent) {
+            res.status(500).json({ ok: false, error: "Internal server error during heartbeat" });
+        }
     }
 });
 
@@ -181,6 +341,25 @@ wss.on("connection", (ws, req) => {
         console.error("[Pulse] WS error:", err);
     });
 });
+
+const HEARTBEAT_TICK_MS = 5000;
+let tickSequence = 1;
+
+// Background auto-tick every 5 seconds
+setInterval(() => {
+    broadcast({
+        type: "heartbeat.tick",
+        eventId: `tick_auto_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        data: {
+            sequence: tickSequence++,
+            state: "risk_forming",
+            score: 0.62,
+            source: "heartbeat_mock",
+            reason: "late_night_motion + missed_checkin"
+        }
+    });
+}, HEARTBEAT_TICK_MS);
 
 httpServer.listen(PORT, HOST, () => {
     console.log(`[Pulse] Server running on http://${HOST}:${PORT}`);
