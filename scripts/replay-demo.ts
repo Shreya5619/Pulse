@@ -19,9 +19,9 @@ const req = http.request(
             "Content-Length": Buffer.byteLength(payload)
         }
     },
-    (res) => {
+    (res: any) => {
         let body = "";
-        res.on("data", (chunk) => {
+        res.on("data", (chunk: Buffer) => {
             body += chunk.toString("utf8");
         });
         res.on("end", () => {
@@ -37,7 +37,7 @@ const req = http.request(
     }
 );
 
-req.on("error", (err) => {
+req.on("error", (err: Error) => {
     console.error("[Pulse] Failed to trigger replay:", err.message);
     process.exit(1);
 });
