@@ -1,0 +1,5 @@
+- Communication layer: Android app UI + optional Telegram later.
+- Channel adapter: mobile app request normalizer, notification/calendar adapters.
+- Gateway/control plane: TypeScript backend server, WebSocket, API routes.
+- Agent loop: risk planner, futures engine, guardian, memory retrieval.
+- Skill execution layer: route ETA fetcher, notification summarizer, draft generator, mode switch hooks.
