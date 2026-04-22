@@ -29,21 +29,20 @@ tmp/
 temp/
 
 # ---- Flutter / Dart ----
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub/
-.pub-cache/
-build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/.pub/
+**/.pub-cache/
 **/build/
-ios/Pods/
-ios/.symlinks/
-ios/Flutter/Flutter.podspec
-android/.gradle/
-android/app/debug/
-android/app/profile/
-android/app/release/
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.podspec
+**/android/.gradle/
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
 
 # ---- IDE / Editor ----
 .vscode/
