@@ -6,15 +6,15 @@ const root = path.resolve(__dirname, "..");
 const dataDir = path.join(root, "data");
 const openclawDir = path.join(dataDir, "openclaw");
 
-function ensureDir(dir) {
+function ensureDir(dir: string) {
     fs.mkdirSync(dir, { recursive: true });
 }
 
-function writeJson(filePath, value) {
+function writeJson(filePath: string, value: unknown) {
     fs.writeFileSync(filePath, JSON.stringify(value, null, 2) + "\n", "utf8");
 }
 
-function writeText(filePath, value) {
+function writeText(filePath: string, value: string) {
     fs.writeFileSync(filePath, value.trim() + "\n", "utf8");
 }
 
