@@ -1,0 +1,27 @@
+[
+  {
+    "id": "evt_001",
+    "title": "ML Lab",
+    "startTime": "2026-04-22T10:00:00+05:30",
+    "endTime": "2026-04-22T11:00:00+05:30",
+    "locationLabel": "Academic Block 3",
+    "locationLat": 12.9716,
+    "locationLng": 77.5946,
+    "priority": "high",
+    "source": "calendar",
+    "attendenceExpected": true,
+    "travelModeHint": "auto"
+  },
+  {
+    "id": "evt_002",
+    "title": "Study Group",
+    "startTime": "2026-04-22T14:00:00+05:30",
+    "endTime": "2026-04-22T15:30:00+05:30",
+    "locationLabel": "Library Cafe",
+    "locationLat": 12.9720,
+    "locationLng": 77.5950,
+    "priority": "medium",
+    "source": "calendar",
+    "attendenceExpected": true
+  }
+]
