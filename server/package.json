@@ -10,6 +10,7 @@
         "build": "tsc -p tsconfig.json",
         "seed": "tsx ../scripts/seed-demo-data.ts",
         "replay": "tsx ../scripts/replay-demo.ts",
+        "test:integration": "tsx ../scripts/test-ws-demo.ts",
         "test": "echo \"Add tests later\""
     },
     "dependencies": {
