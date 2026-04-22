@@ -110,6 +110,28 @@ app.post("/demo/trigger", async (_req: Request, res: Response) => {
     }
 });
 
+app.get("/demo/events", (_req: Request, res: Response) => {
+    try {
+        const eventsPath = path.join(dataDir, "demo-events.json");
+        if (!fs.existsSync(eventsPath)) {
+            return res.status(404).json({
+                ok: false,
+                error: "Missing data/demo-events.json. Run seed script first."
+            });
+        }
+        const events = readJson(eventsPath);
+        res.json({
+            ok: true,
+            data: events
+        });
+    } catch (error) {
+        res.status(500).json({
+            ok: false,
+            error: "Could not read demo events"
+        });
+    }
+});
+
 app.get("/config/openclaw-files", (_req: Request, res: Response) => {
     try {
         const soul = readText(path.join(openclawDir, "SOUL.md"));
@@ -139,8 +161,9 @@ wss.on("connection", (ws, req) => {
 
     sendJson(ws, {
         type: "connection.ready",
-        ts: new Date().toISOString(),
-        payload: {
+        eventId: "conn_" + Date.now(),
+        timestamp: new Date().toISOString(),
+        data: {
             message: "Connected to Pulse WebSocket"
         }
     });

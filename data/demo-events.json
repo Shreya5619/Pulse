@@ -1,16 +1,18 @@
 [
   {
     "type": "heartbeat.tick",
-    "ts": "2026-04-22T10:00:05Z",
-    "payload": {
+    "eventId": "tick_1",
+    "timestamp": "2026-04-22T10:00:05Z",
+    "data": {
       "userId": "USER_DEMO",
       "sequence": 1
     }
   },
   {
     "type": "context.updated",
-    "ts": "2026-04-22T10:00:06Z",
-    "payload": {
+    "eventId": "ctx_1",
+    "timestamp": "2026-04-22T10:00:06Z",
+    "data": {
       "userId": "USER_DEMO",
       "timestamp": "2026-04-22T10:00:00Z",
       "locationLabel": "Home",
@@ -22,8 +24,9 @@
   },
   {
     "type": "risk.updated",
-    "ts": "2026-04-22T10:00:08Z",
-    "payload": {
+    "eventId": "risk_1",
+    "timestamp": "2026-04-22T10:00:08Z",
+    "data": {
       "userId": "USER_DEMO",
       "timestamp": "2026-04-22T10:00:08Z",
       "scenario": "COMMUTE_LATE",
@@ -38,8 +41,9 @@
   },
   {
     "type": "planner.suggested",
-    "ts": "2026-04-22T10:00:10Z",
-    "payload": {
+    "eventId": "plan_1",
+    "timestamp": "2026-04-22T10:00:10Z",
+    "data": {
       "userId": "USER_DEMO",
       "timestamp": "2026-04-22T10:00:10Z",
       "actionId": "ACTION_LEAVE_NOW",
@@ -54,8 +58,9 @@
   },
   {
     "type": "guardian.decided",
-    "ts": "2026-04-22T10:00:12Z",
-    "payload": {
+    "eventId": "guard_1",
+    "timestamp": "2026-04-22T10:00:12Z",
+    "data": {
       "userId": "USER_DEMO",
       "actionId": "ACTION_LEAVE_NOW",
       "timestamp": "2026-04-22T10:00:12Z",
@@ -65,11 +70,12 @@
   },
   {
     "type": "intervention.created",
-    "ts": "2026-04-22T10:00:15Z",
-    "payload": {
+    "eventId": "int_1",
+    "timestamp": "2026-04-22T10:00:15Z",
+    "data": {
       "userId": "USER_DEMO",
       "actionId": "ACTION_LEAVE_NOW",
-      "createdAt": "2026-04-22T10:00:15Z",
+      "timestamp": "2026-04-22T10:00:15Z",
       "headline": "Leave now and enable Battery Saver",
       "body": "Traffic is worsening and your phone is at 17%. Pulse recommends leaving now so you reach lab on time.",
       "ctaLabel": "Start commute",
