@@ -1,0 +1,78 @@
+# =========================
+# Pulse monorepo .gitignore
+# =========================
+
+# ---- Node / TypeScript ----
+**/node_modules/
+**/dist/
+**/.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+coverage/
+.nyc_output/
+.eslintcache
+
+# ---- Environment files ----
+.env
+.env.*
+!.env.example
+
+# ---- Logs / temp ----
+logs/
+*.log
+*.pid
+*.seed
+*.pid.lock
+tmp/
+temp/
+
+# ---- Flutter / Dart ----
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+build/
+**/build/
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.podspec
+android/.gradle/
+android/app/debug/
+android/app/profile/
+android/app/release/
+
+# ---- IDE / Editor ----
+.vscode/
+.idea/
+*.iml
+
+# ---- OS files ----
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ---- Docker / local runtime ----
+*.local
+docker-data/
+*.sqlite
+*.db
+
+# ---- Test / generated artifacts ----
+test-output/
+reports/
+*.lcov
+
+# ---- Optional: secrets / keys ----
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+
+# ---- Optional: generated demo state ----
+data/state/
+data/generated/

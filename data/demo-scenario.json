@@ -1,20 +1,14 @@
 {
-  "scenarioId": "commute_rescue_v1",
-  "label": "Commute Rescue",
-  "description": "User is heading to a high-priority ML Lab. Battery is low, and traffic is worsening.",
-  "initialState": {
-    "batteryPct": 18,
-    "isCharging": false,
-    "location": {
-      "lat": 12.9611,
-      "lng": 77.6387,
-      "label": "Home"
-    },
-    "trafficDensity": "heavy",
-    "networkStatus": "4g"
-  },
-  "constraints": [
-    "must_attend_lab",
-    "low_battery_warning_threshold_20"
-  ]
+  "id": "COMMUTE_RESCUE_V0",
+  "title": "Commute Rescue",
+  "userId": "USER_DEMO",
+  "context": {
+    "userId": "USER_DEMO",
+    "timestamp": "2026-04-22T10:00:00Z",
+    "locationLabel": "Home",
+    "batteryPercent": 17,
+    "minutesToEvent": 25,
+    "eventName": "Physics Lab",
+    "trafficStatus": "JAMMED"
+  }
 }

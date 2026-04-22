@@ -29,7 +29,7 @@ Builds a coherent, short-horizon world state from noisy raw inputs so downstream
 ## Memory Agent
 
 **Purpose**  
-Retrieve and assemble the most relevant historical patterns and recent episodes from `memory/` so Chrona can personalize risk and planning to this specific user.[web:224][web:226][web:233]
+Retrieve and assemble the most relevant historical patterns and recent episodes from `memory/` so Pulse can personalize risk and planning to this specific user.[web:224][web:226][web:233]
 
 **Inputs**  
 - `world_state` from Context Agent.  
@@ -89,7 +89,7 @@ Turn the `risk_profile` into 1–3 concrete, ranked interventions that could red
 - `world_state` from Context Agent.  
 - `memory_context` from Memory Agent.  
 - `risk_profile` from Risk Agent.  
-- Action capabilities: what Chrona is allowed to do (notify, draft messages, suggest route, adjust app behavior, etc.).  
+- Action capabilities: what Pulse is allowed to do (notify, draft messages, suggest route, adjust app behavior, etc.).  
 - User preferences and constraints (do-not-disturb rules, max interventions per hour, channels).  
 
 **Outputs**  
@@ -104,7 +104,7 @@ Turn the `risk_profile` into 1–3 concrete, ranked interventions that could red
 - Trivial or redundant plans (telling the user what they already obviously know).  
 - Overly aggressive plans (e.g. rescheduling meetings without sufficient confidence or consent).  
 - Ignoring user preferences (suggesting commute modes the user avoids, bad times, wrong channels).  
-- Non‑actionable plans (requires capabilities Chrona does not have on device).  
+- Non‑actionable plans (requires capabilities Pulse does not have on device).  
 - Too many options (overwhelming planner output instead of a small, ranked set).
 
 ---

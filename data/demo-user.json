@@ -1,29 +1,11 @@
 {
-  "id": "user_demo_001",
-  "name": "Alex Rivet",
-  "email": "alex@example.com",
-  "preferences": {
-    "preferredTransport": "metro",
-    "arrivalBufferMinutes": 15,
-    "notificationSensitivity": "medium",
-    "theme": "dark"
-  },
+  "id": "USER_DEMO",
+  "name": "Alex",
+  "homeLocation": "Kormangala",
+  "destination": "Campus Lab",
+  "quietHours": "23:00-07:00",
   "trustedContacts": [
-    {
-      "name": "Sarah (Partner)",
-      "phone": "+1-555-0102",
-      "relationship": "emergency"
-    },
-    {
-      "name": "Professor Miller",
-      "phone": "+1-555-0199",
-      "relationship": "work"
-    }
-  ],
-  "quietHours": {
-    "enabled": true,
-    "start": "22:00",
-    "end": "07:00",
-    "timezone": "America/Los_Angeles"
-  }
+    "Lab Partner",
+    "Mom"
+  ]
 }
