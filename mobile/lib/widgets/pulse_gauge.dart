@@ -1,76 +1,87 @@
-import 'dart:math';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../theme/colors.dart';
 
 class PulseGauge extends StatelessWidget {
   final double score;
   final String status;
+  final double size;
 
   const PulseGauge({
-    super.key,
-    required this.score,
+    super.key, 
+    required this.score, 
     required this.status,
+    this.size = 80,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 200,
-      height: 200,
+    return SizedBox(
+      width: size,
+      height: size,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Background Glow
-          Container(
-            width: 160,
-            height: 160,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withOpacity(0.15),
-                  blurRadius: 40,
-                  spreadRadius: 10,
-                ),
-              ],
+          CustomPaint(
+            size: Size(size, size),
+            painter: SimpleGaugePainter(
+              score: score,
+              primaryColor: AppColors.primary,
             ),
           ),
-          // Progress Circle
-          SizedBox(
-            width: 180,
-            height: 180,
-            child: CircularProgressIndicator(
-              value: score / 100,
-              strokeWidth: 8,
-              backgroundColor: AppColors.surfaceVariant,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-              strokeCap: StrokeCap.round,
+          Text(
+            score.toInt().toString(),
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
-          ),
-          // Inner content
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                score.toInt().toString(),
-                style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                  fontSize: 56,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -2,
-                ),
-              ),
-              Text(
-                status.toUpperCase(),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                ),
-              ),
-            ],
           ),
         ],
       ),
     );
   }
+}
+
+class SimpleGaugePainter extends CustomPainter {
+  final double score;
+  final Color primaryColor;
+
+  SimpleGaugePainter({
+    required this.score,
+    required this.primaryColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 4;
+    final strokeWidth = 4.0;
+
+    final trackPaint = Paint()
+      ..color = Colors.white.withOpacity(0.1)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
+    canvas.drawCircle(center, radius, trackPaint);
+
+    final progressPaint = Paint()
+      ..shader = const LinearGradient(
+        colors: [AppColors.primary, AppColors.secondary],
+      ).createShader(Rect.fromCircle(center: center, radius: radius))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -math.pi / 2,
+      (score / 100) * 2 * math.pi,
+      false,
+      progressPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

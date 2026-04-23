@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'theme/app_theme.dart';
 import 'providers/app_state.dart';
 import 'screens/home_screen.dart';
@@ -52,41 +53,55 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: IndexedStack(
         index: _selectedIndex,
         children: _screens,
       ),
       bottomNavigationBar: Container(
+        height: 90,
         decoration: BoxDecoration(
+          color: AppColors.background,
           border: Border(
-            top: BorderSide(color: AppColors.primary.withOpacity(0.1), width: 1),
+            top: BorderSide(color: Colors.white.withOpacity(0.05), width: 1),
           ),
         ),
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: (index) => setState(() => _selectedIndex = index),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(LucideIcons.home),
-              label: 'Overview',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(LucideIcons.activity),
-              label: 'Live Stream',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(LucideIcons.zap),
-              label: 'Actions',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(LucideIcons.history),
-              label: 'History',
-            ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(0, LucideIcons.home, "Home"),
+            _buildNavItem(1, LucideIcons.activity, "Stream"),
+            _buildNavItem(2, LucideIcons.zap, "Actions"),
+            _buildNavItem(3, LucideIcons.history, "History"),
           ],
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
         ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    final isSelected = _selectedIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedIndex = index),
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: isSelected ? AppColors.primary : AppColors.textMuted,
+            size: 24,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: GoogleFonts.outfit(
+              fontSize: 10,
+              color: isSelected ? AppColors.primary : AppColors.textMuted,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../providers/app_state.dart';
 import '../widgets/pulse_gauge.dart';
 import '../widgets/glass_card.dart';
@@ -14,197 +15,318 @@ class HomeScreen extends StatelessWidget {
     return Consumer<AppState>(
       builder: (context, state, child) {
         final risk = state.currentRisk;
-        
+
         return Scaffold(
-          body: Container(
-            decoration: BoxDecoration(
-              gradient: AppColors.surfaceGradient,
-            ),
-            child: SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(context),
-                    const SizedBox(height: 40),
-                    Center(
-                      child: PulseGauge(
-                        score: risk.score,
-                        status: risk.levelText,
-                      ),
+          backgroundColor: AppColors.background,
+          body: Stack(
+            children: [
+              // Background Wavy Glow (Simplified)
+              Positioned(
+                top: 100,
+                right: -100,
+                child: Container(
+                  width: 300,
+                  height: 600,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        AppColors.primary.withOpacity(0.15),
+                        Colors.transparent,
+                      ],
                     ),
-                    const SizedBox(height: 40),
-                    _buildReasonBox(context, risk.reasons),
-                    const SizedBox(height: 20),
-                    _buildTrendBox(context, risk.history),
-                    const SizedBox(height: 20),
-                    _buildActionBox(context, state),
-                    const SizedBox(height: 20),
-                    _buildConnectionBox(context, state),
-                  ],
+                  ),
                 ),
               ),
-            ),
+              SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Pulse",
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        "Good evening, Arjun,",
+                        style: GoogleFonts.outfit(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        "Here's your current safety snapshot.",
+                        style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // Risk Overview Card
+                      _buildRiskOverviewCard(risk),
+                      
+                      const SizedBox(height: 20),
+                      
+                      Row(
+                        children: [
+                          Expanded(child: _buildReasonCard(risk.reasons)),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildTrendCard(risk.history)),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 20),
+                      
+                      Row(
+                        children: [
+                          Expanded(child: _buildPrimaryActionCard(context, state)),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildConnectionCard(state)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "Good Morning, Arjun",
-          style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 28),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          "Here's your day, optimized.",
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildReasonBox(BuildContext context, List<String> reasons) {
+  Widget _buildRiskOverviewCard(dynamic risk) {
     return GlassCard(
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(LucideIcons.alertTriangle, size: 18, color: AppColors.warning),
-              const SizedBox(width: 8),
-              Text("Detection Summary", style: Theme.of(context).textTheme.titleMedium),
-            ],
+          Text(
+            "Risk Overview",
+            style: GoogleFonts.outfit(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Colors.white70,
+            ),
           ),
           const SizedBox(height: 12),
-          ...reasons.map((reason) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              children: [
-                const Icon(LucideIcons.circle, size: 6, color: AppColors.textMuted),
-                const SizedBox(width: 10),
-                Text(reason, style: Theme.of(context).textTheme.bodyMedium),
-              ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.primary.withOpacity(0.3)),
             ),
-          )).toList(),
+            child: Text(
+              risk.levelText,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            risk.score.toInt().toString(),
+            style: GoogleFonts.outfit(
+              fontSize: 72,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          Text(
+            "Last updated: 3 minutes ago",
+            style: GoogleFonts.outfit(
+              fontSize: 12,
+              color: AppColors.textMuted,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTrendBox(BuildContext context, List<double> history) {
+  Widget _buildReasonCard(List<String> reasons) {
     return GlassCard(
+      height: 180,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Reason",
+            style: GoogleFonts.outfit(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: reasons.take(3).map((r) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  r,
+                  style: GoogleFonts.outfit(fontSize: 11, color: AppColors.textSecondary),
+                ),
+              )).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrendCard(List<double> history) {
+    return GlassCard(
+      height: 180,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Trend",
+            style: GoogleFonts.outfit(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          Text(
+            "Last 5 risk scores",
+            style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted),
+          ),
+          const SizedBox(height: 20),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: history.map((h) => Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    h.toInt().toString(),
+                    style: const TextStyle(fontSize: 8, color: Colors.white70),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    width: 12,
+                    height: (h / 100) * 60,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              )).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrimaryActionCard(BuildContext context, AppState state) {
+    return GlassCard(
+      height: 140,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Risk Trend", style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: history.map((h) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+          Text(
+            "Primary Action",
+            style: GoogleFonts.outfit(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+          const Spacer(),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary.withOpacity(0.3),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
               ),
-              child: Text(
-                h.toInt().toString(),
-                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+              child: const Text(
+                "Check in now",
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
               ),
-            )).toList(),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActionBox(BuildContext context, AppState state) {
+  Widget _buildConnectionCard(AppState state) {
     return GlassCard(
-      borderColor: AppColors.primary.withOpacity(0.3),
-      padding: const EdgeInsets.all(2),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          gradient: LinearGradient(
-            colors: [AppColors.primary.withOpacity(0.1), Colors.transparent],
+      height: 140,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Connection",
+            style: GoogleFonts.outfit(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            const CircleAvatar(
-              backgroundColor: AppColors.primary,
-              child: Icon(LucideIcons.check, color: Colors.black),
+          const SizedBox(height: 12),
+          _buildConnRow("WebSocket", "Connected"),
+          _buildConnRow("API", "Online"),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.electricBlue.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(4),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Quick Check-in", style: Theme.of(context).textTheme.titleMedium),
-                  Text("Confirm you're safe to lower risk score.", style: Theme.of(context).textTheme.bodySmall),
-                ],
-              ),
+            child: Text(
+              "Mode: ${state.isLive ? 'LIVE' : 'MOCK'}",
+              style: const TextStyle(color: AppColors.electricBlue, fontSize: 8, fontWeight: FontWeight.bold),
             ),
-            const Icon(LucideIcons.chevronRight, color: AppColors.textMuted),
-          ],
-        ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            "Event count: ${state.snapshots.length * 10}",
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 9),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildConnectionBox(BuildContext context, AppState state) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _buildStatTile(
-          context,
-          "Status",
-          state.isLive ? "Live" : "Mock",
-          state.isLive ? AppColors.success : AppColors.warning,
-        ),
-        _buildStatTile(
-          context,
-          "Signals",
-          state.snapshots.length.toString(),
-          AppColors.primary,
-        ),
-        _buildStatTile(
-          context,
-          "Server",
-          "Connected",
-          AppColors.success,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatTile(BuildContext context, String label, String value, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted)),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-            ),
-            const SizedBox(width: 6),
-            Text(value, style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
-          ],
-        ),
-      ],
+  Widget _buildConnRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 10, color: Colors.white54)),
+          Text(value, style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+        ],
+      ),
     );
   }
 }
