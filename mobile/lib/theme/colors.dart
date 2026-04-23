@@ -8,6 +8,8 @@ class AppColors {
   static const Color primary = Color(0xFF00D2FF); // Electric Blue
   static const Color secondary = Color(0xFF0072FF); // Deep Blue
   static const Color accent = Color(0xFF4A90E2);
+  static const Color electricBlue = primary;
+
   
   static const Color success = Color(0xFF00F5A0);
   static const Color warning = Color(0xFFFDC830);
