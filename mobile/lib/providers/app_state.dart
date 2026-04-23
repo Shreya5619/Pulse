@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/risk_state.dart';
 import '../models/intervention.dart';
 import '../models/snapshot.dart';
@@ -15,16 +18,85 @@ class AppState extends ChangeNotifier {
 
   final List<ContextSnapshot> _snapshots = [];
   final List<Intervention> _interventions = [];
+  final List<String> _rawMessages = [];
   bool _isLive = true;
+  WebSocketChannel? _channel;
 
   RiskState get currentRisk => _currentRisk;
   List<ContextSnapshot> get snapshots => _snapshots;
   List<Intervention> get interventions => _interventions;
+  List<String> get rawMessages => _rawMessages;
   bool get isLive => _isLive;
 
   AppState() {
     _generateMockData();
+    _connectWebSocket();
+    // Keep internal simulation for fallback or UI stability
     _startSimulatedStream();
+  }
+
+  void _connectWebSocket() {
+    try {
+      // DEFAULT: Use 10.0.2.2 for Android Emulators, localhost for everything else
+      String host = 'localhost';
+      if (!kIsWeb) {
+        if (defaultTargetPlatform == TargetPlatform.android) {
+          host = '10.0.2.2';
+        }
+      }
+
+      // OPTIONAL: If testing on a PHYSICAL device, use your machine's IP:
+      host = '192.168.0.101';
+      final wsUrl = 'ws://$host:8080/ws';
+      print('[Pulse] Attempting connection to: $wsUrl');
+
+      _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+
+      _channel!.stream.listen(
+        (message) {
+          _handleWebSocketMessage(message);
+        },
+        onError: (error) {
+          print('[Pulse] WS Error: $error');
+          _reconnect();
+        },
+        onDone: () {
+          print('[Pulse] WS Closed');
+          _reconnect();
+        },
+        cancelOnError: true,
+      );
+    } catch (e) {
+      print('[Pulse] WS Connection failed: $e');
+      _reconnect();
+    }
+  }
+
+  void _reconnect() {
+    Future.delayed(const Duration(seconds: 5), () {
+      if (_channel == null || _channel!.closeCode != null) {
+        print('[Pulse] Attempting to reconnect...');
+        _connectWebSocket();
+      }
+    });
+  }
+
+  void _handleWebSocketMessage(dynamic message) {
+    final String text = message.toString();
+    _rawMessages.insert(0, text);
+    if (_rawMessages.length > 20) _rawMessages.removeLast();
+
+    try {
+      final data = jsonDecode(text);
+      print('[Pulse] Received: ${data['type']}');
+
+      // Here we could update state based on message type
+      // e.g., if (data['type'] == 'heartbeat.tick') { ... }
+    } catch (e) {
+      print('[Pulse] Error parsing message: $e');
+    }
+
+    notifyListeners();
   }
 
   void _generateMockData() {
@@ -78,5 +150,11 @@ class AppState extends ChangeNotifier {
   void toggleLiveMode() {
     _isLive = !_isLive;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _channel?.sink.close();
+    super.dispose();
   }
 }

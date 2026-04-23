@@ -64,7 +64,19 @@ class StreamScreen extends StatelessWidget {
                   
                   const SizedBox(height: 24),
                   Text(
-                    "Raw Event Feed",
+                    "WebSocket Feed (Raw JSON)",
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildRawJsonFeed(state.rawMessages),
+                  
+                  const SizedBox(height: 24),
+                  Text(
+                    "Processed Context History",
                     style: GoogleFonts.outfit(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -79,6 +91,40 @@ class StreamScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildRawJsonFeed(List<String> messages) {
+    if (messages.isEmpty) {
+      return GlassCard(
+        padding: const EdgeInsets.all(16),
+        child: Center(
+          child: Text(
+            "Waiting for WebSocket data...",
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontStyle: FontStyle.italic),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: messages.map((msg) => Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+        ),
+        child: Text(
+          msg,
+          style: GoogleFonts.firaCode(
+            fontSize: 10,
+            color: AppColors.primary.withOpacity(0.9),
+          ),
+        ),
+      )).toList(),
     );
   }
 

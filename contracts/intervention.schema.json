@@ -1,0 +1,62 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/schemas/intervention.json",
+    "title": "Intervention",
+    "type": "object",
+    "required": [
+        "interventionId",
+        "timestamp",
+        "riskId"
+    ],
+    "properties": {
+        "interventionId": {
+            "type": "string",
+            "maxLength": 128
+        },
+        "timestamp": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "riskId": {
+            "type": "string"
+        },
+        "kind": {
+            "type": "string",
+            "enum": [
+                "nudge",
+                "alert",
+                "reminder",
+                "safety",
+                "assist"
+            ]
+        },
+        "priority": {
+            "type": "string",
+            "enum": [
+                "low",
+                "medium",
+                "high"
+            ]
+        },
+        "status": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "accepted",
+                "dismissed",
+                "done"
+            ]
+        },
+        "message": {
+            "type": "string",
+            "maxLength": 512
+        },
+        "action": {
+            "type": "string",
+            "maxLength": 256
+        },
+        "trigger_snapshot": {
+            "type": "string"
+        }
+    }
+}

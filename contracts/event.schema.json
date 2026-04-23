@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/event.json",
+  "title": "Event",
+  "type": "object",
+  "required": [
+    "eventId",
+    "timestamp",
+    "type",
+    "source",
+    "data"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[a-z0-9_\\-]+$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "heartbeat.tick",
+        "heartbeat.mock",
+        "context_snapshot.received",
+        "risk_score.issued",
+        "intervention.triggered",
+        "feedback.received"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "traceId": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "data": {
+      "type": "object"
+    }
+  }
+}
