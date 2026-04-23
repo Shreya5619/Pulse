@@ -1,0 +1,50 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/schemas/risk_score.json",
+    "title": "RiskScore",
+    "type": "object",
+    "required": [
+        "riskId",
+        "timestamp",
+        "state",
+        "score",
+        "reason"
+    ],
+    "properties": {
+        "riskId": {
+            "type": "string",
+            "maxLength": 128
+        },
+        "timestamp": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "state": {
+            "type": "string",
+            "enum": [
+                "safe",
+                "risk_forming",
+                "high_risk",
+                "resolved"
+            ]
+        },
+        "score": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+        },
+        "reason": {
+            "type": "string",
+            "maxLength": 512
+        },
+        "factors": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "source_snapshot": {
+            "type": "string"
+        }
+    }
+}

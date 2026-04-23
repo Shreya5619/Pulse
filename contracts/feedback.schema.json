@@ -1,0 +1,43 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/schemas/feedback.json",
+    "title": "Feedback",
+    "type": "object",
+    "required": [
+        "feedbackId",
+        "timestamp",
+        "interventionId"
+    ],
+    "properties": {
+        "feedbackId": {
+            "type": "string",
+            "maxLength": 128
+        },
+        "timestamp": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "interventionId": {
+            "type": "string"
+        },
+        "outcome": {
+            "type": "string",
+            "enum": [
+                "helped",
+                "ignored",
+                "not_useful",
+                "false_alarm",
+                "unsafe"
+            ]
+        },
+        "rating": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+        },
+        "comment": {
+            "type": "string",
+            "maxLength": 1024
+        }
+    }
+}

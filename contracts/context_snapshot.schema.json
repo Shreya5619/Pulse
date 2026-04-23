@@ -1,0 +1,92 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/schemas/context_snapshot.json",
+    "title": "ContextSnapshot",
+    "type": "object",
+    "required": [
+        "snapshotId",
+        "timestamp",
+        "userId",
+        "device",
+        "location"
+    ],
+    "properties": {
+        "snapshotId": {
+            "type": "string",
+            "maxLength": 128
+        },
+        "timestamp": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "userId": {
+            "type": "string",
+            "maxLength": 64
+        },
+        "device": {
+            "type": "object",
+            "properties": {
+                "battery_pct": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                },
+                "charging": {
+                    "type": "boolean"
+                },
+                "power_save_mode": {
+                    "type": "boolean"
+                },
+                "network_type": {
+                    "type": "string"
+                },
+                "storage_pct_used": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "battery_pct",
+                "charging"
+            ]
+        },
+        "location": {
+            "type": "object",
+            "properties": {
+                "lat": {
+                    "type": "number"
+                },
+                "lng": {
+                    "type": "number"
+                },
+                "place": {
+                    "type": "string"
+                },
+                "motion": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "lat",
+                "lng"
+            ]
+        },
+        "calendar": {
+            "type": "object",
+            "properties": {
+                "next_event": {
+                    "type": "string"
+                },
+                "busy": {
+                    "type": "boolean"
+                },
+                "checkin_missed": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "sensors": {
+            "type": "object",
+            "additionalProperties": true
+        }
+    }
+}

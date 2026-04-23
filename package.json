@@ -1,0 +1,22 @@
+{
+  "name": "pulse",
+  "version": "1.0.0",
+  "description": "Pulse is a **multi‑agent, predictive assistant** that runs on your phone and talks to a backend “heartbeat” server. It models your context, risk, and priorities, then recommends your **next best move** in real time.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "ws": "^8.20.0"
+  }
+}
