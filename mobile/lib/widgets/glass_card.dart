@@ -8,6 +8,7 @@ class GlassCard extends StatelessWidget {
   final double? width;
   final double? height;
   final Color? borderColor;
+  final bool hasGlow;
 
   const GlassCard({
     super.key,
@@ -16,6 +17,7 @@ class GlassCard extends StatelessWidget {
     this.width,
     this.height,
     this.borderColor,
+    this.hasGlow = true,
   });
 
   @override
@@ -24,20 +26,32 @@ class GlassCard extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: borderColor ?? AppColors.primary.withOpacity(0.1),
+          color: borderColor ?? AppColors.primary.withOpacity(0.15),
           width: 1,
         ),
-        color: AppColors.surface.withOpacity(0.5),
+        boxShadow: hasGlow ? [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.05),
+            blurRadius: 20,
+            spreadRadius: 2,
+          ),
+        ] : null,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Padding(
-            padding: padding ?? const EdgeInsets.all(20),
-            child: child,
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: AppColors.glassGradient,
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Padding(
+              padding: padding ?? const EdgeInsets.all(20),
+              child: child,
+            ),
           ),
         ),
       ),
