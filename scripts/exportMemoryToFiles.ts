@@ -35,6 +35,11 @@ exportMemory(userId).then(() => {
   console.log("[Exporter] Done.");
   process.exit(0);
 }).catch(err => {
-  console.error("[Exporter] Failed:", err);
+  if (err.message.includes("Database connection failed")) {
+    console.error(`\n[Exporter] ERROR: ${err.message}`);
+    console.error("[Exporter] Please ensure Docker Desktop is running and run 'docker-compose up -d db' to start Postgres.\n");
+  } else {
+    console.error("[Exporter] Failed:", err);
+  }
   process.exit(1);
 });
