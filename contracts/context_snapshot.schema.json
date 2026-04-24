@@ -1,92 +1,264 @@
 {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://example.com/schemas/context_snapshot.json",
-    "title": "ContextSnapshot",
-    "type": "object",
-    "required": [
-        "snapshotId",
-        "timestamp",
-        "userId",
-        "device",
-        "location"
-    ],
-    "properties": {
-        "snapshotId": {
-            "type": "string",
-            "maxLength": 128
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ContextSnapshot",
+  "type": "object",
+  "required": [
+    "id",
+    "user_id",
+    "timestamp",
+    "location",
+    "calendar",
+    "battery",
+    "notifications",
+    "device_state",
+    "meta"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "location": {
+      "type": "object",
+      "required": [
+        "lat",
+        "lon",
+        "accuracy",
+        "provider",
+        "source"
+      ],
+      "properties": {
+        "lat": {
+          "type": "number"
         },
-        "timestamp": {
-            "type": "string",
-            "format": "date-time"
+        "lon": {
+          "type": "number"
         },
-        "userId": {
-            "type": "string",
-            "maxLength": 64
+        "accuracy": {
+          "type": "number"
         },
-        "device": {
-            "type": "object",
-            "properties": {
-                "battery_pct": {
-                    "type": "number",
-                    "minimum": 0,
-                    "maximum": 100
-                },
-                "charging": {
-                    "type": "boolean"
-                },
-                "power_save_mode": {
-                    "type": "boolean"
-                },
-                "network_type": {
-                    "type": "string"
-                },
-                "storage_pct_used": {
-                    "type": "number"
-                }
-            },
-            "required": [
-                "battery_pct",
-                "charging"
-            ]
+        "provider": {
+          "type": "string"
         },
-        "location": {
-            "type": "object",
-            "properties": {
-                "lat": {
-                    "type": "number"
-                },
-                "lng": {
-                    "type": "number"
-                },
-                "place": {
-                    "type": "string"
-                },
-                "motion": {
-                    "type": "string"
-                }
-            },
-            "required": [
-                "lat",
-                "lng"
-            ]
+        "source": {
+          "type": "string",
+          "enum": [
+            "gps",
+            "network",
+            "passive"
+          ]
         },
-        "calendar": {
-            "type": "object",
-            "properties": {
-                "next_event": {
-                    "type": "string"
-                },
-                "busy": {
-                    "type": "boolean"
-                },
-                "checkin_missed": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "sensors": {
-            "type": "object",
-            "additionalProperties": true
+        "place_id": {
+          "type": "string"
         }
+      }
+    },
+    "calendar": {
+      "type": "object",
+      "required": [
+        "next_event",
+        "upcoming_events"
+      ],
+      "properties": {
+        "next_event": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/CalendarEvent"
+            }
+          ]
+        },
+        "upcoming_events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CalendarEvent"
+          }
+        }
+      }
+    },
+    "battery": {
+      "type": "object",
+      "required": [
+        "level",
+        "is_charging",
+        "power_saver_on"
+      ],
+      "properties": {
+        "level": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "is_charging": {
+          "type": "boolean"
+        },
+        "power_saver_on": {
+          "type": "boolean"
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "last_full_charge_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "notifications": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/NotificationItem"
+      }
+    },
+    "device_state": {
+      "type": "object",
+      "required": [
+        "network_type",
+        "is_roaming",
+        "screen_on",
+        "do_not_disturb",
+        "ringer_mode"
+      ],
+      "properties": {
+        "network_type": {
+          "type": "string",
+          "enum": [
+            "wifi",
+            "4g",
+            "5g",
+            "none"
+          ]
+        },
+        "is_roaming": {
+          "type": "boolean"
+        },
+        "screen_on": {
+          "type": "boolean"
+        },
+        "do_not_disturb": {
+          "type": "boolean"
+        },
+        "ringer_mode": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "vibrate",
+            "silent"
+          ]
+        }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": [
+        "client_version",
+        "schema_version",
+        "capture_reason"
+      ],
+      "properties": {
+        "client_version": {
+          "type": "string"
+        },
+        "schema_version": {
+          "type": "string"
+        },
+        "capture_reason": {
+          "type": "string",
+          "enum": [
+            "event_change",
+            "timer",
+            "manual"
+          ]
+        },
+        "replay_trace_id": {
+          "type": "string"
+        }
+      }
     }
+  },
+  "definitions": {
+    "CalendarEvent": {
+      "type": "object",
+      "required": [
+        "id",
+        "title",
+        "start_time",
+        "end_time",
+        "is_all_day",
+        "importance"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "start_time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end_time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "location_text": {
+          "type": "string"
+        },
+        "is_all_day": {
+          "type": "boolean"
+        },
+        "importance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        }
+      }
+    },
+    "NotificationItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "app_package",
+        "is_ongoing",
+        "posted_at"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "app_package": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "is_ongoing": {
+          "type": "boolean"
+        },
+        "posted_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "is_ongoing_call": {
+          "type": "boolean"
+        },
+        "is_otp_hint": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
 }

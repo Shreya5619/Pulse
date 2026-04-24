@@ -11,6 +11,9 @@ import riskScoreSchemaRaw from "./risk_score.schema.json" assert { type: "json" 
 import interventionSchemaRaw from "./intervention.schema.json" assert { type: "json" };
 import feedbackSchemaRaw from "./feedback.schema.json" assert { type: "json" };
 
+import { ContextSnapshotSchema } from "../shared/context_snapshot";
+
+
 export const eventSchema = eventSchemaRaw as JSONSchema;
 export const contextSnapshotSchema = contextSnapshotSchemaRaw as JSONSchema;
 export const riskScoreSchema = riskScoreSchemaRaw as JSONSchema;
@@ -50,9 +53,13 @@ export function validateEvent(data: unknown): ValidateResult {
 }
 
 export function validateContextSnapshot(data: unknown): ValidateResult {
-    const valid = validators.contextSnapshot(data);
-    return { valid, errors: !valid ? validators.contextSnapshot.errors : undefined };
+    const result = ContextSnapshotSchema.safeParse(data);
+    if (result.success) {
+        return { valid: true };
+    }
+    return { valid: false, errors: result.error.errors };
 }
+
 
 export function validateRiskScore(data: unknown): ValidateResult {
     const valid = validators.riskScore(data);

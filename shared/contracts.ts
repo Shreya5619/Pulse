@@ -8,6 +8,9 @@
 export type IsoTimestamp = string;
 export type UUID = string;
 
+export * from "./context_snapshot";
+
+
 // --- Domain Entities ---
 
 export type TrafficStatus = "JAMMED" | "SLOW" | "CLEAR";
