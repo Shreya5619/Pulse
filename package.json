@@ -11,18 +11,21 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "db:init": "tsx scripts/db-init.ts",
     "db:inspect": "tsx scripts/db-inspect.ts"
-
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "ws": "^8.20.0"
   },
   "dependencies": {
+    "js-yaml": "^4.1.1",
+    "pg": "^8.20.0",
     "zod": "^4.3.6",
     "zod-to-json-schema": "^3.25.2"
   }

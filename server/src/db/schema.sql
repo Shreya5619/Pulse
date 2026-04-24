@@ -17,3 +17,43 @@ CREATE INDEX IF NOT EXISTS idx_snapshots_minutes_to_event ON context_snapshots(m
 
 -- Composite index for latest snapshot lookup
 CREATE INDEX IF NOT EXISTS idx_snapshots_user_timestamp ON context_snapshots(user_id, timestamp DESC);
+-- Memory Tables
+CREATE TABLE IF NOT EXISTS memory_identity (
+    user_id TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+    schema_version INTEGER DEFAULT 1,
+    last_updated TIMESTAMPTZ DEFAULT NOW(),
+    source TEXT
+);
+
+CREATE TABLE IF NOT EXISTS memory_habits (
+    user_id TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+    schema_version INTEGER DEFAULT 1,
+    last_updated TIMESTAMPTZ DEFAULT NOW(),
+    source TEXT
+);
+
+CREATE TABLE IF NOT EXISTS memory_battery (
+    user_id TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+    schema_version INTEGER DEFAULT 1,
+    last_updated TIMESTAMPTZ DEFAULT NOW(),
+    source TEXT
+);
+
+CREATE TABLE IF NOT EXISTS memory_notifications (
+    user_id TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+    schema_version INTEGER DEFAULT 1,
+    last_updated TIMESTAMPTZ DEFAULT NOW(),
+    source TEXT
+);
+
+CREATE TABLE IF NOT EXISTS memory_commute (
+    user_id TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+    schema_version INTEGER DEFAULT 1,
+    last_updated TIMESTAMPTZ DEFAULT NOW(),
+    source TEXT
+);

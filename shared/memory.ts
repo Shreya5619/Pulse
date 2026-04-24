@@ -129,3 +129,12 @@ export const NotificationMemorySchema = z.object({
 });
 
 export type NotificationMemory = z.infer<typeof NotificationMemorySchema>;
+
+export type MemoryState = {
+  identity: IdentityMemory | null;
+  habits: HabitsMemory | null;
+  battery: BatteryMemory | null;
+  commute: CommuteMemory | null;
+  notifications: NotificationMemory | null;
+};
+
