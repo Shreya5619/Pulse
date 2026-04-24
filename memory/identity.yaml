@@ -1,0 +1,26 @@
+# Identity Memory
+# Contains core user basics and fixed locations.
+# Updated: On significant change (e.g. moving house) or manual configuration.
+
+user_id: "user_123"
+basics:
+  name: "John Doe"
+  primary_language: "en"
+  timezone: "America/New_York"
+locations:
+  home:
+    lat: 40.7128
+    lon: -74.0060
+    address: "123 Main St, New York, NY"
+  office:
+    lat: 40.7580
+    lon: -73.9855
+    address: "Times Square, New York, NY"
+commute_preferences:
+  morning_window:
+    start: "07:30"
+    end: "09:30"
+  evening_window:
+    start: "17:00"
+    end: "19:30"
+  default_mode: "transit"

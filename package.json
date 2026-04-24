@@ -8,7 +8,10 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "db:init": "tsx scripts/db-init.ts",
+    "db:inspect": "tsx scripts/db-inspect.ts"
+
   },
   "keywords": [],
   "author": "",

@@ -1,0 +1,17 @@
+services:
+
+  db:
+    image: postgres:15-alpine
+    container_name: pulse-db
+    restart: always
+    environment:
+      POSTGRES_USER: pulse_user
+      POSTGRES_PASSWORD: pulse_password
+      POSTGRES_DB: pulse_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
