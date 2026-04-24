@@ -14,6 +14,7 @@ import { guardianAgent } from "../../agents/guardian";
 import { heartbeatAgent } from "../../agents/heartbeat";
 
 import contextRouter from "./routes/context";
+import memoryRouter from "./routes/memory";
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/api", contextRouter);
+app.use("/api/memory", memoryRouter);
 
 
 const httpServer = createServer(app);
@@ -69,7 +71,7 @@ async function runAgentPulseFlow(initialContext: any) {
         console.log("[Pulse] Starting deterministic agent flow orchestration...");
 
         // 1. Heartbeat
-        await heartbeatAgent();
+        await heartbeatAgent(initialContext.userId);
         broadcast({
             type: "heartbeat.tick",
             eventId: `tick_${Date.now()}`,
