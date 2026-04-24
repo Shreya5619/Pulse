@@ -1,13 +1,13 @@
 import * as fs from "fs";
 import * as path from "path";
 import yaml from "js-yaml";
-import { 
-  MemoryState, 
-  IdentityMemory, 
-  HabitsMemory, 
-  BatteryMemory, 
-  CommuteMemory, 
-  NotificationMemory 
+import {
+  MemoryState,
+  IdentityMemory,
+  HabitsMemory,
+  BatteryMemory,
+  CommuteMemory,
+  NotificationMemory
 } from "../../../shared/memory";
 import { memoryRepository } from "../db/MemoryRepository";
 
@@ -28,7 +28,7 @@ export class MemoryStore {
    */
   async loadAll(userId: string): Promise<MemoryState> {
     const userDir = path.join(this.baseDir, userId);
-    
+
     const state: MemoryState = {
       identity: null,
       habits: null,
@@ -46,7 +46,7 @@ export class MemoryStore {
           const content = fs.readFileSync(filePath, 'utf8');
           // Strip comments if needed, but js-yaml handles them
           const data = yaml.load(content) as any;
-          
+
           // Migration Hook
           const migratedData = await this.migrateIfNeeded(type, data);
           state[type] = migratedData;
