@@ -31,19 +31,26 @@ export class MemoryRepository {
       commute: null
     };
 
-    for (const table of tables) {
-      const res = await pool.query(`SELECT * FROM ${table} WHERE user_id = $1`, [userId]);
-      if (res.rows.length > 0) {
-        let row = res.rows[0];
-        
-        // Migration Hook
-        if (row.schema_version < CURRENT_SCHEMA_VERSION) {
-          row = await this.migrate(table, row);
-        }
+    try {
+      for (const table of tables) {
+        const res = await pool.query(`SELECT * FROM ${table} WHERE user_id = $1`, [userId]);
+        if (res.rows.length > 0) {
+          let row = res.rows[0];
+          
+          // Migration Hook
+          if (row.schema_version < CURRENT_SCHEMA_VERSION) {
+            row = await this.migrate(table, row);
+          }
 
-        const type = table.replace('memory_', '');
-        state[type] = row.data;
+          const type = table.replace('memory_', '');
+          state[type] = row.data;
+        }
       }
+    } catch (error: any) {
+      if (error.code === 'ECONNREFUSED') {
+        throw new Error(`Database connection failed. Is Postgres/Docker running on ${error.address}:${error.port}?`);
+      }
+      throw error;
     }
 
     return state as MemoryState;
