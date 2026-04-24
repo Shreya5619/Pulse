@@ -61,16 +61,22 @@ export class MemoryRepository {
    */
   async save(userId: string, type: keyof MemoryState, data: any, source: string = 'system'): Promise<void> {
     const table = `memory_${type}`;
+    
+    // Extract metadata if present in data object (from MemoryStore)
+    const version = data.schema_version || CURRENT_SCHEMA_VERSION;
+    const updatedAt = data.last_updated || new Date().toISOString();
+    const finalSource = data.source || source;
+
     const query = `
       INSERT INTO ${table} (user_id, data, schema_version, last_updated, source)
-      VALUES ($1, $2, $3, NOW(), $4)
+      VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT (user_id) DO UPDATE SET
         data = EXCLUDED.data,
         schema_version = EXCLUDED.schema_version,
         last_updated = EXCLUDED.last_updated,
         source = EXCLUDED.source
     `;
-    await pool.query(query, [userId, data, CURRENT_SCHEMA_VERSION, source]);
+    await pool.query(query, [userId, data, version, updatedAt, finalSource]);
   }
 
   /**
