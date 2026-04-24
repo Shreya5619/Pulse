@@ -1,0 +1,27 @@
+# Commute Memory
+# Profile of common routes and ETA statistics.
+# Mapping: Aggregated from location clusters and transport mode detection.
+# Updated: Weekly.
+
+routes:
+  - id: "home_to_office"
+    from_label: "Home"
+    to_label: "Office"
+    typical_duration_minutes: 35
+    eta_bands:
+      p50: 35
+      p90: 48
+    usual_mode: "transit"
+  - id: "office_to_home"
+    from_label: "Office"
+    to_label: "Home"
+    typical_duration_minutes: 40
+    eta_bands:
+      p50: 40
+      p90: 55
+    usual_mode: "transit"
+recent_anomalies:
+  - date: "2026-04-23"
+    delay_minutes: 20
+    reason: "Subway signal failure"
+last_updated: "2026-04-24T08:00:00Z"

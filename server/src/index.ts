@@ -13,11 +13,16 @@ import { plannerAgent } from "../../agents/planner";
 import { guardianAgent } from "../../agents/guardian";
 import { heartbeatAgent } from "../../agents/heartbeat";
 
+import contextRouter from "./routes/context";
+
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+app.use("/api", contextRouter);
+
 
 const httpServer = createServer(app);
 const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
