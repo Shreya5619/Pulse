@@ -15,8 +15,9 @@ import { heartbeatAgent } from "../../agents/heartbeat";
 
 import contextRouter from "./routes/context";
 import memoryRouter from "./routes/memory";
+import graphRouter from "./routes/graph";
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 const app = express();
 app.use(cors());
@@ -24,6 +25,7 @@ app.use(express.json());
 
 app.use("/api", contextRouter);
 app.use("/api/memory", memoryRouter);
+app.use("/api/graph", graphRouter);
 
 
 const httpServer = createServer(app);
