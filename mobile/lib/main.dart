@@ -8,6 +8,7 @@ import 'screens/home_screen.dart';
 import 'screens/stream_screen.dart';
 import 'screens/intervention_screen.dart';
 import 'screens/feedback_screen.dart';
+import 'screens/timeline_screen.dart';
 import 'theme/colors.dart';
 
 void main() {
@@ -48,6 +49,7 @@ class _MainShellState extends State<MainShell> {
     const StreamScreen(),
     const InterventionScreen(),
     const FeedbackScreen(),
+    const TimelineScreen(),
   ];
 
   @override
@@ -73,6 +75,7 @@ class _MainShellState extends State<MainShell> {
             _buildNavItem(1, LucideIcons.activity, "Stream"),
             _buildNavItem(2, LucideIcons.zap, "Actions"),
             _buildNavItem(3, LucideIcons.history, "History"),
+            _buildNavItem(4, LucideIcons.clock, "Timeline"),
           ],
         ),
       ),
