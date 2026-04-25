@@ -6,6 +6,8 @@ import { ContextSnapshot, CalendarEvent } from "../../../shared/context_snapshot
 import { MemoryState } from "../../../shared/memory";
 
 export class GraphBuilder {
+  private graphCache = new Map<string, { nodes: GraphNode[]; edges: GraphEdge[]; summary: GraphSummary }>();
+
   async buildForUser(userId: string): Promise<{ nodes: GraphNode[]; edges: GraphEdge[]; summary: GraphSummary }> {
     const context = await contextSnapshotRepo.findLatestByUser(userId);
     const memory = await memoryStore.loadAll(userId);
@@ -116,9 +118,15 @@ export class GraphBuilder {
     this.calculateScores(nodes, edges, context, memory);
 
     // --- SUMMARY GENERATION ---
-    const summary = this.generateSummary(nodes, context);
+    const summary = this.computeTopRisks(nodes, context);
 
-    return { nodes, edges, summary };
+    const result = { nodes, edges, summary };
+    this.graphCache.set(userId, result);
+    return result;
+  }
+
+  getCachedGraph(userId: string) {
+    return this.graphCache.get(userId);
   }
 
   private calculateScores(nodes: GraphNode[], edges: GraphEdge[], context: ContextSnapshot, memory: MemoryState) {
@@ -190,56 +198,49 @@ export class GraphBuilder {
     return s1 < e2 && s2 < e1;
   }
 
-  private generateSummary(nodes: GraphNode[], context: ContextSnapshot): GraphSummary {
-    const risks: RiskSummaryItem[] = [];
+  private computeTopRisks(nodes: GraphNode[], context: ContextSnapshot): GraphSummary {
+    const nowTime = new Date(context.timestamp).getTime();
+    const limitTime = nowTime + 90 * 60 * 1000;
 
-    nodes.forEach(node => {
+    // Filter nodes in next 90 mins
+    const activeNodes = nodes.filter(node => {
+      if (!node.timeWindow) return true; // Persistent states like battery/messages
+      const start = new Date(node.timeWindow.start).getTime();
+      return start <= limitTime; // Starts within 90 mins
+    });
+
+    const bestByRisk: Record<string, RiskSummaryItem> = {};
+
+    activeNodes.forEach(node => {
       if (!node.scores) return;
 
-      if (node.scores.lateness && node.scores.lateness > 0.4) {
-        risks.push({
-          type: "lateness",
-          score: node.scores.lateness,
-          nodeId: node.id,
-          label: `Likely late for ${node.label}`,
-          occursAt: node.timeWindow?.start || context.timestamp
-        });
-      }
+      const checkRisk = (type: RiskSummaryItem["type"], score: number | undefined, template: string) => {
+        if (score && score > 0.1) { // Basic threshold
+          if (!bestByRisk[type] || score > bestByRisk[type].score) {
+            bestByRisk[type] = {
+              type,
+              score,
+              nodeId: node.id,
+              label: template.replace("${label}", node.label),
+              occursAt: node.timeWindow?.start || context.timestamp
+            };
+          }
+        }
+      };
 
-      if (node.scores.battery && node.scores.battery > 0.5) {
-        risks.push({
-          type: "battery",
-          score: node.scores.battery,
-          nodeId: node.id,
-          label: "Battery might not last this window",
-          occursAt: context.timestamp
-        });
-      }
-
-      if (node.scores.overload && node.scores.overload > 0.6) {
-        risks.push({
-          type: "overload",
-          score: node.scores.overload,
-          nodeId: node.id,
-          label: `Schedule overload around ${node.label}`,
-          occursAt: node.timeWindow?.start || context.timestamp
-        });
-      }
-
-      if (node.scores.responseDebt && node.scores.responseDebt > 0.7) {
-        risks.push({
-          type: "response_debt",
-          score: node.scores.responseDebt,
-          nodeId: node.id,
-          label: "Accumulating response debt",
-          occursAt: context.timestamp
-        });
-      }
+      checkRisk("lateness", node.scores.lateness, "Likely late for ${label}");
+      checkRisk("battery", node.scores.battery, "Battery might fail before ${label}");
+      checkRisk("overload", node.scores.overload, "Schedule overload at ${label}");
+      checkRisk("response_debt", node.scores.responseDebt, "Pending response debt");
     });
+
+    const risks = Object.values(bestByRisk)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
 
     return {
       totalRisksNext90Min: risks.length,
-      risks: risks.sort((a, b) => b.score - a.score)
+      risks
     };
   }
 }

@@ -16,6 +16,7 @@ import { heartbeatAgent } from "../../agents/heartbeat";
 import contextRouter from "./routes/context";
 import memoryRouter from "./routes/memory";
 import graphRouter from "./routes/graph";
+import { graphBuilder } from "./services/GraphBuilder";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -108,6 +109,13 @@ async function runAgentPulseFlow(initialContext: any) {
             }
         });
         await new Promise(r => setTimeout(r, 1000));
+        
+        // 3.5 Build Graph (Day 6)
+        const graph = await graphBuilder.buildForUser(initialContext.userId);
+        const appCount = graph.nodes.filter(n => n.type === "APPOINTMENT").length;
+        const placeCount = graph.nodes.filter(n => n.type === "PLACE").length;
+        const msgCount = graph.nodes.filter(n => n.type === "MESSAGE_OBLIGATION").length;
+        console.log(`[Pulse] Graph built: ${appCount} appointments, ${placeCount} places, 1 battery node, ${msgCount} message obligations, totalRisksNext90Min=${graph.summary.totalRisksNext90Min}.`);
 
         // 4. Planner Agent
         await plannerAgent({});
