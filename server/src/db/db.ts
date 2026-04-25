@@ -1,14 +1,16 @@
 import { Pool } from "pg";
 import dotenv from "dotenv";
 
-dotenv.config();
+import path from "path";
+
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 
 const pool = new Pool({
-    user: process.env.DB_USER || "pulse_user",
-    host: process.env.DB_HOST || "localhost",
-    database: process.env.DB_NAME || "pulse_db",
-    password: process.env.DB_PASSWORD || "pulse_password",
-    port: Number(process.env.DB_PORT || 5432),
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: Number(process.env.DB_PORT),
 });
 
 export const query = (text: string, params?: any[]) => pool.query(text, params);
