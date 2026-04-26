@@ -3,7 +3,7 @@ import { ContextSnapshot } from "../shared/context_snapshot";
 import crypto from "crypto";
 
 async function seedSnapshots() {
-  const userId = 'user_123';
+  const userId = process.argv[2] || 'user_123';
   console.log(`[Seeder] Seeding snapshots for user: ${userId}`);
 
   const now = new Date();

@@ -33,6 +33,10 @@ export function normalizeContext(raw: any): ContextSnapshot {
       start_time: new Date(event.start_time).toISOString(),
       end_time: new Date(event.end_time).toISOString(),
       location_text: event.location_text || null,
+      location: event.location ? {
+        lat: Number(event.location.lat),
+        lon: Number(event.location.lon),
+      } : null,
       is_all_day: !!event.is_all_day,
       importance: mapImportance(event),
     };

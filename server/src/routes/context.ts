@@ -13,7 +13,9 @@ router.post("/snapshots", async (req: Request, res: Response) => {
     try {
         const rawPayload = req.body;
         const deviceId = req.header("X-Device-Id") || "unknown";
-        const userId = req.header("X-User-Id") || "unknown";
+        const userId = req.header("X-User-Id") || req.body.user_id || req.body.userId || "unknown";
+
+        console.log(`[Pulse] Ingest request: X-User-Id=${req.header("X-User-Id")}, identified userId=${userId}`);
 
         // 1. Normalize
         const normalized = normalizeContext({
@@ -54,8 +56,8 @@ router.post("/snapshots", async (req: Request, res: Response) => {
  */
 router.get("/snapshots/latest", async (req: Request, res: Response) => {
     try {
-        const userId = req.header("X-User-Id") || "unknown";
-        const latest = await contextSnapshotRepo.findLatestByUser(userId);
+        const userId = req.header("X-User-Id") || req.query.userId || req.query["X-User-Id"] || "unknown";
+        const latest = await contextSnapshotRepo.findLatestByUser(userId as string);
 
         if (!latest) {
             return res.status(404).json({

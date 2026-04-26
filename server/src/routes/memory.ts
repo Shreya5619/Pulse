@@ -30,7 +30,7 @@ router.get("/summary", async (req: Request, res: Response) => {
  * Manually trigger a summarization run.
  */
 router.post("/trigger", async (req: Request, res: Response) => {
-  const userId = req.body.userId || "user_123";
+  const userId = req.header("X-User-Id") || req.body.userId || req.body.user_id || req.query.userId || "unknown";
   
   try {
     await memoryAgent.runSummary(userId);
