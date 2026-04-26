@@ -19,6 +19,10 @@ export const CalendarEventSchema = z.object({
   start_time: z.string().datetime(),
   end_time: z.string().datetime(),
   location_text: z.string().optional().nullable(),
+  location: z.object({
+    lat: z.number(),
+    lon: z.number(),
+  }).optional().nullable(),
   is_all_day: z.boolean(),
   importance: ImportanceSchema.default("normal"),
 });

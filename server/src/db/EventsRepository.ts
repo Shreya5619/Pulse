@@ -19,6 +19,18 @@ export class ContextEventsRepository implements IEventsRepository {
             return startTime >= now && startTime <= limit;
         });
     }
+
+    async getNextEvent(userId: string): Promise<CalendarEvent | null> {
+        const latest = await contextSnapshotRepo.findLatestByUser(userId);
+        if (!latest || !latest.calendar.next_event) {
+            // Fallback to first upcoming event if next_event is not explicitly set
+            if (latest && latest.calendar.upcoming_events.length > 0) {
+                return latest.calendar.upcoming_events[0];
+            }
+            return null;
+        }
+        return latest.calendar.next_event;
+    }
 }
 
 export const eventsRepo = new ContextEventsRepository();

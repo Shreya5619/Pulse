@@ -16,6 +16,7 @@ import { heartbeatAgent } from "../../agents/heartbeat";
 import contextRouter from "./routes/context";
 import memoryRouter from "./routes/memory";
 import graphRouter from "./routes/graph";
+import routingRouter from "./routes/routing";
 import { graphBuilder } from "./services/GraphBuilder";
 import { memoryAgent } from "./services/MemoryAgent";
 
@@ -28,6 +29,7 @@ app.use(express.json());
 app.use("/api", contextRouter);
 app.use("/api/memory", memoryRouter);
 app.use("/api/graph", graphRouter);
+app.use("/api/routing", routingRouter);
 
 
 const httpServer = createServer(app);

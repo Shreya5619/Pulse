@@ -9,12 +9,12 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
     ports:
-      - "${DB_PORT}:5432"
+      - "${DB_PORT}:${DB_PORT}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
   osrm:
     image: osrm/osrm-backend:latest
-    container_name: pulse-osrm
+    container_name: ${OSRM_NAME}
     command: >
       osrm-routed
       --algorithm mld
@@ -22,7 +22,7 @@ services:
     volumes:
       - ./osrm-data:/data
     ports:
-      - "5000:5000"
+      - "${OSRM_PORT}:${OSRM_PORT}"
     restart: always
 
 volumes:
