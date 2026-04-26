@@ -12,6 +12,18 @@ services:
       - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+  osrm:
+    image: osrm/osrm-backend:latest
+    container_name: pulse-osrm
+    command: >
+      osrm-routed
+      --algorithm mld
+      /data/karnataka-latest.osrm
+    volumes:
+      - ./osrm-data:/data
+    ports:
+      - "5000:5000"
+    restart: always
 
 volumes:
   postgres_data:
