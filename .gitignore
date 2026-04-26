@@ -71,7 +71,11 @@ reports/
 *.p12
 *.pem
 *.key
+*.key
 
 # ---- Optional: generated demo state ----
 data/state/
 data/generated/
+
+# ---- Pulse Memory Layer (User Data) ----
+memory/
