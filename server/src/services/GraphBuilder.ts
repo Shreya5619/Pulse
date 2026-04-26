@@ -4,6 +4,7 @@ import { eventsRepo } from "../db/EventsRepository";
 import { GraphNode, GraphEdge, GraphSummary, RiskSummaryItem } from "../types/graph";
 import { ContextSnapshot, CalendarEvent } from "../../../shared/context_snapshot";
 import { MemoryState } from "../../../shared/memory";
+import { routingService } from "./RoutingService";
 
 export class GraphBuilder {
   private graphCache = new Map<string, { nodes: GraphNode[]; edges: GraphEdge[]; summary: GraphSummary }>();
@@ -38,7 +39,7 @@ export class GraphBuilder {
     });
 
     // 3. APPOINTMENT Nodes & TRAVEL Edges
-    upcomingEvents.forEach((event, index) => {
+    for (const event of upcomingEvents) {
       const eventNodeId = `APP_${event.id}`;
       nodes.push({
         id: eventNodeId,
@@ -48,9 +49,21 @@ export class GraphBuilder {
         scores: { lateness: 0 } // Will calculate below
       });
 
-      // TRAVEL Edge from current location (stub ETA for now)
-      // In a real app, we'd use a routing engine
-      const travelWeight = 15; // default 15 mins
+      // TRAVEL Edge from current location
+      let travelWeight = 15; // default 15 mins
+      if (context.location.lat && context.location.lon && event.location?.lat && event.location?.lon) {
+        try {
+          const route = await routingService.getRoute(
+            { lat: context.location.lat, lon: context.location.lon },
+            { lat: event.location.lat, lon: event.location.lon }
+          );
+          travelWeight = Math.ceil(route.durationSeconds / 60);
+          console.log(`[Graph] TRAVEL edge ${currentPlaceId} → ${event.title}, etaMinutes=${travelWeight}`);
+        } catch (err) {
+          console.warn(`[Graph] OSRM routing failed for ${event.title}, using fallback.`);
+        }
+      }
+
       edges.push({
         id: `TRAVEL_NOW_${event.id}`,
         from: `PLACE_${currentPlaceId}`,
@@ -71,7 +84,7 @@ export class GraphBuilder {
         type: "URGENCY",
         weight: diffMins
       });
-    });
+    }
 
     // 4. BATTERY_STATE Node & ENERGY_COST Edge
     const batteryNodeId = "BATTERY";

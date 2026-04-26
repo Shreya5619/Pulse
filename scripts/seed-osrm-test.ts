@@ -3,7 +3,7 @@ import { ContextSnapshot } from "../shared/context_snapshot";
 import crypto from "crypto";
 
 async function seedOsrmTest() {
-  const userId = 'user_123';
+  const userId = 'USER_DEMO';
   console.log(`[Seeder] Seeding OSRM test data for user: ${userId}`);
 
   const now = new Date();
@@ -18,7 +18,8 @@ async function seedOsrmTest() {
       lon: 77.5946, 
       accuracy: 10, 
       provider: 'gps', 
-      source: 'gps' 
+      source: 'gps',
+      place_id: "home"
     },
     calendar: { 
       next_event: {
@@ -34,7 +35,21 @@ async function seedOsrmTest() {
         is_all_day: false,
         importance: "high"
       }, 
-      upcoming_events: [] 
+      upcoming_events: [
+        {
+          id: "event_lab",
+          title: "Physics Lab",
+          start_time: new Date(now.getTime() + 30 * 60000).toISOString(), // in 30 mins
+          end_time: new Date(now.getTime() + 90 * 60000).toISOString(),
+          location_text: "Indiranagar",
+          location: {
+            lat: 12.9859,
+            lon: 77.6387
+          },
+          is_all_day: false,
+          importance: "high"
+        }
+      ] 
     },
     battery: { level: 0.17, is_charging: false, power_saver_on: false },
     notifications: [],
