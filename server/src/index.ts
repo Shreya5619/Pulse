@@ -17,6 +17,7 @@ import contextRouter from "./routes/context";
 import memoryRouter from "./routes/memory";
 import graphRouter from "./routes/graph";
 import { graphBuilder } from "./services/GraphBuilder";
+import { memoryAgent } from "./services/MemoryAgent";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -116,6 +117,9 @@ async function runAgentPulseFlow(initialContext: any) {
         const placeCount = graph.nodes.filter(n => n.type === "PLACE").length;
         const msgCount = graph.nodes.filter(n => n.type === "MESSAGE_OBLIGATION").length;
         console.log(`[Pulse] Graph built: ${appCount} appointments, ${placeCount} places, 1 battery node, ${msgCount} message obligations, totalRisksNext90Min=${graph.summary.totalRisksNext90Min}.`);
+
+        // 3.6 Memory Agent check (triggers DailySummarizer if threshold met)
+        await memoryAgent.onHeartbeat(initialContext.userId);
 
         // 4. Planner Agent
         await plannerAgent({});
