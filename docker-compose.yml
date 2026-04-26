@@ -18,7 +18,7 @@ services:
     command: >
       osrm-routed
       --algorithm mld
-      /data/karnataka-latest.osrm
+      /data/bangalore-latest.osrm
     volumes:
       - ./osrm-data:/data
     ports:

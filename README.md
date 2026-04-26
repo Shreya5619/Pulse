@@ -186,3 +186,5 @@ Payload shapes are defined in `contracts/` and documented in `docs/ws-events.md`
 - **B (backend):**
   - Owns `server/`, `agents/`, `memory/`, `contracts/`, `data/`, and backend docs.
   - Ensures monorepo boots and the fake demo payload moves end‑to‑end.
+
+Routing is limited to Bengaluru region for demo; OSRM dataset included.
