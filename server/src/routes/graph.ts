@@ -10,7 +10,7 @@ const router = Router();
  */
 router.get("/summary", async (req: Request, res: Response) => {
     try {
-        const userId = req.header("X-User-Id") || "lifecanvas_studios";
+        const userId = req.header("X-User-Id") || req.query.userId || req.query["X-User-Id"] || "lifecanvas_studios";
         
         let graph = graphBuilder.getCachedGraph(userId);
         if (!graph) {
@@ -34,7 +34,7 @@ router.get("/summary", async (req: Request, res: Response) => {
  */
 router.get("/full", async (req: Request, res: Response) => {
     try {
-        const userId = req.header("X-User-Id") || "lifecanvas_studios";
+        const userId = req.header("X-User-Id") || req.query.userId || req.query["X-User-Id"] || "lifecanvas_studios";
         
         let graph = graphBuilder.getCachedGraph(userId);
         if (!graph) {
