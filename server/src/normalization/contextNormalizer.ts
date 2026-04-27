@@ -1,8 +1,8 @@
 import * as crypto from "node:crypto";
-import { 
-  ContextSnapshot, 
-  ContextSnapshotSchema, 
-  Importance, 
+import {
+  ContextSnapshot,
+  ContextSnapshotSchema,
+  Importance,
   NotificationCategory,
   BatteryBand
 } from "../../../shared/context_snapshot";
@@ -90,7 +90,7 @@ export function normalizeContext(raw: any): ContextSnapshot {
   const now = new Date(timestamp).getTime();
   const nextEventStart = next_event ? new Date(next_event.start_time).getTime() : null;
   const minutes_to_next_event = nextEventStart ? Math.round((nextEventStart - now) / 60000) : null;
-  
+
   const derived = {
     has_next_event: !!next_event,
     minutes_to_next_event,
@@ -121,7 +121,7 @@ export function normalizeContext(raw: any): ContextSnapshot {
 function mapImportance(event: any): Importance {
   const title = (event.title || "").toLowerCase();
   const isHighPriority = event.priority_flag || event.importance_level > 7;
-  
+
   if (title.includes("urgent") || title.includes("emergency") || title.includes("critical")) return "critical";
   if (isHighPriority || title.includes("meeting") || title.includes("interview") || title.includes("exam")) return "high";
   if (title.includes("lunch") || title.includes("coffee") || title.includes("break")) return "low";
@@ -131,11 +131,11 @@ function mapImportance(event: any): Importance {
 function mapNotificationCategory(n: any): NotificationCategory {
   if (n.is_otp_hint || (n.body || "").toLowerCase().includes("code")) return "otp";
   if (n.is_ongoing_call || n.app_package?.includes("telecom") || n.app_package?.includes("dialer")) return "call";
-  
+
   const pkg = (n.app_package || "").toLowerCase();
   if (pkg.includes("whatsapp") || pkg.includes("messenger") || pkg.includes("discord") || pkg.includes("slack")) return "message";
   if (pkg.includes("promo") || pkg.includes("deal") || pkg.includes("offer")) return "promo";
-  
+
   return "unknown";
 }
 

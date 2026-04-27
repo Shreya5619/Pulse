@@ -9,7 +9,7 @@ const router = Router();
  */
 router.get("/summary", async (req: Request, res: Response) => {
   const userId = (req.query.userId as string) || "user_123";
-  
+
   try {
     const summary = await memoryAgent.getMemorySummary(userId);
     res.json({
@@ -31,7 +31,7 @@ router.get("/summary", async (req: Request, res: Response) => {
  */
 router.post("/trigger", async (req: Request, res: Response) => {
   const userId = req.header("X-User-Id") || req.body.userId || req.body.user_id || req.query.userId || "unknown";
-  
+
   try {
     await memoryAgent.runSummary(userId);
     res.json({

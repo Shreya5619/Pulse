@@ -84,7 +84,7 @@ export class GraphBuilder {
       const startTime = new Date(event.start_time).getTime();
       const nowTime = new Date(context.timestamp).getTime();
       const diffMins = Math.max(0, (startTime - nowTime) / 60000);
-      
+
       edges.push({
         id: `URGENCY_NOW_${event.id}`,
         from: "NOW",
@@ -113,7 +113,7 @@ export class GraphBuilder {
     });
 
     // 5. MESSAGE_OBLIGATION Nodes
-    const importantNotifications = context.notifications.filter(n => 
+    const importantNotifications = context.notifications.filter(n =>
       n.category === "message" || n.category === "call"
     );
 

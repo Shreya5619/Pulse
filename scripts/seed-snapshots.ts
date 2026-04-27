@@ -12,7 +12,7 @@ async function seedSnapshots() {
   // Generate 20 snapshots per day for the last 7 days
   for (let d = 0; d < 7; d++) {
     const dayDate = new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
-    
+
     for (let h = 0; h < 20; h++) {
       const timestamp = new Date(dayDate);
       timestamp.setUTCHours(7 + h, Math.floor(Math.random() * 60), 0, 0);
