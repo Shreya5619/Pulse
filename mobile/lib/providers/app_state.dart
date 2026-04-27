@@ -43,10 +43,11 @@ class AppState extends ChangeNotifier {
   }
 
   void _initContextIngestion() async {
+    debugPrint('[Pulse AppState] Starting context ingestion...');
     // Battery
     _contextServices.batteryStream.listen((info) {
       final oldTrend = _deviceContext.battery.trend;
-      final newTrend = [...oldTrend, info.level];
+      final List<int> newTrend = List<int>.from(oldTrend)..add(info.level);
       if (newTrend.length > 20) newTrend.removeAt(0);
 
       _deviceContext = DeviceContext(
@@ -70,10 +71,13 @@ class AppState extends ChangeNotifier {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-      
-      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
         _contextServices.locationStream.listen((info) {
-          debugPrint('[Pulse Context] Location Update: ${info.latitude}, ${info.longitude}');
+          debugPrint(
+            '[Pulse Context] Location Update: ${info.latitude}, ${info.longitude}',
+          );
           _deviceContext = DeviceContext(
             battery: _deviceContext.battery,
             location: info,
@@ -93,7 +97,9 @@ class AppState extends ChangeNotifier {
     // Calendar - Refresh every 15 minutes
     Timer.periodic(const Duration(minutes: 15), (timer) async {
       final events = await _contextServices.getUpcomingEvents();
-      debugPrint('[Pulse Context] Calendar Refreshed: ${events.length} events found');
+      debugPrint(
+        '[Pulse Context] Calendar Refreshed: ${events.length} events found',
+      );
       _deviceContext = DeviceContext(
         battery: _deviceContext.battery,
         location: _deviceContext.location,
@@ -103,14 +109,16 @@ class AppState extends ChangeNotifier {
       );
       notifyListeners();
     });
-    
+
     // Initial fetch
     final initialEvents = await _contextServices.getUpcomingEvents();
-    debugPrint('[Pulse Context] Initial Calendar Fetch: ${initialEvents.length} events found');
+    debugPrint(
+      '[Pulse Context] Initial Calendar Fetch: ${initialEvents.length} events found',
+    );
     for (var event in initialEvents) {
       debugPrint('  - Event: ${event.title} at ${event.start}');
     }
-    
+
     _deviceContext = DeviceContext(
       battery: _deviceContext.battery,
       location: _deviceContext.location,
@@ -121,11 +129,11 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     // Notifications
-    await _contextServices.initNotifications((event) {
-      debugPrint('[Pulse Context] Notification Received: ${event.packageName}');
+    await _contextServices.initNotifications((data) {
+      debugPrint('[Pulse Context] Notification Received: ${data['packageName']}');
       final newNotif = NotificationInfo(
-        packageName: event.packageName ?? "unknown",
-        title: event.title,
+        packageName: data['packageName'] ?? "unknown",
+        title: data['title'] ?? "No Title",
         timestamp: DateTime.now(),
       );
       final newList = [newNotif, ..._deviceContext.notifications];
@@ -148,14 +156,16 @@ class AppState extends ChangeNotifier {
       String host = 'localhost';
       if (!kIsWeb) {
         if (defaultTargetPlatform == TargetPlatform.android) {
-          host = '10.0.2.2';
+          // Check if running on emulator (10.0.2.2 is the host machine)
+          host = '192.168.1.5';
         }
       }
 
-      // OPTIONAL: If testing on a PHYSICAL device, use your machine's IP:
-      host = '192.168.0.101';
+      // If you are using a PHYSICAL device, you should change this to your computer's actual IP
+      // host = '192.168.x.x';
+
       final wsUrl = 'ws://$host:8080/ws';
-      debugPrint('[Pulse] Attempting connection to: $wsUrl');
+      debugPrint('[Pulse WS] Connecting to: $wsUrl');
 
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
 

@@ -39,9 +39,7 @@
         <service android:name="im.zoe.labs.flutter_notification_listener.NotificationsHandlerService"
             android:label="Pulse Notifications"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-            android:exported="true"
-            android:foregroundServiceType="specialUse">
-            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="notification_listener"/>
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
