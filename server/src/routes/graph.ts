@@ -10,8 +10,8 @@ const router = Router();
  */
 router.get("/summary", async (req: Request, res: Response) => {
     try {
-        const userId = req.header("X-User-Id") || req.query.userId || req.query["X-User-Id"] || "lifecanvas_studios";
-        
+        const userId = (req.header("X-User-Id") || req.query.userId || req.query["X-User-Id"] || "lifecanvas_studios") as string;
+
         let graph = graphBuilder.getCachedGraph(userId);
         if (!graph) {
             console.log(`[GraphRoute] Cache miss for ${userId}, building...`);
@@ -34,8 +34,13 @@ router.get("/summary", async (req: Request, res: Response) => {
  */
 router.get("/full", async (req: Request, res: Response) => {
     try {
-        const userId = req.header("X-User-Id") || req.query.userId || req.query["X-User-Id"] || "lifecanvas_studios";
-        
+        const userId = (
+            typeof req.header("X-User-Id") === "string" ? req.header("X-User-Id") :
+                typeof req.query.userId === "string" ? req.query.userId :
+                    typeof req.query["X-User-Id"] === "string" ? req.query["X-User-Id"] :
+                        "lifecanvas_studios"
+        ) as string;
+
         let graph = graphBuilder.getCachedGraph(userId);
         if (!graph) {
             graph = await graphBuilder.buildForUser(userId);

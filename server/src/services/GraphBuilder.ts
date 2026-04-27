@@ -5,6 +5,12 @@ import { GraphNode, GraphEdge, GraphSummary, RiskSummaryItem } from "../types/gr
 import { ContextSnapshot, CalendarEvent } from "../../../shared/context_snapshot";
 import { MemoryState } from "../../../shared/memory";
 import { routingService } from "./RoutingService";
+import {
+  latenessRisk,
+  batteryRisk,
+  responseDebtRisk,
+  overloadRisk
+} from "./RiskEngine";
 
 export class GraphBuilder {
   private graphCache = new Map<string, { nodes: GraphNode[]; edges: GraphEdge[]; summary: GraphSummary }>();
@@ -145,58 +151,68 @@ export class GraphBuilder {
   private calculateScores(nodes: GraphNode[], edges: GraphEdge[], context: ContextSnapshot, memory: MemoryState) {
     const nowTime = new Date(context.timestamp).getTime();
 
+    // Pre-compute aggregate inputs for response-debt and overload
+    const importantMessages = nodes.filter(n => n.type === "MESSAGE_OBLIGATION");
+    const appointmentNodes = nodes.filter(n => n.type === "APPOINTMENT");
+
     nodes.forEach(node => {
       if (!node.scores) return;
 
-      // Lateness Heuristic
+      // Lateness — delegate to RiskEngine.latenessRisk
       if (node.type === "APPOINTMENT" && node.timeWindow) {
         const edge = edges.find(e => e.to === node.id && e.type === "TRAVEL");
-        const travelTime = edge ? edge.weight : 20;
+        const etaMinutes = edge ? edge.weight : 20;
         const startTime = new Date(node.timeWindow.start).getTime();
-        const minsRemaining = (startTime - nowTime) / 60000;
-        
-        const habitLateMargin = memory.habits?.commute?.buffer_minutes || 5;
-        
-        // Score is high if minsRemaining < travelTime + margin
-        if (minsRemaining < (travelTime + habitLateMargin)) {
-          node.scores.lateness = Math.min(1, (travelTime + habitLateMargin - minsRemaining) / 20);
-        } else {
-          node.scores.lateness = 0;
-        }
+        const minutesToEvent = (startTime - nowTime) / 60000;
+        // typical_lateness = avg minutes late; treat as the buffer the user "normally cuts it close" by
+        const buffer = memory.habits?.patterns?.typical_lateness ?? 5;
+
+        node.scores.lateness = latenessRisk(minutesToEvent, etaMinutes, buffer);
       }
 
-      // Battery Heuristic
+      // Battery — delegate to RiskEngine.batteryRisk
       if (node.type === "BATTERY_STATE") {
-        const band = context.derived?.battery_band || "ok";
-        let score = 0;
-        if (band === "critical") score = 0.9;
-        else if (band === "low") score = 0.6;
-        else if (band === "ok") score = 0.2;
+        const currentPct = Math.round(context.battery.level * 100);
+        // Use memory discharge rate if available, fall back to 8%/hr estimate
+        const drainRate = memory.battery?.profile?.discharge_rates?.active ?? 8;
+        // Horizon = minutes to next event or default 120
+        const nextEventStart = appointmentNodes
+          .map(n => n.timeWindow ? new Date(n.timeWindow.start).getTime() : Infinity)
+          .sort((a, b) => a - b)[0];
+        const horizonMinutes =
+          nextEventStart && nextEventStart !== Infinity
+            ? Math.max(0, (nextEventStart - nowTime) / 60000)
+            : 120;
 
-        // Boost score if memory says fast drain is expected
-        if (memory.battery?.drain_patterns?.some(p => p.drain_rate > 0.1)) {
-           score = Math.min(1, score + 0.2);
-        }
-        node.scores.battery = score;
+        node.scores.battery = batteryRisk(currentPct, horizonMinutes, drainRate);
       }
 
-      // Response Debt Heuristic
+      // Response Debt — delegate to RiskEngine.responseDebtRisk
       if (node.type === "MESSAGE_OBLIGATION") {
-        // High if many messages or if from important sender
-        node.scores.responseDebt = 0.5; // Simple stub
+        const importantPending = importantMessages.length;
+        // Estimate oldest message age from notification timestamps (fallback 30min)
+        const oldestMinutes = 30; // TODO: derive from notification timestamp once available
+        node.scores.responseDebt = responseDebtRisk(importantPending, oldestMinutes);
       }
 
-      // Overload Heuristic
+      // Overload — delegate to RiskEngine.overloadRisk
       if (node.type === "APPOINTMENT") {
-         // High if overlapping or heavy notifications
-         const overlapping = nodes.filter(n => 
-           n.type === "APPOINTMENT" && 
-           n.id !== node.id && 
-           this.isOverlapping(node, n)
-         ).length;
-         
-         const notificationLoad = context.notifications.length > 10 ? 0.4 : 0.1;
-         node.scores.overload = Math.min(1, (overlapping * 0.4) + notificationLoad);
+        const eventsIn90 = appointmentNodes.filter(n => {
+          if (!n.timeWindow) return false;
+          const start = new Date(n.timeWindow.start).getTime();
+          return start <= nowTime + 90 * 60 * 1000;
+        }).length;
+
+        const totalPairs = appointmentNodes.length * (appointmentNodes.length - 1) / 2 || 1;
+        const overlappingPairs = appointmentNodes.filter(n =>
+          n.id !== node.id && this.isOverlapping(node, n)
+        ).length;
+        const overlapScore = overlappingPairs / totalPairs;
+
+        // Notifications per 15 min (approximate from snapshot count)
+        const notifRate = context.notifications.length;
+
+        node.scores.overload = overloadRisk(eventsIn90, overlapScore, notifRate);
       }
     });
   }
