@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:http/http.dart' as http;
 import '../models/risk_state.dart';
 import '../models/intervention.dart';
 import '../models/snapshot.dart';
@@ -62,6 +63,7 @@ class AppState extends ChangeNotifier {
         timestamp: DateTime.now(),
       );
       notifyListeners();
+      _sendContextSnapshot("battery_change");
     });
 
     // Location Permission & Stream
@@ -86,6 +88,7 @@ class AppState extends ChangeNotifier {
             timestamp: DateTime.now(),
           );
           notifyListeners();
+          _sendContextSnapshot("location_change");
         });
       } else {
         debugPrint('[Pulse Context] Location Permission Denied: $permission');
@@ -130,7 +133,9 @@ class AppState extends ChangeNotifier {
 
     // Notifications
     await _contextServices.initNotifications((data) {
-      debugPrint('[Pulse Context] Notification Received: ${data['packageName']}');
+      debugPrint(
+        '[Pulse Context] Notification Received: ${data['packageName']}',
+      );
       final newNotif = NotificationInfo(
         packageName: data['packageName'] ?? "unknown",
         title: data['title'] ?? "No Title",
@@ -147,23 +152,13 @@ class AppState extends ChangeNotifier {
         timestamp: DateTime.now(),
       );
       notifyListeners();
+      _sendContextSnapshot("notification_received");
     });
   }
 
   void _connectWebSocket() {
     try {
-      // DEFAULT: Use 10.0.2.2 for Android Emulators, localhost for everything else
-      String host = 'localhost';
-      if (!kIsWeb) {
-        if (defaultTargetPlatform == TargetPlatform.android) {
-          // Check if running on emulator (10.0.2.2 is the host machine)
-          host = '192.168.1.5';
-        }
-      }
-
-      // If you are using a PHYSICAL device, you should change this to your computer's actual IP
-      // host = '192.168.x.x';
-
+      final host = _getBackendHost();
       final wsUrl = 'ws://$host:8080/ws';
       debugPrint('[Pulse WS] Connecting to: $wsUrl');
 
@@ -267,6 +262,134 @@ class AppState extends ChangeNotifier {
   void toggleLiveMode() {
     _isLive = !_isLive;
     notifyListeners();
+  }
+
+  Future<void> _sendContextSnapshot(String reason) async {
+    try {
+      final now = DateTime.now();
+      final userId = "user1"; // As requested in headers
+
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/snapshots');
+
+      // Construct payload matching the requested schema
+      final payload = {
+        "id": "snap_${now.millisecondsSinceEpoch}",
+        "user_id": userId,
+        "timestamp": now.toUtc().toIso8601String(),
+        "location": {
+          "lat": _deviceContext.location.latitude,
+          "lon": _deviceContext.location.longitude,
+          "accuracy": 5,
+          "provider": "gps",
+          "source": "gps",
+          "place_id": _deviceContext.location.status,
+        },
+        "calendar": {
+          "next_event": _deviceContext.upcomingEvents.isNotEmpty
+              ? {
+                  "id":
+                      "event_${_deviceContext.upcomingEvents.first.title.hashCode}",
+                  "title": _deviceContext.upcomingEvents.first.title,
+                  "start_time": _deviceContext.upcomingEvents.first.start
+                      .toUtc()
+                      .toIso8601String(),
+                  "end_time": _deviceContext.upcomingEvents.first.end
+                      .toUtc()
+                      .toIso8601String(),
+                  "location_text": "Detected Location",
+                  "location": {
+                    "lat": _deviceContext.location.latitude,
+                    "lon": _deviceContext.location.longitude,
+                  },
+                  "is_all_day": false,
+                  "importance": "high",
+                }
+              : null,
+          "upcoming_events": _deviceContext.upcomingEvents
+              .map(
+                (e) => {
+                  "title": e.title,
+                  "start_time": e.start.toUtc().toIso8601String(),
+                  "end_time": e.end.toUtc().toIso8601String(),
+                },
+              )
+              .toList(),
+        },
+        "battery": {
+          "level": _deviceContext.battery.level / 100.0,
+          "is_charging": _deviceContext.battery.isCharging,
+          "power_saver_on": false,
+        },
+        "notifications": _deviceContext.notifications
+            .map(
+              (n) => {
+                "app_package": n.packageName,
+                "title": n.title,
+                "posted_at": n.timestamp.toUtc().toIso8601String(),
+              },
+            )
+            .toList(),
+        "device_state": {
+          "network_type": "wifi",
+          "is_roaming": false,
+          "screen_on": true,
+          "do_not_disturb": false,
+          "ringer_mode": "normal",
+        },
+        "meta": {
+          "client_version": "1.0.0",
+          "schema_version": "1.0.0",
+          "capture_reason": reason,
+        },
+        "derived": {
+          "has_next_event": _deviceContext.upcomingEvents.isNotEmpty,
+          "minutes_to_next_event": _deviceContext.upcomingEvents.isNotEmpty
+              ? _deviceContext.upcomingEvents.first.start
+                    .difference(now)
+                    .inMinutes
+              : null,
+          "is_commute_window": false,
+          "battery_band": _deviceContext.battery.level > 20 ? "ok" : "low",
+        },
+      };
+
+      debugPrint('[Pulse API] Sending context snapshot to $url (Reason: $reason)...');
+
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json', 'X-User-Id': userId},
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        debugPrint('[Pulse API] Success: Snapshot ingested by backend.');
+        debugPrint('[Pulse API] Response: ${response.body}');
+      } else {
+        debugPrint(
+          '[Pulse API] Error: Backend returned ${response.statusCode}',
+        );
+        debugPrint('[Pulse API] Response: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('[Pulse API] Exception sending snapshot: $e');
+    }
+  }
+
+  void triggerManualSnapshot() {
+    _sendContextSnapshot("manual_trigger");
+  }
+
+  String _getBackendHost() {
+    String host = 'localhost';
+    if (!kIsWeb) {
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        // For physical devices or emulators on local network
+        // Use your computer's local IP address
+        host = '192.168.1.4';
+      }
+    }
+    return host;
   }
 
   @override

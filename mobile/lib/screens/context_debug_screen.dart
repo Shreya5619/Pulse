@@ -24,6 +24,23 @@ class ContextDebugScreen extends StatelessWidget {
           icon: const Icon(LucideIcons.chevronLeft, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(LucideIcons.uploadCloud, color: Colors.white),
+            tooltip: "Send Snapshot Now",
+            onPressed: () {
+              final appState = Provider.of<AppState>(context, listen: false);
+              appState.triggerManualSnapshot();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Sending context snapshot to backend..."),
+                  duration: Duration(seconds: 1),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Consumer<AppState>(
         builder: (context, appState, child) {
