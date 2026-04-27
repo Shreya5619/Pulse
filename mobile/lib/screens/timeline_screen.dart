@@ -92,8 +92,8 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
   late List<ScreenSession> rawSessions;
   double _currentScale = 1.0; // track zoom scale for adaptive labels
 
-  static const double startHour = 0.0;   // start at midnight for long-term data
-  static const double endHour = 24.0;    // 24h format
+  static const double startHour = 0.0; // start at midnight for long-term data
+  static const double endHour = 24.0; // 24h format
   double get totalHours => endHour - startHour;
   static const double baseHoursPerScreen = 6.0; // at scale=1, visible range ~6h
   double _baseWidth = 1200.0; // base width at scale=1
@@ -121,7 +121,14 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
       if (app == 'Screen') {
         final List<AppActivity> screenActs = [];
         for (final session in rawSessions) {
-          screenActs.add(AppActivity('Screen', session.startHours, session.endHours, Colors.cyanAccent));
+          screenActs.add(
+            AppActivity(
+              'Screen',
+              session.startHours,
+              session.endHours,
+              Colors.cyanAccent,
+            ),
+          );
         }
         appActivities[app] = screenActs;
       } else {
@@ -130,17 +137,22 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
     }
   }
 
-  List<AppActivity> _activitiesForApp(String appName, List<ScreenSession> sessions) {
+  List<AppActivity> _activitiesForApp(
+    String appName,
+    List<ScreenSession> sessions,
+  ) {
     final result = <AppActivity>[];
     for (final session in sessions) {
       for (final activity in session.activities) {
         if (activity.appName == appName) {
-          result.add(AppActivity(
-            appName,
-            activity.startHours,
-            activity.endHours,
-            activity.color,
-          ));
+          result.add(
+            AppActivity(
+              appName,
+              activity.startHours,
+              activity.endHours,
+              activity.color,
+            ),
+          );
         }
       }
     }
@@ -161,10 +173,10 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
   int _getHourStep() {
     final pixelsPerHour = _baseWidth / totalHours;
     final visiblePixelsPerHour = pixelsPerHour * _currentScale;
-    if (visiblePixelsPerHour > 50) return 1;      // every hour
-    if (visiblePixelsPerHour > 20) return 3;      // every 3 hours
-    if (visiblePixelsPerHour > 10) return 6;      // every 6 hours
-    return 12;                                    // every 12 hours
+    if (visiblePixelsPerHour > 50) return 1; // every hour
+    if (visiblePixelsPerHour > 20) return 3; // every 3 hours
+    if (visiblePixelsPerHour > 10) return 6; // every 6 hours
+    return 12; // every 12 hours
   }
 
   @override
@@ -181,16 +193,25 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
             margin: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(32),
-              border: Border.all(color: Colors.white.withOpacity(0.12), width: 1.2),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.12),
+                width: 1.2,
+              ),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  const Color(0xFF1A1E2E).withOpacity(0.7),
-                  const Color(0xFF0B0F1A).withOpacity(0.9),
+                  const Color(0xFF1A1E2E).withValues(alpha: 0.7),
+                  const Color(0xFF0B0F1A).withValues(alpha: 0.9),
                 ],
               ),
-              boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 30, offset: Offset(0, 8))],
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black45,
+                  blurRadius: 30,
+                  offset: Offset(0, 8),
+                ),
+              ],
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(32),
@@ -201,8 +222,8 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
                   SizedBox(
                     height: containerHeight - 60,
                     child: InteractiveViewer(
-                      minScale: 0.1,               // zoom out very far
-                      maxScale: double.infinity,    // no upper limit
+                      minScale: 0.1, // zoom out very far
+                      maxScale: double.infinity, // no upper limit
                       constrained: false,
                       scaleEnabled: true,
                       panEnabled: true,
@@ -224,7 +245,11 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
                             ..._buildAdaptiveHourNumbers(rowHeight),
                             // Tracks
                             for (int i = 0; i < rowCount; i++)
-                              _buildTrackRow(i, rowHeight, expanded ? appOrder[i] : 'Screen'),
+                              _buildTrackRow(
+                                i,
+                                rowHeight,
+                                expanded ? appOrder[i] : 'Screen',
+                              ),
                           ],
                         ),
                       ),
@@ -246,7 +271,12 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
         children: [
           const Text(
             'PULSE • Timeline',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: -0.5, color: Colors.white),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.5,
+              color: Colors.white,
+            ),
           ),
           const Spacer(),
           // Colour legend (tiny, scrollable)
@@ -257,15 +287,29 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: appOrder.where((app) => app != 'Screen').map((app) {
-                  final color = appActivities[app]?.firstOrNull?.color ?? Colors.grey;
+                  final color =
+                      appActivities[app]?.firstOrNull?.color ?? Colors.grey;
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 6),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
                         const SizedBox(width: 4),
-                        Text(app, style: const TextStyle(fontSize: 10, color: Colors.white70)),
+                        Text(
+                          app,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.white70,
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -280,7 +324,7 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(30),
               ),
               child: Icon(
@@ -305,7 +349,10 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
           left: x,
           top: 0,
           bottom: 0,
-          child: Container(width: 1, color: Colors.white.withOpacity(0.1)),
+          child: Container(
+            width: 1,
+            color: Colors.white.withValues(alpha: 0.1),
+          ),
         ),
       );
     }
@@ -325,7 +372,11 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
           top: -24,
           child: Text(
             label,
-            style: const TextStyle(fontSize: 11, color: Colors.white38, fontFeatures: [FontFeature.tabularFigures()]),
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.white38,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
           ),
         ),
       );
@@ -348,22 +399,34 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
           // Subtle alternating row background
           Container(
             height: rowHeight,
-            color: rowIndex % 2 == 0 ? Colors.white.withOpacity(0.02) : Colors.transparent,
+            color: rowIndex % 2 == 0
+                ? Colors.white.withValues(alpha: 0.02)
+                : Colors.transparent,
           ),
           // Activity bars (thin, no text)
           for (final act in activities)
             Positioned(
               left: hourToX(act.startHours),
-              width: (hourToX(act.endHours) - hourToX(act.startHours)).clamp(2.0, double.infinity),
+              width: (hourToX(act.endHours) - hourToX(act.startHours)).clamp(
+                2.0,
+                double.infinity,
+              ),
               top: (rowHeight - 12) / 2,
               height: 12,
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 1),
                 decoration: BoxDecoration(
-                  color: act.color.withOpacity(appName == 'Screen' ? 0.7 : 0.85),
+                  color: act.color.withValues(
+                    alpha: appName == 'Screen' ? 0.7 : 0.85,
+                  ),
                   borderRadius: BorderRadius.circular(6),
                   boxShadow: appName == 'Screen'
-                      ? [BoxShadow(color: act.color.withOpacity(0.3), blurRadius: 4)]
+                      ? [
+                          BoxShadow(
+                            color: act.color.withValues(alpha: 0.3),
+                            blurRadius: 4,
+                          ),
+                        ]
                       : null,
                 ),
               ),

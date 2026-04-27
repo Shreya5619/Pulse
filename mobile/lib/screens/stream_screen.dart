@@ -16,7 +16,7 @@ class StreamScreen extends StatelessWidget {
       builder: (context, state, child) {
         final snapshots = state.snapshots;
         final latest = snapshots.isNotEmpty ? snapshots.first : null;
-        
+
         return Scaffold(
           backgroundColor: AppColors.background,
           body: SafeArea(
@@ -41,7 +41,7 @@ class StreamScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   if (latest != null) ...[
                     _buildSnapshotSummary(latest),
                     const SizedBox(height: 16),
@@ -61,7 +61,7 @@ class StreamScreen extends StatelessWidget {
                       ],
                     ),
                   ],
-                  
+
                   const SizedBox(height: 24),
                   Text(
                     "WebSocket Feed (Raw JSON)",
@@ -73,7 +73,7 @@ class StreamScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   _buildRawJsonFeed(state.rawMessages),
-                  
+
                   const SizedBox(height: 24),
                   Text(
                     "Processed Context History",
@@ -101,30 +101,40 @@ class StreamScreen extends StatelessWidget {
         child: Center(
           child: Text(
             "Waiting for WebSocket data...",
-            style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontStyle: FontStyle.italic),
+            style: TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 12,
+              fontStyle: FontStyle.italic,
+            ),
           ),
         ),
       );
     }
 
     return Column(
-      children: messages.map((msg) => Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(12),
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-        ),
-        child: Text(
-          msg,
-          style: GoogleFonts.firaCode(
-            fontSize: 10,
-            color: AppColors.primary.withOpacity(0.9),
-          ),
-        ),
-      )).toList(),
+      children: messages
+          .map(
+            (msg) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Text(
+                msg,
+                style: GoogleFonts.firaCode(
+                  fontSize: 10,
+                  color: AppColors.primary.withValues(alpha: 0.9),
+                ),
+              ),
+            ),
+          )
+          .toList(),
     );
   }
 
@@ -137,8 +147,18 @@ class StreamScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("Snapshot ID", style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-              Text(snap.id.substring(0, 8), style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
+              Text(
+                "Snapshot ID",
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+              ),
+              Text(
+                snap.id.substring(0, 8),
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -157,10 +177,24 @@ class StreamScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(LucideIcons.smartphone, size: 18, color: AppColors.primary),
+          const Icon(
+            LucideIcons.smartphone,
+            size: 18,
+            color: AppColors.primary,
+          ),
           const Spacer(),
-          Text("${snap.batteryLevel.toInt()}%", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-          Text(snap.isCharging ? "Charging" : "On Battery", style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+          Text(
+            "${snap.batteryLevel.toInt()}%",
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          Text(
+            snap.isCharging ? "Charging" : "On Battery",
+            style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+          ),
         ],
       ),
     );
@@ -173,10 +207,25 @@ class StreamScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(LucideIcons.mapPin, size: 18, color: AppColors.electricBlue),
+          const Icon(
+            LucideIcons.mapPin,
+            size: 18,
+            color: AppColors.electricBlue,
+          ),
           const Spacer(),
-          Text(snap.location, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis),
-          Text(snap.activity, style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+          Text(
+            snap.location,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            snap.activity,
+            style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+          ),
         ],
       ),
     );
@@ -191,8 +240,19 @@ class StreamScreen extends StatelessWidget {
         children: [
           const Icon(LucideIcons.calendar, size: 18, color: AppColors.warning),
           const Spacer(),
-          Text(snap.nextEvent, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis),
-          const Text("Next Event", style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+          Text(
+            snap.nextEvent,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          const Text(
+            "Next Event",
+            style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+          ),
         ],
       ),
     );
@@ -207,8 +267,18 @@ class StreamScreen extends StatelessWidget {
         children: [
           const Icon(LucideIcons.bell, size: 18, color: AppColors.danger),
           const Spacer(),
-          Text("${(snap.recentSignals as List).length} Alerts", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-          const Text("Recent Signals", style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+          Text(
+            "${(snap.recentSignals as List).length} Alerts",
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const Text(
+            "Recent Signals",
+            style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+          ),
         ],
       ),
     );
@@ -216,38 +286,58 @@ class StreamScreen extends StatelessWidget {
 
   Widget _buildEventFeed(List snapshots) {
     return Column(
-      children: snapshots.map((s) => Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.surface.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.05)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 4,
-              height: 30,
+      children: snapshots
+          .map(
+            (s) => Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(2),
+                color: AppColors.surface.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text("Snapshot Updated", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-                  Text("Location: ${s.location} • Battery: ${s.batteryLevel.toInt()}%", style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
+                  Container(
+                    width: 4,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Snapshot Updated",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          "Location: ${s.location} • Battery: ${s.batteryLevel.toInt()}%",
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    DateFormat('HH:mm:ss').format(s.timestamp),
+                    style: TextStyle(fontSize: 10, color: AppColors.textMuted),
+                  ),
                 ],
               ),
             ),
-            Text(DateFormat('HH:mm:ss').format(s.timestamp), style: TextStyle(fontSize: 10, color: AppColors.textMuted)),
-          ],
-        ),
-      )).toList(),
+          )
+          .toList(),
     );
   }
 
@@ -257,8 +347,21 @@ class StreamScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-          Text(value, style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w500)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );

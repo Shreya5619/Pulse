@@ -14,7 +14,10 @@ class ContextDebugScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E21),
       appBar: AppBar(
-        title: const Text("Device Context", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text(
+          "Device Context",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -48,15 +51,27 @@ class ContextDebugScreen extends StatelessWidget {
   Widget _buildBatteryCard(BatteryInfo battery) {
     return _GlassCard(
       title: "Battery Status",
-      icon: battery.isCharging ? LucideIcons.batteryCharging : LucideIcons.battery,
+      icon: battery.isCharging
+          ? LucideIcons.batteryCharging
+          : LucideIcons.battery,
       color: _getBatteryColor(battery.level),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("${battery.level}%", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
-              Text(battery.isCharging ? "Charging" : "Discharging", style: TextStyle(color: Colors.white.withOpacity(0.7))),
+              Text(
+                "${battery.level}%",
+                style: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                battery.isCharging ? "Charging" : "Discharging",
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+              ),
             ],
           ),
           const SizedBox(height: 15),
@@ -69,14 +84,22 @@ class ContextDebugScreen extends StatelessWidget {
                 borderData: FlBorderData(show: false),
                 lineBarsData: [
                   LineChartBarData(
-                    spots: battery.trend.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.toDouble())).toList(),
+                    spots: battery.trend
+                        .asMap()
+                        .entries
+                        .map(
+                          (e) => FlSpot(e.key.toDouble(), e.value.toDouble()),
+                        )
+                        .toList(),
                     isCurved: true,
                     color: _getBatteryColor(battery.level),
                     barWidth: 3,
                     dotData: FlDotData(show: false),
                     belowBarData: BarAreaData(
                       show: true,
-                      color: _getBatteryColor(battery.level).withOpacity(0.1),
+                      color: _getBatteryColor(
+                        battery.level,
+                      ).withValues(alpha: 0.1),
                     ),
                   ),
                 ],
@@ -96,10 +119,23 @@ class ContextDebugScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(location.status, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white)),
+          Text(
+            location.status,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text("Lat: ${location.latitude.toStringAsFixed(4)}", style: TextStyle(color: Colors.white.withOpacity(0.6))),
-          Text("Lng: ${location.longitude.toStringAsFixed(4)}", style: TextStyle(color: Colors.white.withOpacity(0.6))),
+          Text(
+            "Lat: ${location.latitude.toStringAsFixed(4)}",
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
+          ),
+          Text(
+            "Lng: ${location.longitude.toStringAsFixed(4)}",
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
+          ),
         ],
       ),
     );
@@ -111,31 +147,53 @@ class ContextDebugScreen extends StatelessWidget {
       icon: LucideIcons.calendar,
       color: Colors.purpleAccent,
       child: events.isEmpty
-          ? const Text("No upcoming events", style: TextStyle(color: Colors.white54))
+          ? const Text(
+              "No upcoming events",
+              style: TextStyle(color: Colors.white54),
+            )
           : Column(
-              children: events.take(3).map((e) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 4,
-                      height: 40,
-                      decoration: BoxDecoration(color: Colors.purpleAccent, borderRadius: BorderRadius.circular(2)),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              children: events
+                  .take(3)
+                  .map(
+                    (e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
                         children: [
-                          Text(e.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          Text("${DateFormat.Hm().format(e.start)} - ${DateFormat.Hm().format(e.end)}", 
-                               style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                          Container(
+                            width: 4,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.purpleAccent,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  e.title,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  "${DateFormat.Hm().format(e.start)} - ${DateFormat.Hm().format(e.end)}",
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              )).toList(),
+                  )
+                  .toList(),
             ),
     );
   }
@@ -151,24 +209,55 @@ class ContextDebugScreen extends StatelessWidget {
       icon: LucideIcons.bell,
       color: Colors.orangeAccent,
       child: notifications.isEmpty
-          ? const Text("No notifications detected", style: TextStyle(color: Colors.white54))
+          ? const Text(
+              "No notifications detected",
+              style: TextStyle(color: Colors.white54),
+            )
           : Column(
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("Total: ${notifications.length}", style: const TextStyle(color: Colors.white70)),
-                    Text("Apps: ${counts.length}", style: const TextStyle(color: Colors.white70)),
+                    Text(
+                      "Total: ${notifications.length}",
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    Text(
+                      "Apps: ${counts.length}",
+                      style: const TextStyle(color: Colors.white70),
+                    ),
                   ],
                 ),
                 const Divider(color: Colors.white10, height: 20),
-                ...notifications.take(5).map((n) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  title: Text(n.packageName.split('.').last, style: const TextStyle(color: Colors.white, fontSize: 14)),
-                  subtitle: Text(n.title ?? "No title", style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
-                  trailing: Text(DateFormat.Hm().format(n.timestamp), style: const TextStyle(color: Colors.white24, fontSize: 10)),
-                )).toList(),
+                ...notifications
+                    .take(5)
+                    .map(
+                      (n) => ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(
+                          n.packageName.split('.').last,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
+                        subtitle: Text(
+                          n.title ?? "No title",
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 12,
+                          ),
+                        ),
+                        trailing: Text(
+                          DateFormat.Hm().format(n.timestamp),
+                          style: const TextStyle(
+                            color: Colors.white24,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ),
               ],
             ),
     );
@@ -187,7 +276,12 @@ class _GlassCard extends StatelessWidget {
   final Widget child;
   final Color color;
 
-  const _GlassCard({required this.title, required this.icon, required this.child, required this.color});
+  const _GlassCard({
+    required this.title,
+    required this.icon,
+    required this.child,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -195,9 +289,9 @@ class _GlassCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,7 +300,14 @@ class _GlassCard extends StatelessWidget {
             children: [
               Icon(icon, color: color, size: 20),
               const SizedBox(width: 10),
-              Text(title, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16, fontWeight: FontWeight.w600)),
+              Text(
+                title,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),

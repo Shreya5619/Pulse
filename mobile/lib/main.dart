@@ -13,10 +13,7 @@ import 'theme/colors.dart';
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AppState(),
-      child: const PulseApp(),
-    ),
+    ChangeNotifierProvider(create: (_) => AppState(), child: const PulseApp()),
   );
 }
 
@@ -56,16 +53,16 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _screens),
       bottomNavigationBar: Container(
         height: 90,
         decoration: BoxDecoration(
           color: AppColors.background,
           border: Border(
-            top: BorderSide(color: Colors.white.withOpacity(0.05), width: 1),
+            top: BorderSide(
+              color: Colors.white.withValues(alpha: 0.05),
+              width: 1,
+            ),
           ),
         ),
         child: Row(

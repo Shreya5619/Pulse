@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/risk_state.dart';
 import '../models/intervention.dart';
@@ -11,7 +12,7 @@ import '../services/context_services.dart';
 class AppState extends ChangeNotifier {
   final ContextServices _contextServices = ContextServices();
   DeviceContext _deviceContext = DeviceContext.initial();
-  
+
   DeviceContext get deviceContext => _deviceContext;
   final RiskState _currentRisk = RiskState(
     score: 84,
@@ -47,9 +48,13 @@ class AppState extends ChangeNotifier {
       final oldTrend = _deviceContext.battery.trend;
       final newTrend = [...oldTrend, info.level];
       if (newTrend.length > 20) newTrend.removeAt(0);
-      
+
       _deviceContext = DeviceContext(
-        battery: BatteryInfo(level: info.level, isCharging: info.isCharging, trend: newTrend),
+        battery: BatteryInfo(
+          level: info.level,
+          isCharging: info.isCharging,
+          trend: newTrend,
+        ),
         location: _deviceContext.location,
         upcomingEvents: _deviceContext.upcomingEvents,
         notifications: _deviceContext.notifications,
@@ -58,21 +63,37 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     });
 
-    // Location
-    _contextServices.locationStream.listen((info) {
-      _deviceContext = DeviceContext(
-        battery: _deviceContext.battery,
-        location: info,
-        upcomingEvents: _deviceContext.upcomingEvents,
-        notifications: _deviceContext.notifications,
-        timestamp: DateTime.now(),
-      );
-      notifyListeners();
-    });
+    // Location Permission & Stream
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (serviceEnabled) {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      
+      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+        _contextServices.locationStream.listen((info) {
+          debugPrint('[Pulse Context] Location Update: ${info.latitude}, ${info.longitude}');
+          _deviceContext = DeviceContext(
+            battery: _deviceContext.battery,
+            location: info,
+            upcomingEvents: _deviceContext.upcomingEvents,
+            notifications: _deviceContext.notifications,
+            timestamp: DateTime.now(),
+          );
+          notifyListeners();
+        });
+      } else {
+        debugPrint('[Pulse Context] Location Permission Denied: $permission');
+      }
+    } else {
+      debugPrint('[Pulse Context] Location Services Disabled');
+    }
 
     // Calendar - Refresh every 15 minutes
     Timer.periodic(const Duration(minutes: 15), (timer) async {
       final events = await _contextServices.getUpcomingEvents();
+      debugPrint('[Pulse Context] Calendar Refreshed: ${events.length} events found');
       _deviceContext = DeviceContext(
         battery: _deviceContext.battery,
         location: _deviceContext.location,
@@ -82,8 +103,14 @@ class AppState extends ChangeNotifier {
       );
       notifyListeners();
     });
+    
     // Initial fetch
     final initialEvents = await _contextServices.getUpcomingEvents();
+    debugPrint('[Pulse Context] Initial Calendar Fetch: ${initialEvents.length} events found');
+    for (var event in initialEvents) {
+      debugPrint('  - Event: ${event.title} at ${event.start}');
+    }
+    
     _deviceContext = DeviceContext(
       battery: _deviceContext.battery,
       location: _deviceContext.location,
@@ -95,6 +122,7 @@ class AppState extends ChangeNotifier {
 
     // Notifications
     await _contextServices.initNotifications((event) {
+      debugPrint('[Pulse Context] Notification Received: ${event.packageName}');
       final newNotif = NotificationInfo(
         packageName: event.packageName ?? "unknown",
         title: event.title,
@@ -127,7 +155,7 @@ class AppState extends ChangeNotifier {
       // OPTIONAL: If testing on a PHYSICAL device, use your machine's IP:
       host = '192.168.0.101';
       final wsUrl = 'ws://$host:8080/ws';
-      print('[Pulse] Attempting connection to: $wsUrl');
+      debugPrint('[Pulse] Attempting connection to: $wsUrl');
 
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
 
@@ -136,17 +164,17 @@ class AppState extends ChangeNotifier {
           _handleWebSocketMessage(message);
         },
         onError: (error) {
-          print('[Pulse] WS Error: $error');
+          debugPrint('[Pulse] WS Error: $error');
           _reconnect();
         },
         onDone: () {
-          print('[Pulse] WS Closed');
+          debugPrint('[Pulse] WS Closed');
           _reconnect();
         },
         cancelOnError: true,
       );
     } catch (e) {
-      print('[Pulse] WS Connection failed: $e');
+      debugPrint('[Pulse] WS Connection failed: $e');
       _reconnect();
     }
   }
@@ -154,7 +182,7 @@ class AppState extends ChangeNotifier {
   void _reconnect() {
     Future.delayed(const Duration(seconds: 5), () {
       if (_channel == null || _channel!.closeCode != null) {
-        print('[Pulse] Attempting to reconnect...');
+        debugPrint('[Pulse] Attempting to reconnect...');
         _connectWebSocket();
       }
     });
@@ -167,12 +195,12 @@ class AppState extends ChangeNotifier {
 
     try {
       final data = jsonDecode(text);
-      print('[Pulse] Received: ${data['type']}');
+      debugPrint('[Pulse] Received: ${data['type']}');
 
       // Here we could update state based on message type
       // e.g., if (data['type'] == 'heartbeat.tick') { ... }
     } catch (e) {
-      print('[Pulse] Error parsing message: $e');
+      debugPrint('[Pulse] Error parsing message: $e');
     }
 
     notifyListeners();

@@ -8,8 +8,8 @@ class PulseGauge extends StatelessWidget {
   final double size;
 
   const PulseGauge({
-    super.key, 
-    required this.score, 
+    super.key,
+    required this.score,
     required this.status,
     this.size = 80,
   });
@@ -47,10 +47,7 @@ class SimpleGaugePainter extends CustomPainter {
   final double score;
   final Color primaryColor;
 
-  SimpleGaugePainter({
-    required this.score,
-    required this.primaryColor,
-  });
+  SimpleGaugePainter({required this.score, required this.primaryColor});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -59,7 +56,7 @@ class SimpleGaugePainter extends CustomPainter {
     final strokeWidth = 4.0;
 
     final trackPaint = Paint()
-      ..color = Colors.white.withOpacity(0.1)
+      ..color = Colors.white.withValues(alpha: 0.1)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth;
 

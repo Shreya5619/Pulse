@@ -32,7 +32,7 @@ class HomeScreen extends StatelessWidget {
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        AppColors.primary.withOpacity(0.15),
+                        AppColors.primary.withValues(alpha: 0.15),
                         Colors.transparent,
                       ],
                     ),
@@ -41,7 +41,10 @@ class HomeScreen extends StatelessWidget {
               ),
               SafeArea(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24.0,
+                    vertical: 16.0,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -57,10 +60,16 @@ class HomeScreen extends StatelessWidget {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(LucideIcons.activity, color: AppColors.primary),
+                            icon: const Icon(
+                              LucideIcons.activity,
+                              color: AppColors.primary,
+                            ),
                             onPressed: () => Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => const ContextDebugScreen()),
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const ContextDebugScreen(),
+                              ),
                             ),
                           ),
                         ],
@@ -82,12 +91,12 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      
+
                       // Risk Overview Card
                       _buildRiskOverviewCard(risk),
-                      
+
                       const SizedBox(height: 20),
-                      
+
                       Row(
                         children: [
                           Expanded(child: _buildReasonCard(risk.reasons)),
@@ -95,12 +104,14 @@ class HomeScreen extends StatelessWidget {
                           Expanded(child: _buildTrendCard(risk.history)),
                         ],
                       ),
-                      
+
                       const SizedBox(height: 20),
-                      
+
                       Row(
                         children: [
-                          Expanded(child: _buildPrimaryActionCard(context, state)),
+                          Expanded(
+                            child: _buildPrimaryActionCard(context, state),
+                          ),
                           const SizedBox(width: 16),
                           Expanded(child: _buildConnectionCard(state)),
                         ],
@@ -134,9 +145,11 @@ class HomeScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.2),
+              color: AppColors.primary.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.3),
+              ),
             ),
             child: Text(
               risk.levelText,
@@ -158,10 +171,7 @@ class HomeScreen extends StatelessWidget {
           ),
           Text(
             "Last updated: 3 minutes ago",
-            style: GoogleFonts.outfit(
-              fontSize: 12,
-              color: AppColors.textMuted,
-            ),
+            style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted),
           ),
         ],
       ),
@@ -187,13 +197,21 @@ class HomeScreen extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: reasons.take(3).map((r) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  r,
-                  style: GoogleFonts.outfit(fontSize: 11, color: AppColors.textSecondary),
-                ),
-              )).toList(),
+              children: reasons
+                  .take(3)
+                  .map(
+                    (r) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        r,
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
           ),
         ],
@@ -225,24 +243,31 @@ class HomeScreen extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
-              children: history.map((h) => Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    h.toInt().toString(),
-                    style: const TextStyle(fontSize: 8, color: Colors.white70),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    width: 12,
-                    height: (h / 100) * 60,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(4),
+              children: history
+                  .map(
+                    (h) => Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          h.toInt().toString(),
+                          style: const TextStyle(
+                            fontSize: 8,
+                            color: Colors.white70,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 12,
+                          height: (h / 100) * 60,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              )).toList(),
+                  )
+                  .toList(),
             ),
           ),
         ],
@@ -271,11 +296,13 @@ class HomeScreen extends StatelessWidget {
             child: ElevatedButton(
               onPressed: () {},
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary.withOpacity(0.3),
+                backgroundColor: AppColors.primary.withValues(alpha: 0.3),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+                  side: BorderSide(
+                    color: AppColors.primary.withValues(alpha: 0.5),
+                  ),
                 ),
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
@@ -312,12 +339,16 @@ class HomeScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: AppColors.electricBlue.withOpacity(0.2),
+              color: AppColors.electricBlue.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
               "Mode: ${state.isLive ? 'LIVE' : 'MOCK'}",
-              style: const TextStyle(color: AppColors.electricBlue, fontSize: 8, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: AppColors.electricBlue,
+                fontSize: 8,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           const SizedBox(height: 4),
@@ -336,8 +367,18 @@ class HomeScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 10, color: Colors.white54)),
-          Text(value, style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10, color: Colors.white54),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
