@@ -57,3 +57,18 @@ CREATE TABLE IF NOT EXISTS memory_commute (
     last_updated TIMESTAMPTZ DEFAULT NOW(),
     source TEXT
 );
+
+-- Risk Snapshots — point-in-time risk assessments
+CREATE TABLE IF NOT EXISTS risk_snapshots (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL,
+    top_score REAL NOT NULL DEFAULT 0,
+    risk_count INTEGER NOT NULL DEFAULT 0,
+    risks JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_risk_snapshots_user ON risk_snapshots(user_id);
+CREATE INDEX IF NOT EXISTS idx_risk_snapshots_user_ts ON risk_snapshots(user_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_risk_snapshots_top_score ON risk_snapshots(top_score DESC);

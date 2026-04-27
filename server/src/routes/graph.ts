@@ -1,5 +1,7 @@
 import { Router, Request, Response } from "express";
 import { graphBuilder } from "../services/GraphBuilder";
+import { riskEngine } from "../services/RiskEngineService";
+import { riskSnapshotRepo } from "../db/RiskSnapshotRepository";
 
 const router = Router();
 
@@ -57,6 +59,57 @@ router.get("/full", async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/graph/risk
+ * Compute and return a live RiskSnapshot for the user.
+ * The snapshot is also persisted to Postgres for historical queries.
+ */
+router.get("/risk", async (req: Request, res: Response) => {
+    try {
+        const userId = (req.header("X-User-Id") || req.query.userId || "lifecanvas_studios") as string;
+        console.log(`[GraphRoute] GET /risk hit for user: ${userId}`);
+
+        const snapshot = await riskEngine.computeForUser(userId);
+        res.json({ ok: true, data: snapshot });
+    } catch (error: any) {
+        console.error("[Pulse] Risk computation error:", error);
+        res.status(500).json({ ok: false, error: "Failed to compute risk snapshot", message: error.message });
+    }
+});
+
+/**
+ * GET /api/graph/risk/history
+ * Query stored risk snapshots by time window.
+ *
+ * Query params:
+ *   userId  – user identifier (default: lifecanvas_studios)
+ *   from    – ISO 8601 start time (default: 24h ago)
+ *   to      – ISO 8601 end time   (default: now)
+ */
+router.get("/risk/history", async (req: Request, res: Response) => {
+    try {
+        const userId = (req.header("X-User-Id") || req.query.userId || "lifecanvas_studios") as string;
+        const now = new Date();
+        const from = req.query.from ? new Date(req.query.from as string) : new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const to = req.query.to ? new Date(req.query.to as string) : now;
+
+        const snapshots = await riskSnapshotRepo.findRange(userId, from, to);
+        res.json({
+            ok: true,
+            data: {
+                userId,
+                from: from.toISOString(),
+                to: to.toISOString(),
+                count: snapshots.length,
+                snapshots
+            }
+        });
+    } catch (error: any) {
+        console.error("[Pulse] Risk history error:", error);
+        res.status(500).json({ ok: false, error: "Failed to query risk history", message: error.message });
+    }
+});
+
+/**
  * GET /api/graph
  * Fallback to full graph.
  */
@@ -65,3 +118,4 @@ router.get("/", async (req: Request, res: Response) => {
 });
 
 export default router;
+

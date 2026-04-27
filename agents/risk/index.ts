@@ -1,18 +1,22 @@
 /**
  * Risk Agent
  * Quantifies failure probability across multiple dimensions (lateness, battery, etc.).
- * 
+ *
+ * Delegates to the RiskEngineService which builds a graph, reads memory,
+ * and produces a full RiskSnapshot with human-readable explanations.
+ *
  * @param context - The normalized world state from Context Agent.
- * @returns riskScore - An object containing scaled risk values and factors.
+ * @returns RiskSnapshot with scored risks across all dimensions.
  */
-export async function riskAgent(context: any): Promise<any> {
-  console.log("Risk Agent: Calculating risk scores...");
+import { riskEngine } from "../../server/src/services/RiskEngineService";
+import { RiskSnapshot } from "../../server/src/types/risk";
 
-  // TODO: Implement risk assessment logic
-  return {
-    latenessRisk: 0.1,
-    batteryRisk: 0.05,
-    factors: ["low_traffic", "sufficient_battery"],
-    contextId: context?.id
-  };
+export async function riskAgent(context: any): Promise<RiskSnapshot> {
+  const userId = context?.userId || "lifecanvas_studios";
+
+  console.log(`[RiskAgent] Computing risk for ${userId}...`);
+  const snapshot = await riskEngine.computeForUser(userId);
+
+  console.log("[RiskAgent] Snapshot:", JSON.stringify(snapshot, null, 2));
+  return snapshot;
 }

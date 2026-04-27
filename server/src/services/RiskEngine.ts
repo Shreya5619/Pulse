@@ -189,7 +189,7 @@ export function assessResponseDebt(
     importantPending === 0
       ? "No pending response debt."
       : `${importantPending} unread message(s) from important contacts, ` +
-        `oldest ${oldestMinutes} min ago → ${label} response debt.`;
+      `oldest ${oldestMinutes} min ago → ${label} response debt.`;
 
   return { type: "response_debt", score, label, nodeId, summary, causes };
 }
@@ -264,3 +264,5 @@ export function buildSnapshot(
     risks: risks.filter((r) => r.score > 0), // omit zero-risk entries
   };
 }
+
+

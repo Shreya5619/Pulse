@@ -13,15 +13,17 @@ import {
 } from "./RiskEngine";
 
 export class GraphBuilder {
-  private graphCache = new Map<string, { nodes: GraphNode[]; edges: GraphEdge[]; summary: GraphSummary }>();
+  private graphCache = new Map<string, { nodes: GraphNode[]; edges: GraphEdge[]; summary: GraphSummary; context: ContextSnapshot }>();
 
-  async buildForUser(userId: string): Promise<{ nodes: GraphNode[]; edges: GraphEdge[]; summary: GraphSummary }> {
+  async buildForUser(userId: string): Promise<{ nodes: GraphNode[]; edges: GraphEdge[]; summary: GraphSummary; context: ContextSnapshot }> {
     const context = await contextSnapshotRepo.findLatestByUser(userId);
     const memory = await memoryStore.loadAll(userId);
     const upcomingEvents = await eventsRepo.getUpcoming(userId, { withinMinutes: 240 });
 
     if (!context) {
-      return { nodes: [], edges: [], summary: { totalRisksNext90Min: 0, risks: [] } };
+      // Return a minimal stub context so callers don't need null-checks
+      const stub = { timestamp: new Date().toISOString() } as ContextSnapshot;
+      return { nodes: [], edges: [], summary: { totalRisksNext90Min: 0, risks: [] }, context: stub };
     }
 
     const nodes: GraphNode[] = [];
@@ -139,7 +141,7 @@ export class GraphBuilder {
     // --- SUMMARY GENERATION ---
     const summary = this.computeTopRisks(nodes, context);
 
-    const result = { nodes, edges, summary };
+    const result = { nodes, edges, summary, context };
     this.graphCache.set(userId, result);
     return result;
   }
@@ -244,7 +246,7 @@ export class GraphBuilder {
       if (!node.scores) return;
 
       const checkRisk = (type: RiskSummaryItem["type"], score: number | undefined, template: string) => {
-        if (score && score > 0.1) { // Basic threshold
+        if (score && score >= 0.4) { // Non-LOW risks only (MEDIUM + HIGH)
           if (!bestByRisk[type] || score > bestByRisk[type].score) {
             bestByRisk[type] = {
               type,

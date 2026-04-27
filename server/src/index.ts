@@ -19,6 +19,7 @@ import graphRouter from "./routes/graph";
 import routingRouter from "./routes/routing";
 import { graphBuilder } from "./services/GraphBuilder";
 import { memoryAgent } from "./services/MemoryAgent";
+import { riskEngine } from "./services/RiskEngineService";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -96,23 +97,16 @@ async function runAgentPulseFlow(initialContext: any) {
         });
         await new Promise(r => setTimeout(r, 1000));
 
-        // 3. Risk Agent
-        await riskAgent(initialContext);
+        // 3. Risk Agent — live snapshot from graph + memory
+        const riskSnapshot = await riskAgent(initialContext);
         broadcast({
             type: "risk.updated",
             eventId: `risk_${Date.now()}`,
             timestamp: new Date().toISOString(),
-            data: {
-                userId: initialContext.userId,
-                timestamp: new Date().toISOString(),
-                scenario: "COMMUTE_LATE",
-                score: 0.84,
-                label: "HIGH",
-                reasons: ["Traffic worsening", "Battery at 17%", "25 minutes to lab"]
-            }
+            data: riskSnapshot
         });
         await new Promise(r => setTimeout(r, 1000));
-        
+
         // 3.5 Build Graph (Day 6)
         const graph = await graphBuilder.buildForUser(initialContext.userId);
         const appCount = graph.nodes.filter(n => n.type === "APPOINTMENT").length;
@@ -173,7 +167,7 @@ async function runAgentPulseFlow(initialContext: any) {
                 secondaryCtaLabel: "Dismiss"
             }
         });
-        
+
         console.log("[Pulse] Agent flow orchestration completed.");
         return { alert: lastInterventionText };
     } finally {
@@ -270,7 +264,7 @@ app.post("/heartbeat/manual", async (req: Request, res: Response) => {
     try {
         const scenarioPath = path.join(dataDir, "demo-scenario.json");
         const scenario = readJson(scenarioPath) as JsonObject;
-        
+
         // Return immediate ACK
         res.json({
             ok: true,
@@ -368,18 +362,23 @@ wss.on("connection", (ws, req) => {
 const HEARTBEAT_TICK_MS = 5000;
 let tickSequence = 1;
 
-// Background auto-tick every 5 seconds
+// Background auto-tick every 5 seconds (lightweight: uses cached graph)
 setInterval(() => {
+    // Derive a live risk score from the cached graph if available
+    const cached = graphBuilder.getCachedGraph("lifecanvas_studios");
+    const topRisks = cached?.summary?.risks || [];
+    const topScore = topRisks.length > 0 ? Math.max(...topRisks.map(r => r.score)) : 0;
+
     broadcast({
         type: "heartbeat.tick",
         eventId: `tick_auto_${Date.now()}`,
         timestamp: new Date().toISOString(),
         data: {
             sequence: tickSequence++,
-            state: "risk_forming",
-            score: 0.62,
-            source: "heartbeat_mock",
-            reason: "late_night_motion + missed_checkin"
+            state: topScore >= 0.4 ? "risk_forming" : "nominal",
+            score: parseFloat(topScore.toFixed(2)),
+            source: "graph_cache",
+            risksNext90Min: cached?.summary?.totalRisksNext90Min ?? 0
         }
     });
 }, HEARTBEAT_TICK_MS);
