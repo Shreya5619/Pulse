@@ -1,13 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/risk_state.dart';
 import '../models/intervention.dart';
 import '../models/snapshot.dart';
+import '../models/device_context.dart';
+import '../services/context_services.dart';
 
 class AppState extends ChangeNotifier {
+  final ContextServices _contextServices = ContextServices();
+  DeviceContext _deviceContext = DeviceContext.initial();
+  
+  DeviceContext get deviceContext => _deviceContext;
   final RiskState _currentRisk = RiskState(
     score: 84,
     level: RiskLevel.safe,
@@ -31,8 +36,82 @@ class AppState extends ChangeNotifier {
   AppState() {
     _generateMockData();
     _connectWebSocket();
+    _initContextIngestion();
     // Keep internal simulation for fallback or UI stability
     _startSimulatedStream();
+  }
+
+  void _initContextIngestion() async {
+    // Battery
+    _contextServices.batteryStream.listen((info) {
+      final oldTrend = _deviceContext.battery.trend;
+      final newTrend = [...oldTrend, info.level];
+      if (newTrend.length > 20) newTrend.removeAt(0);
+      
+      _deviceContext = DeviceContext(
+        battery: BatteryInfo(level: info.level, isCharging: info.isCharging, trend: newTrend),
+        location: _deviceContext.location,
+        upcomingEvents: _deviceContext.upcomingEvents,
+        notifications: _deviceContext.notifications,
+        timestamp: DateTime.now(),
+      );
+      notifyListeners();
+    });
+
+    // Location
+    _contextServices.locationStream.listen((info) {
+      _deviceContext = DeviceContext(
+        battery: _deviceContext.battery,
+        location: info,
+        upcomingEvents: _deviceContext.upcomingEvents,
+        notifications: _deviceContext.notifications,
+        timestamp: DateTime.now(),
+      );
+      notifyListeners();
+    });
+
+    // Calendar - Refresh every 15 minutes
+    Timer.periodic(const Duration(minutes: 15), (timer) async {
+      final events = await _contextServices.getUpcomingEvents();
+      _deviceContext = DeviceContext(
+        battery: _deviceContext.battery,
+        location: _deviceContext.location,
+        upcomingEvents: events,
+        notifications: _deviceContext.notifications,
+        timestamp: DateTime.now(),
+      );
+      notifyListeners();
+    });
+    // Initial fetch
+    final initialEvents = await _contextServices.getUpcomingEvents();
+    _deviceContext = DeviceContext(
+      battery: _deviceContext.battery,
+      location: _deviceContext.location,
+      upcomingEvents: initialEvents,
+      notifications: _deviceContext.notifications,
+      timestamp: DateTime.now(),
+    );
+    notifyListeners();
+
+    // Notifications
+    await _contextServices.initNotifications((event) {
+      final newNotif = NotificationInfo(
+        packageName: event.packageName ?? "unknown",
+        title: event.title,
+        timestamp: DateTime.now(),
+      );
+      final newList = [newNotif, ..._deviceContext.notifications];
+      if (newList.length > 50) newList.removeLast();
+
+      _deviceContext = DeviceContext(
+        battery: _deviceContext.battery,
+        location: _deviceContext.location,
+        upcomingEvents: _deviceContext.upcomingEvents,
+        notifications: newList,
+        timestamp: DateTime.now(),
+      );
+      notifyListeners();
+    });
   }
 
   void _connectWebSocket() {

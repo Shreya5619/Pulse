@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:ui';
 
 class TimelineScreen extends StatelessWidget {
   const TimelineScreen({super.key});
