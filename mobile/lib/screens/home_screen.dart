@@ -5,13 +5,13 @@ import 'package:google_fonts/google_fonts.dart';
 import '../providers/app_state.dart';
 import '../widgets/glass_card.dart';
 import '../theme/colors.dart';
-
 import '../screens/context_debug_screen.dart';
 import '../screens/replay_screen.dart';
+import '../screens/scenario_player_screen.dart';
+import '../screens/gantt_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
   @override
   Widget build(BuildContext context) {
     return Consumer<AppState>(
@@ -20,379 +20,359 @@ class HomeScreen extends StatelessWidget {
 
         return Scaffold(
           backgroundColor: AppColors.background,
-          body: Stack(
-            children: [
-              // Background Wavy Glow (Simplified)
-              Positioned(
-                top: 100,
-                right: -100,
-                child: Container(
-                  width: 300,
-                  height: 600,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        AppColors.primary.withValues(alpha: 0.15),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20.0,
+                vertical: 16.0,
               ),
-              SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24.0,
-                    vertical: 16.0,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Pulse",
-                            style: GoogleFonts.outfit(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(
-                              LucideIcons.playCircle,
-                              color: AppColors.primary,
-                            ),
-                            tooltip: "Simulation Mode",
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const ReplayScreen(),
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(
-                              LucideIcons.activity,
-                              color: AppColors.primary,
-                            ),
-                            tooltip: "Device Context",
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const ContextDebugScreen(),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        "Good evening, Arjun,",
-                        style: GoogleFonts.outfit(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        "Here's your current safety snapshot.",
-                        style: GoogleFonts.outfit(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Risk Overview Card
-                      _buildRiskOverviewCard(risk),
-
-                      const SizedBox(height: 20),
-
-                      Row(
-                        children: [
-                          Expanded(child: _buildReasonCard(risk.reasons)),
-                          const SizedBox(width: 16),
-                          Expanded(child: _buildTrendCard(risk.history)),
-                        ],
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildPrimaryActionCard(context, state),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(child: _buildConnectionCard(state)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeaderStrip(context, state),
+                  const SizedBox(height: 24),
+                  _buildBigSummaryCard(state),
+                  const SizedBox(height: 24),
+                  _buildRiskStack(state),
+                  const SizedBox(height: 24),
+                  _buildContextChipsRow(context, state),
+                  const SizedBox(height: 80), // Space for bottom banner
+                ],
               ),
-            ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildRiskOverviewCard(dynamic risk) {
+  Widget _buildHeaderStrip(BuildContext context, AppState state) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Now until 90 min",
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(
+                  LucideIcons.playCircle,
+                  size: 14,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ScenarioPlayerScreen(),
+                    ),
+                  ),
+                  child: const Text(
+                    "Simulation Mode",
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            IconButton(
+              icon: const Icon(LucideIcons.calendar, size: 18, color: Colors.white30),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const GanttScreen()),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(LucideIcons.clock, size: 14, color: Colors.blueAccent),
+                  const SizedBox(width: 8),
+                  Text(
+                    "Client Review · 18 min",
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBigSummaryCard(AppState state) {
     return GlassCard(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            "Risk Overview",
-            style: GoogleFonts.outfit(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Colors.white70,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.3),
-              ),
-            ),
-            child: Text(
-              risk.levelText,
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
+          const Text(
+            "3 risks forming in next 90 minutes",
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              height: 1.2,
             ),
           ),
           const SizedBox(height: 16),
-          Text(
-            risk.score.toInt().toString(),
-            style: GoogleFonts.outfit(
-              fontSize: 72,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _statusChip("Lateness", Colors.redAccent),
+              _statusChip("Battery", Colors.orangeAccent),
+              _statusChip("Overload", Colors.purpleAccent),
+              _statusChip("Response Debt", Colors.blueAccent),
+            ],
           ),
-          Text(
-            "Last updated: 3 minutes ago",
-            style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              const Icon(LucideIcons.info, size: 12, color: Colors.white30),
+              const SizedBox(width: 6),
+              Text(
+                "Tap a card below to see why.",
+                style: GoogleFonts.outfit(fontSize: 11, color: Colors.white30),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildReasonCard(List<String> reasons) {
+  Widget _statusChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRiskStack(AppState state) {
+    return Column(
+      children: [
+        _riskCard(
+          icon: LucideIcons.clock,
+          color: Colors.redAccent,
+          title: "You'll be 10–15 min late to client review",
+          chips: ["Route congestion", "You leave in 5 min"],
+          score: "0.78",
+          level: "High",
+        ),
+        const SizedBox(height: 12),
+        _riskCard(
+          icon: LucideIcons.battery,
+          color: Colors.orangeAccent,
+          title: "Phone will die before commute ends",
+          chips: ["Battery 17%", "Draining fast"],
+          score: "0.82",
+          level: "High",
+        ),
+        const SizedBox(height: 12),
+        _riskCard(
+          icon: LucideIcons.inbox,
+          color: Colors.blueAccent,
+          title: "4 pending responses to High priority",
+          chips: ["Avg reply > 2h", "Client messages"],
+          score: "0.45",
+          level: "Med",
+        ),
+      ],
+    );
+  }
+
+  Widget _riskCard({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required List<String> chips,
+    required String score,
+    required String level,
+  }) {
     return GlassCard(
-      height: 180,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.all(16),
+      child: Row(
         children: [
-          Text(
-            "Reason",
-            style: GoogleFonts.outfit(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
             ),
+            child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: reasons
-                  .take(3)
-                  .map(
-                    (r) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        r,
-                        style: GoogleFonts.outfit(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTrendCard(List<double> history) {
-    return GlassCard(
-      height: 180,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Trend",
-            style: GoogleFonts.outfit(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-          Text(
-            "Last 5 risk scores",
-            style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: history
-                  .map(
-                    (h) => Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          h.toInt().toString(),
-                          style: const TextStyle(
-                            fontSize: 8,
-                            color: Colors.white70,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Container(
-                          width: 12,
-                          height: (h / 100) * 60,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.4),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPrimaryActionCard(BuildContext context, AppState state) {
-    return GlassCard(
-      height: 140,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Primary Action",
-            style: GoogleFonts.outfit(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-          const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary.withValues(alpha: 0.3),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: AppColors.primary.withValues(alpha: 0.5),
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
                   ),
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              child: const Text(
-                "Check in now",
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-              ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  children: chips.map((c) => _tinyChip(c)).toList(),
+                ),
+              ],
             ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                score,
+                style: GoogleFonts.outfit(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              Text(
+                level,
+                style: TextStyle(
+                  color: color.withOpacity(0.5),
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildConnectionCard(AppState state) {
-    return GlassCard(
-      height: 140,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Connection",
-            style: GoogleFonts.outfit(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildConnRow("WebSocket", "Connected"),
-          _buildConnRow("API", "Online"),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppColors.electricBlue.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              "Mode: ${state.isReplayMode ? 'REPLAY' : (state.isLive ? 'LIVE' : 'MOCK')}",
-              style: const TextStyle(
-                color: AppColors.electricBlue,
-                fontSize: 8,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "Event count: ${state.snapshots.length * 10}",
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 9),
-          ),
-        ],
+  Widget _tinyChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        "• $label",
+        style: const TextStyle(color: Colors.white54, fontSize: 9),
       ),
     );
   }
 
-  Widget _buildConnRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
+  Widget _buildContextChipsRow(BuildContext context, AppState state) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Current Context",
+          style: GoogleFonts.outfit(
+            fontSize: 12,
+            color: Colors.white30,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _contextChip(LucideIcons.battery, "Battery 17% (draining fast)"),
+              _contextChip(LucideIcons.calendar, "Calendar: 3 events next 2h"),
+              _contextChip(LucideIcons.bell, "Notifications: 46 in last hour"),
+              _contextChip(
+                LucideIcons.mapPin,
+                "Koramangala → Whitefield · 56 min",
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ContextDebugScreen(),
+                ),
+              );
+            },
+            icon: const Icon(LucideIcons.list, size: 14),
+            label: const Text("VIEW RAW CONTEXT STREAM", style: TextStyle(fontSize: 10, letterSpacing: 1.1)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white30,
+              side: const BorderSide(color: Colors.white10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _contextChip(IconData icon, String label) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          Icon(icon, size: 12, color: Colors.white30),
+          const SizedBox(width: 8),
           Text(
             label,
-            style: const TextStyle(fontSize: 10, color: Colors.white54),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 10,
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
           ),
         ],
       ),

@@ -6,10 +6,12 @@ import 'package:intl/intl.dart';
 import 'theme/app_theme.dart';
 import 'providers/app_state.dart';
 import 'screens/home_screen.dart';
-import 'screens/stream_screen.dart';
-import 'screens/intervention_screen.dart';
-import 'screens/feedback_screen.dart';
 import 'screens/timeline_screen.dart';
+import 'screens/futures_screen.dart';
+import 'screens/intervention_screen.dart';
+import 'screens/digest_screen.dart';
+import 'screens/gantt_screen.dart';
+import 'screens/scenario_player_screen.dart';
 import 'theme/colors.dart';
 
 void main() {
@@ -44,10 +46,10 @@ class _MainShellState extends State<MainShell> {
 
   final List<Widget> _screens = [
     const HomeScreen(),
-    const StreamScreen(),
-    const InterventionScreen(),
-    const FeedbackScreen(),
     const TimelineScreen(),
+    const FuturesScreen(),
+    const InterventionScreen(),
+    const DigestScreen(),
   ];
 
   @override
@@ -58,36 +60,36 @@ class _MainShellState extends State<MainShell> {
         builder: (context, appState, child) {
           return Column(
             children: [
+              Expanded(
+                child: IndexedStack(index: _selectedIndex, children: _screens),
+              ),
               if (appState.isReplayMode)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.blueAccent.withOpacity(0.9),
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+                  decoration: const BoxDecoration(
+                    color: Colors.amber,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
                         children: [
-                          const Icon(LucideIcons.playCircle, color: Colors.white, size: 16),
+                          const Icon(LucideIcons.playCircle, color: Colors.black, size: 16),
                           const SizedBox(width: 10),
-                          const Text(
-                            "REPLAY MODE ACTIVE",
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                          Text(
+                            "Scenario replay: Morning commute",
+                            style: GoogleFonts.outfit(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
                           ),
                         ],
                       ),
                       Text(
-                        "Simulated: ${appState.simulatedTime != null ? DateFormat.Hm().format(appState.simulatedTime!) : '--:--'} (${appState.replaySpeed.toInt()}x)",
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        "${appState.simulatedTime != null ? DateFormat.Hm().format(appState.simulatedTime!) : '08:35'} / 09:10 · Pause / Restart",
+                        style: GoogleFonts.outfit(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
                 ),
-              Expanded(
-                child: IndexedStack(index: _selectedIndex, children: _screens),
-              ),
             ],
           );
         },
@@ -107,10 +109,10 @@ class _MainShellState extends State<MainShell> {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _buildNavItem(0, LucideIcons.home, "Home"),
-            _buildNavItem(1, LucideIcons.activity, "Stream"),
-            _buildNavItem(2, LucideIcons.zap, "Actions"),
-            _buildNavItem(3, LucideIcons.history, "History"),
-            _buildNavItem(4, LucideIcons.clock, "Timeline"),
+            _buildNavItem(1, LucideIcons.list, "Timeline"),
+            _buildNavItem(2, LucideIcons.trendingUp, "Futures"),
+            _buildNavItem(3, LucideIcons.zap, "Actions"),
+            _buildNavItem(4, LucideIcons.layout, "Digest"),
           ],
         ),
       ),

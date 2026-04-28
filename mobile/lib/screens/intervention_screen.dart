@@ -1,367 +1,123 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../providers/app_state.dart';
-import '../models/intervention.dart';
-import '../widgets/glass_card.dart';
 import '../theme/colors.dart';
+import '../widgets/glass_card.dart';
 
 class InterventionScreen extends StatelessWidget {
   const InterventionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppState>(
-      builder: (context, state, child) {
-        final intervention = state.interventions.isNotEmpty
-            ? state.interventions.first
-            : null;
-
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          body: SafeArea(
-            child: intervention == null
-                ? _buildEmptyState(context)
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Intervention Detail",
-                          style: GoogleFonts.outfit(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          "Guidance for your current risk level",
-                          style: GoogleFonts.outfit(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        _buildMainInterventionCard(intervention),
-                        const SizedBox(height: 20),
-                        _buildWhyBox(intervention),
-                        const SizedBox(height: 20),
-                        _buildStepsBox(intervention),
-                        const SizedBox(height: 20),
-                        _buildImpactBox(intervention),
-                        const SizedBox(height: 32),
-                        _buildActionButtons(context, state, intervention),
-                        const SizedBox(height: 24),
-                        _buildTraceabilityBox(intervention),
-                      ],
-                    ),
-                  ),
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Suggested action right now", style: TextStyle(color: Colors.white30, fontSize: 12, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              _buildPrimaryActionCard(),
+              const SizedBox(height: 32),
+              _buildActionCategory("Commute", [
+                _actionRow(LucideIcons.car, "Switch to cab", "Saves 15 min vs Metro walking", true),
+                _actionRow(LucideIcons.batteryCharging, "Add charging stop", "Ensures +20% buffer for lab", false),
+              ]),
+              const SizedBox(height: 24),
+              _buildActionCategory("Focus", [
+                _actionRow(LucideIcons.moon, "Commute mode", "Auto-reply to all non-urgent", true),
+                _actionRow(LucideIcons.bellOff, "Suppress noisy senders", "Cuts notification load by ~40%", false),
+              ]),
+              const SizedBox(height: 24),
+              _buildActionCategory("Communication", [
+                _actionRow(LucideIcons.messageCircle, "Send 'Running late'", "Notifies client review host", false),
+              ]),
+            ],
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            LucideIcons.shieldCheck,
-            size: 80,
-            color: AppColors.primary.withValues(alpha: 0.1),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            "No Active Interventions",
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          Text(
-            "Your current risk is within normal bounds.",
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildMainInterventionCard(Intervention intervention) {
+  Widget _buildPrimaryActionCard() {
     return GlassCard(
       padding: const EdgeInsets.all(24),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(LucideIcons.zap, color: AppColors.primary),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  intervention.title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      intervention.type.toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.danger.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        "URGENT",
-                        style: TextStyle(
-                          color: AppColors.danger,
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWhyBox(Intervention intervention) {
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            "Why this action?",
-            style: GoogleFonts.outfit(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            intervention.reason,
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            "Linked Risk Score: 68",
-            style: TextStyle(
-              fontSize: 11,
-              color: AppColors.primary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStepsBox(Intervention intervention) {
-    return GlassCard(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Suggested Action Steps",
-            style: GoogleFonts.outfit(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.greenAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                child: const Icon(LucideIcons.zap, color: Colors.greenAccent, size: 20),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Text("Leave now and take Metro + cab", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
-          ...intervention.steps.map(
-            (step) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    LucideIcons.checkCircle2,
-                    size: 16,
-                    color: AppColors.success,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      step,
-                      style: const TextStyle(fontSize: 13, color: Colors.white),
-                    ),
-                  ),
-                ],
+          const Text("Reduces lateness risk from 0.78 → 0.23.", style: TextStyle(color: Colors.white70, fontSize: 14)),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 16)),
+                  child: const Text("Accept", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {},
+                  style: OutlinedButton.styleFrom(foregroundColor: Colors.white70, side: const BorderSide(color: Colors.white10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 16)),
+                  child: const Text("Alternatives"),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildImpactBox(Intervention intervention) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.electricBlue.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.electricBlue.withValues(alpha: 0.1),
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            LucideIcons.trendingDown,
-            size: 20,
-            color: AppColors.electricBlue,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              "Expected Impact: ${intervention.impact}",
-              style: const TextStyle(
-                color: AppColors.electricBlue,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButtons(
-    BuildContext context,
-    AppState state,
-    Intervention intervention,
-  ) {
+  Widget _buildActionCategory(String title, List<Widget> children) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildMainButton("MARK AS DONE", AppColors.primaryGradient, () {
-          state.updateInterventionStatus(
-            intervention.id,
-            InterventionStatus.done,
-          );
-        }),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildSecondaryButton("SNOOZE", LucideIcons.clock, () {}),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildSecondaryButton("DISMISS", LucideIcons.x, () {
-                state.updateInterventionStatus(
-                  intervention.id,
-                  InterventionStatus.dismissed,
-                );
-              }),
-            ),
-          ],
-        ),
+        Text(title, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+        const SizedBox(height: 16),
+        ...children,
       ],
     );
   }
 
-  Widget _buildMainButton(String label, Gradient gradient, VoidCallback onTap) {
+  Widget _actionRow(IconData icon, String title, String impact, bool isEnabled) {
     return Container(
-      width: double.infinity,
-      height: 60,
-      decoration: BoxDecoration(
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSecondaryButton(
-    String label,
-    IconData icon,
-    VoidCallback onTap,
-  ) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        foregroundColor: Colors.white,
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      ),
-    );
-  }
-
-  Widget _buildTraceabilityBox(Intervention intervention) {
-    return Center(
-      child: Column(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(0.03), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.05))),
+      child: Row(
         children: [
-          Text(
-            "ID: ${intervention.id}",
-            style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+          Icon(icon, color: Colors.white30, size: 20),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                const SizedBox(height: 4),
+                Text(impact, style: const TextStyle(color: Colors.white30, fontSize: 11)),
+              ],
+            ),
           ),
-          Text(
-            "Source: Backend Planner v1.2",
-            style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
-          ),
+          Switch(value: isEnabled, onChanged: (v) {}, activeColor: AppColors.primary),
         ],
       ),
     );
