@@ -354,7 +354,9 @@ class AppState extends ChangeNotifier {
         },
       };
 
-      debugPrint('[Pulse API] Sending context snapshot to $url (Reason: $reason)...');
+      debugPrint(
+        '[Pulse API] Sending context snapshot to $url (Reason: $reason)...',
+      );
 
       final response = await http.post(
         url,

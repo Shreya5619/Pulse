@@ -17,9 +17,11 @@ import contextRouter from "./routes/context";
 import memoryRouter from "./routes/memory";
 import graphRouter from "./routes/graph";
 import routingRouter from "./routes/routing";
+import futuresRouter from "./routes/futures";
 import { graphBuilder } from "./services/GraphBuilder";
 import { memoryAgent } from "./services/MemoryAgent";
 import { riskEngine } from "./services/RiskEngineService";
+import { futuresEngine } from "./services/FuturesEngine";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -31,6 +33,7 @@ app.use("/api", contextRouter);
 app.use("/api/memory", memoryRouter);
 app.use("/api/graph", graphRouter);
 app.use("/api/routing", routingRouter);
+app.use("/api", futuresRouter);
 
 
 const httpServer = createServer(app);
@@ -104,6 +107,16 @@ async function runAgentPulseFlow(initialContext: any) {
             eventId: `risk_${Date.now()}`,
             timestamp: new Date().toISOString(),
             data: riskSnapshot
+        });
+        await new Promise(r => setTimeout(r, 1000));
+
+        // 3.1 Futures Engine — heuristic simulations
+        const futures = await futuresEngine.computeForUser(initialContext.userId);
+        broadcast({
+            type: "futures.updated",
+            eventId: `fut_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            data: futures
         });
         await new Promise(r => setTimeout(r, 1000));
 
