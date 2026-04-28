@@ -10,9 +10,11 @@ import '../models/intervention.dart';
 import '../models/snapshot.dart';
 import '../models/device_context.dart';
 import '../services/context_services.dart';
+import '../services/local_repository.dart';
 
 class AppState extends ChangeNotifier {
   final ContextServices _contextServices = ContextServices();
+  final LocalRepository _localRepo = LocalRepository();
   DeviceContext _deviceContext = DeviceContext.initial();
 
   DeviceContext get deviceContext => _deviceContext;
@@ -30,18 +32,40 @@ class AppState extends ChangeNotifier {
   bool _isLive = true;
   WebSocketChannel? _channel;
 
+  // Replay Mode State
+  bool _isReplayMode = false;
+  DateTime? _simulatedTime;
+  Timer? _replayTimer;
+  double _replaySpeed = 1.0;
+  List<dynamic> _currentTrace = [];
+  int _replayIndex = 0;
+
   RiskState get currentRisk => _currentRisk;
   List<ContextSnapshot> get snapshots => _snapshots;
   List<Intervention> get interventions => _interventions;
   List<String> get rawMessages => _rawMessages;
   bool get isLive => _isLive;
+  bool get isReplayMode => _isReplayMode;
+  DateTime? get simulatedTime => _simulatedTime;
+  double get replaySpeed => _replaySpeed;
+  int get replayProgress => _currentTrace.isEmpty ? 0 : ((_replayIndex / _currentTrace.length) * 100).toInt();
 
   AppState() {
+    _initLocalData();
     _generateMockData();
     _connectWebSocket();
     _initContextIngestion();
     // Keep internal simulation for fallback or UI stability
     _startSimulatedStream();
+  }
+
+  Future<void> _initLocalData() async {
+    // Load initial state from DB
+    final latestSnapshots = await _localRepo.getLatestSnapshots(20);
+    // Convert back to models if needed, for now just priming the pump
+    debugPrint(
+      '[Pulse AppState] Local data initialized: ${latestSnapshots.length} snapshots found',
+    );
   }
 
   void _initContextIngestion() async {
@@ -201,14 +225,58 @@ class AppState extends ChangeNotifier {
 
     try {
       final data = jsonDecode(text);
-      debugPrint('[Pulse] Received: ${data['type']}');
+      if (_isReplayMode) return; // Ignore live messages during replay
 
-      // Here we could update state based on message type
-      // e.g., if (data['type'] == 'heartbeat.tick') { ... }
+      debugPrint('[Pulse] Received: ${data['type']}');
+      _processPulseEvent(data);
     } catch (e) {
       debugPrint('[Pulse] Error parsing message: $e');
     }
 
+    notifyListeners();
+  }
+
+  void _processPulseEvent(Map<String, dynamic> data) {
+    final type = data['type'] as String?;
+    final timestampStr = data['timestamp'] as String?;
+    final timestamp = timestampStr != null ? DateTime.parse(timestampStr) : DateTime.now();
+
+    // Persist to Local DB
+    if (type == 'risk.updated') {
+      _localRepo.saveRisk(
+        timestamp.toIso8601String(),
+        data['data']?['level'] ?? 'unknown',
+        data,
+      );
+      // Update UI State (Real-time)
+      // Logic to update _currentRisk model would go here
+    } else if (type == 'intervention.created') {
+      _localRepo.saveTimelineEvent(
+        data['eventId'] ?? const Uuid().v4(),
+        timestamp.toIso8601String(),
+        type!,
+        data,
+      );
+      // Update UI State
+      final intv = data['data'];
+      if (intv != null) {
+        _interventions.insert(0, Intervention(
+          id: data['eventId'] ?? "int_${DateTime.now().millisecondsSinceEpoch}",
+          title: intv['headline'] ?? "New Intervention",
+          description: intv['body'] ?? "",
+          type: "System",
+          priority: 1,
+          status: InterventionStatus.pending,
+          steps: [],
+          impact: "",
+          reason: "",
+          createdAt: timestamp,
+        ));
+      }
+    } else if (type == 'heartbeat.tick') {
+       // Logic for updating heartbeat pulse in UI
+    }
+    
     notifyListeners();
   }
 
@@ -367,7 +435,15 @@ class AppState extends ChangeNotifier {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         debugPrint('[Pulse API] Success: Snapshot ingested by backend.');
-        debugPrint('[Pulse API] Response: ${response.body}');
+        // debugPrint('[Pulse API] Response: ${response.body}');
+
+        // Save to Local DB
+        await _localRepo.saveSnapshot(
+          payload['id'] as String,
+          payload['timestamp'] as String,
+          _mapReason(reason),
+          payload,
+        );
       } else {
         debugPrint(
           '[Pulse API] Error: Backend returned ${response.statusCode}',
@@ -395,6 +471,68 @@ class AppState extends ChangeNotifier {
         return "timer";
       default:
         return "event_change";
+    }
+  }
+
+  // --- Import / Export Actions ---
+
+  Future<String> exportData() async {
+    final path = await _localRepo.exportToJson();
+    debugPrint('[Pulse AppState] Data exported to: $path');
+    return path;
+  }
+
+  Future<void> importData(String json) async {
+    await _localRepo.importFromJson(json);
+    await _initLocalData();
+    notifyListeners();
+  }
+
+  // --- Replay Mode Engine ---
+
+  void startReplay(List<dynamic> trace, {double speed = 1.0}) {
+    stopReplay(); // Clear existing
+    _isReplayMode = true;
+    _currentTrace = trace;
+    _replaySpeed = speed;
+    _replayIndex = 0;
+    
+    if (_currentTrace.isEmpty) return;
+
+    debugPrint('[Pulse Replay] Starting trace with ${_currentTrace.length} events at ${speed}x');
+    
+    _replayTimer = Timer.periodic(
+      Duration(milliseconds: (2000 / speed).toInt()), // 2 real seconds per event step by default
+      (timer) {
+        if (_replayIndex >= _currentTrace.length) {
+          stopReplay();
+          return;
+        }
+
+        final event = _currentTrace[_replayIndex];
+        _simulatedTime = DateTime.parse(event['timestamp']);
+        _processPulseEvent(Map<String, dynamic>.from(event));
+        
+        _replayIndex++;
+        notifyListeners();
+      }
+    );
+    notifyListeners();
+  }
+
+  void stopReplay() {
+    _replayTimer?.cancel();
+    _isReplayMode = false;
+    _simulatedTime = null;
+    _replayIndex = 0;
+    notifyListeners();
+  }
+
+  void setReplaySpeed(double speed) {
+    _replaySpeed = speed;
+    if (_isReplayMode) {
+      // Restart timer with new speed
+      startReplay(_currentTrace, speed: speed);
     }
   }
 

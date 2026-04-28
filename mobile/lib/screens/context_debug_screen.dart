@@ -26,6 +26,32 @@ class ContextDebugScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
+            icon: const Icon(LucideIcons.download, color: Colors.white),
+            tooltip: "Export Trace JSON",
+            onPressed: () async {
+              final appState = Provider.of<AppState>(context, listen: false);
+              final path = await appState.exportData();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text("Trace exported to: $path"),
+                    backgroundColor: Colors.blueAccent,
+                  ),
+                );
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(LucideIcons.history, color: Colors.white),
+            tooltip: "Local DB Status",
+            onPressed: () {
+              // Quick debug info about DB size/entries
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Offline-first persistence active.")),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(LucideIcons.uploadCloud, color: Colors.white),
             tooltip: "Send Snapshot Now",
             onPressed: () {

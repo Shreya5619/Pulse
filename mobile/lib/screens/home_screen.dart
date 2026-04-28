@@ -7,6 +7,7 @@ import '../widgets/glass_card.dart';
 import '../theme/colors.dart';
 
 import '../screens/context_debug_screen.dart';
+import '../screens/replay_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -61,9 +62,23 @@ class HomeScreen extends StatelessWidget {
                           ),
                           IconButton(
                             icon: const Icon(
+                              LucideIcons.playCircle,
+                              color: AppColors.primary,
+                            ),
+                            tooltip: "Simulation Mode",
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ReplayScreen(),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(
                               LucideIcons.activity,
                               color: AppColors.primary,
                             ),
+                            tooltip: "Device Context",
                             onPressed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -343,7 +358,7 @@ class HomeScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
-              "Mode: ${state.isLive ? 'LIVE' : 'MOCK'}",
+              "Mode: ${state.isReplayMode ? 'REPLAY' : (state.isLive ? 'LIVE' : 'MOCK')}",
               style: const TextStyle(
                 color: AppColors.electricBlue,
                 fontSize: 8,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'theme/app_theme.dart';
 import 'providers/app_state.dart';
 import 'screens/home_screen.dart';
@@ -53,7 +54,44 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: IndexedStack(index: _selectedIndex, children: _screens),
+      body: Consumer<AppState>(
+        builder: (context, appState, child) {
+          return Column(
+            children: [
+              if (appState.isReplayMode)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent.withOpacity(0.9),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(LucideIcons.playCircle, color: Colors.white, size: 16),
+                          const SizedBox(width: 10),
+                          const Text(
+                            "REPLAY MODE ACTIVE",
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        "Simulated: ${appState.simulatedTime != null ? DateFormat.Hm().format(appState.simulatedTime!) : '--:--'} (${appState.replaySpeed.toInt()}x)",
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              Expanded(
+                child: IndexedStack(index: _selectedIndex, children: _screens),
+              ),
+            ],
+          );
+        },
+      ),
       bottomNavigationBar: Container(
         height: 90,
         decoration: BoxDecoration(

@@ -14,8 +14,10 @@ const String portName = 'PULSE_NOTIF_ISOLATE_PORT';
 
 @pragma('vm:entry-point')
 Future<void> onNotificationEvent(NotificationEvent event) async {
-  debugPrint('[Pulse Native] Notification caught in background isolate: ${event.packageName}');
-  
+  debugPrint(
+    '[Pulse Native] Notification caught in background isolate: ${event.packageName}',
+  );
+
   try {
     SendPort? uiPort;
     int attempts = 0;
@@ -37,7 +39,9 @@ Future<void> onNotificationEvent(NotificationEvent event) async {
       });
       debugPrint('[Pulse Native] Successfully sent to main isolate port');
     } else {
-      debugPrint('[Pulse Native] CRITICAL: UI Port NOT FOUND in background isolate after retries.');
+      debugPrint(
+        '[Pulse Native] CRITICAL: UI Port NOT FOUND in background isolate after retries.',
+      );
     }
   } catch (e) {
     debugPrint('[Pulse Native] Error sending to main isolate: $e');
@@ -93,7 +97,9 @@ class ContextServices {
 
       if (status.isGranted) {
         final calendars = await _calendarPlugin.retrieveCalendars();
-        if (calendars.isSuccess && calendars.data != null && calendars.data!.isNotEmpty) {
+        if (calendars.isSuccess &&
+            calendars.data != null &&
+            calendars.data!.isNotEmpty) {
           var selectedCalendar = calendars.data!.firstWhere(
             (c) => c.isDefault ?? false,
             orElse: () => calendars.data!.firstWhere(
@@ -136,23 +142,29 @@ class ContextServices {
       bool hasPermission = await NotificationsListener.hasPermission ?? false;
       if (!hasPermission) {
         await NotificationsListener.openPermissionSettings();
-        return; 
+        return;
       }
 
       // Register the port so the background isolate can find it
       IsolateNameServer.removePortNameMapping(portName);
       final ReceivePort uiReceivePort = ReceivePort();
       IsolateNameServer.registerPortWithName(uiReceivePort.sendPort, portName);
-      
+
       uiReceivePort.listen((data) {
-        debugPrint('[Pulse Context] Success! Data received from background isolate: ${data['packageName']}');
+        debugPrint(
+          '[Pulse Context] Success! Data received from background isolate: ${data['packageName']}',
+        );
         onEvent(data as Map<String, dynamic>);
       });
 
       debugPrint('[Pulse Context] Initializing Notification Listener...');
-      await NotificationsListener.initialize(callbackHandle: onNotificationEvent);
-      
-      debugPrint('[Pulse Context] Notification Listener Initialized Successfully');
+      await NotificationsListener.initialize(
+        callbackHandle: onNotificationEvent,
+      );
+
+      debugPrint(
+        '[Pulse Context] Notification Listener Initialized Successfully',
+      );
     } catch (e) {
       debugPrint('[Pulse Context] Notification Init Error: $e');
     }
