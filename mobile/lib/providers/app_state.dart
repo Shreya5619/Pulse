@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
 import '../models/risk_state.dart';
 import '../models/intervention.dart';
 import '../models/snapshot.dart';
@@ -274,7 +275,7 @@ class AppState extends ChangeNotifier {
 
       // Construct payload matching the requested schema
       final payload = {
-        "id": "snap_${now.millisecondsSinceEpoch}",
+        "id": Uuid().v4(),
         "user_id": userId,
         "timestamp": now.toUtc().toIso8601String(),
         "location": {
@@ -340,7 +341,7 @@ class AppState extends ChangeNotifier {
         "meta": {
           "client_version": "1.0.0",
           "schema_version": "1.0.0",
-          "capture_reason": reason,
+          "capture_reason": _mapReason(reason),
         },
         "derived": {
           "has_next_event": _deviceContext.upcomingEvents.isNotEmpty,
@@ -380,6 +381,21 @@ class AppState extends ChangeNotifier {
 
   void triggerManualSnapshot() {
     _sendContextSnapshot("manual_trigger");
+  }
+
+  String _mapReason(String reason) {
+    switch (reason) {
+      case "manual_trigger":
+        return "manual";
+      case "battery_change":
+      case "location_change":
+      case "notification_received":
+        return "event_change";
+      case "timer_tick":
+        return "timer";
+      default:
+        return "event_change";
+    }
   }
 
   String _getBackendHost() {
