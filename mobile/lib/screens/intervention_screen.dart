@@ -1,47 +1,53 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/colors.dart';
 import '../widgets/glass_card.dart';
+import '../providers/app_state.dart';
 
 class InterventionScreen extends StatelessWidget {
   const InterventionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("Suggested action right now", style: TextStyle(color: Colors.white30, fontSize: 12, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              _buildPrimaryActionCard(),
-              const SizedBox(height: 32),
-              _buildActionCategory("Commute", [
-                _actionRow(LucideIcons.car, "Switch to cab", "Saves 15 min vs Metro walking", true),
-                _actionRow(LucideIcons.batteryCharging, "Add charging stop", "Ensures +20% buffer for lab", false),
-              ]),
-              const SizedBox(height: 24),
-              _buildActionCategory("Focus", [
-                _actionRow(LucideIcons.moon, "Commute mode", "Auto-reply to all non-urgent", true),
-                _actionRow(LucideIcons.bellOff, "Suppress noisy senders", "Cuts notification load by ~40%", false),
-              ]),
-              const SizedBox(height: 24),
-              _buildActionCategory("Communication", [
-                _actionRow(LucideIcons.messageCircle, "Send 'Running late'", "Notifies client review host", false),
-              ]),
-            ],
+    return Consumer<AppState>(
+      builder: (context, state, child) {
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Suggested action right now", style: TextStyle(color: Colors.white30, fontSize: 12, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  _buildPrimaryActionCard(state),
+                  const SizedBox(height: 32),
+                  _buildActionCategory("Commute", [
+                    _actionRow(LucideIcons.car, "Switch to cab", "Saves 15 min vs Metro walking", true),
+                    _actionRow(LucideIcons.batteryCharging, "Add charging stop", "Ensures +20% buffer for lab", false),
+                  ]),
+                  const SizedBox(height: 24),
+                  _buildActionCategory("Focus", [
+                    _actionRow(LucideIcons.moon, "Commute mode", "Auto-reply to all non-urgent", true),
+                    _actionRow(LucideIcons.bellOff, "Suppress noisy senders", "Cuts notification load by ~40%", false),
+                  ]),
+                  const SizedBox(height: 24),
+                  _buildActionCategory("Communication", [
+                    _actionRow(LucideIcons.messageCircle, "Send 'Running late'", "Notifies client review host", false),
+                  ]),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildPrimaryActionCard() {
+  Widget _buildPrimaryActionCard(AppState state) {
     return GlassCard(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -62,14 +68,22 @@ class InterventionScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           const Text("Reduces lateness risk from 0.78 → 0.23.", style: TextStyle(color: Colors.white70, fontSize: 14)),
+          if (state.isReplayMode)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                "SIMULATED IN REPLAY",
+                style: GoogleFonts.outfit(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
+              ),
+            ),
           const SizedBox(height: 24),
           Row(
             children: [
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: state.isReplayMode ? null : () {},
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 16)),
-                  child: const Text("Accept", style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: Text(state.isReplayMode ? "Simulated" : "Accept", style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(width: 12),

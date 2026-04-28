@@ -17,6 +17,20 @@ class ScenarioPlayerScreen extends StatefulWidget {
 class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
   String _selectedTrace = "Commute – Low battery";
 
+  final Map<String, List<Map<String, dynamic>>> _traceData = {
+    "Commute – Low battery": [
+      {"type": "heartbeat.tick", "timestamp": "2026-04-28T08:00:00Z", "data": {"status": "nominal"}},
+      {"type": "risk.updated", "timestamp": "2026-04-28T08:05:00Z", "data": {"level": "low", "score": 32.0, "reasons": ["Traffic forming"], "history": [20, 22, 25, 28, 32]}},
+      {"type": "risk.updated", "timestamp": "2026-04-28T08:15:00Z", "data": {"level": "high", "score": 78.0, "reasons": ["Battery 15%", "Traffic delay"], "history": [32, 45, 55, 65, 78]}},
+      {"type": "intervention.created", "timestamp": "2026-04-28T08:16:00Z", "eventId": "int_001", "data": {"headline": "Switch to cab + Battery Saver", "body": "Traffic is heavy. Switching to a cab now saves 15 min walk."}},
+      {"type": "risk.updated", "timestamp": "2026-04-28T08:30:00Z", "data": {"level": "med", "score": 45.0, "reasons": ["In cab", "Charging"], "history": [78, 70, 60, 50, 45]}},
+    ],
+    "Back-to-back meetings": [
+      {"type": "heartbeat.tick", "timestamp": "2026-04-28T13:00:00Z", "data": {"status": "nominal"}},
+      {"type": "risk.updated", "timestamp": "2026-04-28T13:10:00Z", "data": {"level": "med", "score": 52.0, "reasons": ["Overload"], "history": [10, 20, 35, 45, 52]}},
+    ]
+  };
+
   @override
   Widget build(BuildContext context) {
     final appState = Provider.of<AppState>(context);
@@ -29,9 +43,17 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "Scenario Player",
-                style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+              Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(LucideIcons.chevronLeft, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  Text(
+                    "Scenario Player",
+                    style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
               _buildTraceDropdown(),
@@ -62,17 +84,15 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
         underline: const SizedBox(),
         isExpanded: true,
         icon: const Icon(LucideIcons.chevronDown, color: Colors.white30),
-        items: [
-          "Commute – Low battery",
-          "Back-to-back meetings",
-          "Overload + response debt",
-        ].map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(color: Colors.white, fontSize: 14)))).toList(),
+        items: _traceData.keys.map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(color: Colors.white, fontSize: 14)))).toList(),
         onChanged: (v) => setState(() => _selectedTrace = v!),
       ),
     );
   }
 
   Widget _buildPlaybackControls(AppState appState) {
+    bool isActive = appState.isReplayMode && appState.currentScenarioName == _selectedTrace;
+
     return GlassCard(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -81,24 +101,28 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
-                icon: Icon(appState.isReplayMode ? LucideIcons.pause : LucideIcons.play, color: Colors.white),
+                icon: Icon(isActive ? LucideIcons.stopCircle : LucideIcons.play, color: isActive ? Colors.redAccent : Colors.white),
                 onPressed: () {
-                   // Mock trigger for demo
-                   if (appState.isReplayMode) appState.stopReplay();
-                   else appState.startReplay([]); 
+                   if (isActive) {
+                     appState.stopReplay();
+                   } else {
+                     appState.startReplay(_selectedTrace, _traceData[_selectedTrace]!);
+                   }
                 },
               ),
               Expanded(
                 child: Slider(
-                  value: appState.replayProgress.toDouble(),
+                  value: appState.isReplayMode ? appState.replayProgress.toDouble() : 0.0,
                   max: 100,
-                  onChanged: (v) {},
+                  onChanged: (v) {
+                    if (appState.isReplayMode) appState.seekToProgress(v);
+                  },
                   activeColor: AppColors.primary,
                   inactiveColor: Colors.white10,
                 ),
               ),
               Text(
-                appState.simulatedTime != null ? DateFormat.Hm().format(appState.simulatedTime!) : "08:35",
+                appState.simulatedTime != null ? DateFormat.Hm().format(appState.simulatedTime!) : "--:--",
                 style: const TextStyle(color: Colors.white, fontSize: 12),
               ),
             ],
@@ -140,8 +164,14 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-            child: const Text("HIGH", style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+            decoration: BoxDecoration(
+              color: appState.currentRisk.levelColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8)
+            ),
+            child: Text(
+              appState.currentRisk.levelText.toUpperCase(),
+              style: TextStyle(color: appState.currentRisk.levelColor, fontSize: 10, fontWeight: FontWeight.bold)
+            ),
           ),
         ],
       ),

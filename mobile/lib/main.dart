@@ -78,14 +78,33 @@ class _MainShellState extends State<MainShell> {
                           const Icon(LucideIcons.playCircle, color: Colors.black, size: 16),
                           const SizedBox(width: 10),
                           Text(
-                            "Scenario replay: Morning commute",
+                            "Replay mode: ${appState.currentScenarioName}",
                             style: GoogleFonts.outfit(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
                           ),
                         ],
                       ),
-                      Text(
-                        "${appState.simulatedTime != null ? DateFormat.Hm().format(appState.simulatedTime!) : '08:35'} / 09:10 · Pause / Restart",
-                        style: GoogleFonts.outfit(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w600),
+                      Row(
+                        children: [
+                          Text(
+                            "${appState.simulatedTime != null ? DateFormat.Hm().format(appState.simulatedTime!) : '08:35'} / 09:10",
+                            style: GoogleFonts.outfit(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(width: 16),
+                          GestureDetector(
+                            onTap: () => appState.stopReplay(),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.black, width: 1.5),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                "Exit replay",
+                                style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

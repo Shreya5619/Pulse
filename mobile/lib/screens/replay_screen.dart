@@ -132,7 +132,7 @@ class _ReplayScreenState extends State<ReplayScreen> {
             if (isSelected && !appState.isReplayMode)
               TextButton(
                 onPressed: () {
-                  appState.startReplay(_scenarios[name]!);
+                  appState.startReplay(name, _scenarios[name]!);
                 },
                 child: const Text("START"),
               )

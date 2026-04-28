@@ -49,22 +49,44 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildFilterBar(),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                itemCount: _mockEvents.length,
-                itemBuilder: (context, index) => _buildTimelineItem(_mockEvents[index], index == 0, index == _mockEvents.length - 1),
-              ),
+    return Consumer<AppState>(
+      builder: (context, state, child) {
+        final events = state.interventions;
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: SafeArea(
+            child: Column(
+              children: [
+                _buildFilterBar(),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                    itemCount: events.length,
+                    itemBuilder: (context, index) {
+                      final event = events[index];
+                      // Highlight if this event was the most recently added in replay
+                      final isReplayHighlight = state.isReplayMode && index == 0;
+                      
+                      return _buildTimelineItem(
+                        {
+                          "time": DateFormat.Hm().format(event.createdAt),
+                          "type": "Action",
+                          "agent": "Planner",
+                          "text": "${event.title}: ${event.description}",
+                          "isNow": isReplayHighlight,
+                        },
+                        index == 0,
+                        index == events.length - 1,
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 

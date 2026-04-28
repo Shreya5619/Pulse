@@ -18,16 +18,16 @@ class AppState extends ChangeNotifier {
   DeviceContext _deviceContext = DeviceContext.initial();
 
   DeviceContext get deviceContext => _deviceContext;
-  final RiskState _currentRisk = RiskState(
-    score: 84,
+  RiskState _currentRisk = RiskState(
+    score: 0,
     level: RiskLevel.safe,
     timestamp: DateTime.now(),
-    reasons: ["Late night motion", "Low battery"],
-    history: [72, 75, 80, 82, 84],
+    reasons: [],
+    history: [],
   );
 
   final List<ContextSnapshot> _snapshots = [];
-  final List<Intervention> _interventions = [];
+  List<Intervention> _interventions = [];
   final List<String> _rawMessages = [];
   bool _isLive = true;
   WebSocketChannel? _channel;
@@ -35,10 +35,17 @@ class AppState extends ChangeNotifier {
   // Replay Mode State
   bool _isReplayMode = false;
   DateTime? _simulatedTime;
+  DateTime? _scenarioStart;
+  DateTime? _scenarioEnd;
   Timer? _replayTimer;
   double _replaySpeed = 1.0;
   List<dynamic> _currentTrace = [];
   int _replayIndex = 0;
+  String _currentScenarioName = "";
+
+  // Original State Backup (to restore after replay)
+  RiskState? _liveRisk;
+  List<Intervention>? _liveInterventions;
 
   RiskState get currentRisk => _currentRisk;
   List<ContextSnapshot> get snapshots => _snapshots;
@@ -46,9 +53,16 @@ class AppState extends ChangeNotifier {
   List<String> get rawMessages => _rawMessages;
   bool get isLive => _isLive;
   bool get isReplayMode => _isReplayMode;
+  String get currentScenarioName => _currentScenarioName;
   DateTime? get simulatedTime => _simulatedTime;
   double get replaySpeed => _replaySpeed;
-  int get replayProgress => _currentTrace.isEmpty ? 0 : ((_replayIndex / _currentTrace.length) * 100).toInt();
+  int get replayProgress {
+    if (_scenarioStart == null || _scenarioEnd == null || _simulatedTime == null) return 0;
+    final total = _scenarioEnd!.difference(_scenarioStart!).inSeconds;
+    final current = _simulatedTime!.difference(_scenarioStart!).inSeconds;
+    if (total == 0) return 0;
+    return ((current / total) * 100).clamp(0, 100).toInt();
+  }
 
   AppState() {
     _initLocalData();
@@ -236,28 +250,42 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _processPulseEvent(Map<String, dynamic> data) {
+  void _processPulseEvent(Map<String, dynamic> data, {bool isReplay = false}) {
     final type = data['type'] as String?;
     final timestampStr = data['timestamp'] as String?;
     final timestamp = timestampStr != null ? DateTime.parse(timestampStr) : DateTime.now();
 
-    // Persist to Local DB
+    // Persist to Local DB (Only if live)
+    if (!isReplay) {
+      if (type == 'risk.updated') {
+        _localRepo.saveRisk(
+          timestamp.toIso8601String(),
+          data['data']?['level'] ?? 'unknown',
+          data,
+        );
+      } else if (type == 'intervention.created') {
+        _localRepo.saveTimelineEvent(
+          data['eventId'] ?? const Uuid().v4(),
+          timestamp.toIso8601String(),
+          type!,
+          data,
+        );
+      }
+    }
+
+    // Update UI State
     if (type == 'risk.updated') {
-      _localRepo.saveRisk(
-        timestamp.toIso8601String(),
-        data['data']?['level'] ?? 'unknown',
-        data,
-      );
-      // Update UI State (Real-time)
-      // Logic to update _currentRisk model would go here
+      final rData = data['data'];
+      if (rData != null) {
+        _currentRisk = RiskState(
+          score: (rData['score'] as num?)?.toDouble() ?? 0.0,
+          level: _parseRiskLevel(rData['level'] as String?),
+          timestamp: timestamp,
+          reasons: List<String>.from(rData['reasons'] ?? []),
+          history: List<double>.from((rData['history'] ?? []).map((h) => (h as num).toDouble())),
+        );
+      }
     } else if (type == 'intervention.created') {
-      _localRepo.saveTimelineEvent(
-        data['eventId'] ?? const Uuid().v4(),
-        timestamp.toIso8601String(),
-        type!,
-        data,
-      );
-      // Update UI State
       final intv = data['data'];
       if (intv != null) {
         _interventions.insert(0, Intervention(
@@ -490,33 +518,97 @@ class AppState extends ChangeNotifier {
 
   // --- Replay Mode Engine ---
 
-  void startReplay(List<dynamic> trace, {double speed = 1.0}) {
+  void startReplay(String name, List<dynamic> trace, {double speed = 1.0}) {
     stopReplay(); // Clear existing
+    
+    // Backup live state
+    _liveRisk = _currentRisk;
+    _liveInterventions = List.from(_interventions);
+    
     _isReplayMode = true;
+    _currentScenarioName = name;
     _currentTrace = trace;
     _replaySpeed = speed;
     _replayIndex = 0;
     
     if (_currentTrace.isEmpty) return;
 
-    debugPrint('[Pulse Replay] Starting trace with ${_currentTrace.length} events at ${speed}x');
+    // Determine bounds
+    _scenarioStart = DateTime.parse(_currentTrace.first['timestamp']);
+    _scenarioEnd = DateTime.parse(_currentTrace.last['timestamp']);
+    _simulatedTime = _scenarioStart;
+
+    debugPrint('[Pulse Replay] Starting "$name" at ${speed}x');
     
+    _resumeTimer();
+    notifyListeners();
+  }
+
+  void _resumeTimer() {
+    _replayTimer?.cancel();
     _replayTimer = Timer.periodic(
-      Duration(milliseconds: (2000 / speed).toInt()), // 2 real seconds per event step by default
+      const Duration(milliseconds: 100), // High frequency update for smooth clock
       (timer) {
-        if (_replayIndex >= _currentTrace.length) {
-          stopReplay();
+        if (!_isReplayMode) {
+          timer.cancel();
           return;
         }
 
-        final event = _currentTrace[_replayIndex];
-        _simulatedTime = DateTime.parse(event['timestamp']);
-        _processPulseEvent(Map<String, dynamic>.from(event));
-        
-        _replayIndex++;
+        // Advance simulated time based on speed (100ms * speed)
+        _simulatedTime = _simulatedTime!.add(
+          Duration(milliseconds: (100 * _replaySpeed).toInt()),
+        );
+
+        // Process all events that have occurred up to this simulated time
+        bool stateChanged = false;
+        while (_replayIndex < _currentTrace.length) {
+          final event = _currentTrace[_replayIndex];
+          final eventTime = DateTime.parse(event['timestamp']);
+          
+          if (eventTime.isBefore(_simulatedTime!) || eventTime.isAtSameMomentAs(_simulatedTime!)) {
+            _processPulseEvent(Map<String, dynamic>.from(event), isReplay: true);
+            _replayIndex++;
+            stateChanged = true;
+          } else {
+            break;
+          }
+        }
+
+        if (_simulatedTime!.isAfter(_scenarioEnd!) || _simulatedTime!.isAtSameMomentAs(_scenarioEnd!)) {
+          _replayTimer?.cancel();
+        }
+
         notifyListeners();
       }
     );
+  }
+
+  void seekToProgress(double progress) {
+    if (!_isReplayMode || _scenarioStart == null || _scenarioEnd == null) return;
+    
+    _replayTimer?.cancel();
+    
+    final totalSeconds = _scenarioEnd!.difference(_scenarioStart!).inSeconds;
+    final targetSeconds = (totalSeconds * (progress / 100)).toInt();
+    _simulatedTime = _scenarioStart!.add(Duration(seconds: targetSeconds));
+    
+    // Reset simulation state
+    _interventions = [];
+    _replayIndex = 0;
+    
+    // Replay all events up to the target time instantly
+    for (var i = 0; i < _currentTrace.length; i++) {
+      final event = _currentTrace[i];
+      final eventTime = DateTime.parse(event['timestamp']);
+      if (eventTime.isBefore(_simulatedTime!) || eventTime.isAtSameMomentAs(_simulatedTime!)) {
+        _processPulseEvent(Map<String, dynamic>.from(event), isReplay: true);
+        _replayIndex = i + 1;
+      } else {
+        break;
+      }
+    }
+    
+    _resumeTimer();
     notifyListeners();
   }
 
@@ -524,15 +616,41 @@ class AppState extends ChangeNotifier {
     _replayTimer?.cancel();
     _isReplayMode = false;
     _simulatedTime = null;
+    _scenarioStart = null;
+    _scenarioEnd = null;
     _replayIndex = 0;
+    
+    // Restore live state
+    if (_liveRisk != null) _currentRisk = _liveRisk!;
+    if (_liveInterventions != null) _interventions = _liveInterventions!;
+    
     notifyListeners();
   }
 
   void setReplaySpeed(double speed) {
     _replaySpeed = speed;
     if (_isReplayMode) {
-      // Restart timer with new speed
-      startReplay(_currentTrace, speed: speed);
+      _resumeTimer();
+    }
+    notifyListeners();
+  }
+
+  RiskLevel _parseRiskLevel(String? level) {
+    switch (level?.toLowerCase()) {
+      case 'safe':
+        return RiskLevel.safe;
+      case 'low':
+      case 'med':
+      case 'riskforming':
+      case 'risk_forming':
+        return RiskLevel.riskForming;
+      case 'high':
+      case 'critical':
+      case 'highrisk':
+      case 'high_risk':
+        return RiskLevel.highRisk;
+      default:
+        return RiskLevel.safe;
     }
   }
 
