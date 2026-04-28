@@ -11,12 +11,11 @@
 import { riskEngine } from "../../server/src/services/RiskEngineService";
 import { RiskSnapshot } from "../../server/src/types/risk";
 
-export async function riskAgent(context: any): Promise<RiskSnapshot> {
-  const userId = context?.userId || "lifecanvas_studios";
+export async function riskAgent(input: any): Promise<RiskSnapshot> {
+  const userId = typeof input === "string" ? input : (input?.userId || "demo-user");
 
   console.log(`[RiskAgent] Computing risk for ${userId}...`);
   const snapshot = await riskEngine.computeForUser(userId);
 
-  console.log("[RiskAgent] Snapshot:", JSON.stringify(snapshot, null, 2));
   return snapshot;
 }

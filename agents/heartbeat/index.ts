@@ -1,20 +1,21 @@
-import { memoryAgent } from "../../server/src/services/MemoryAgent";
+import { heartbeatOrchestrator } from "../../server/src/services/HeartbeatOrchestrator";
 
 /**
  * Heartbeat Agent
  * Manages the periodic evaluation cycle.
  * 
- * @returns periodic tick/event - Signal to trigger the agent swarm loop.
+ * @param userId - The user to run the heartbeat for.
+ * @returns result - The full execution result from the orchestrator.
  */
-export async function heartbeatAgent(userId: string = "user_123"): Promise<any> {
-  console.log("Heartbeat Agent: Emitting periodic tick...");
+export async function heartbeatAgent(userId: string = "demo-user"): Promise<any> {
+  console.log(`[HeartbeatAgent] Triggering orchestrated cycle for ${userId}...`);
 
-  // Check for memory summary updates
-  await memoryAgent.onHeartbeat(userId);
+  const result = await heartbeatOrchestrator.runOnce(userId);
 
   return {
     timestamp: new Date().toISOString(),
     event: "cycle_tick",
-    sequence: 1
+    status: "completed",
+    result
   };
 }

@@ -1,18 +1,32 @@
+import { PlannerAction } from "../../shared/planner";
+
 /**
  * Guardian Agent
  * Acts as a safety and UX gatekeeper for proposed actions.
  * 
- * @param action - The suggested action(s) from Planner Agent.
+ * @param chosenAction - The suggested action from Planner Agent.
  * @returns approvalDecision - Final determination on execution mode (auto, suggest, block).
  */
-export async function guardianAgent(action: any): Promise<any> {
+export async function guardianAgent(chosenAction: PlannerAction | null): Promise<{ 
+  mode: "AUTO" | "ASK" | "BLOCK"; 
+  approved: boolean; 
+  rationale: string 
+}> {
   console.log("Guardian Agent: Validating action safety...");
 
-  // TODO: Implement safety/policy checks
+  if (!chosenAction) {
+    return {
+      mode: "AUTO",
+      approved: true,
+      rationale: "No action proposed, system in neutral state."
+    };
+  }
+
+  // TODO: Implement safety/policy checks based on chosenAction
+  // For now, default to ASK for all significant actions
   return {
-    mode: "suggest",
+    mode: "ASK",
     approved: true,
-    action: action,
-    rationale: "Default stub approval"
+    rationale: `Action '${chosenAction.title}' requires user confirmation as it involves device or schedule changes.`
   };
 }

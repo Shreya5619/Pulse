@@ -22,6 +22,8 @@ import { graphBuilder } from "./services/GraphBuilder";
 import { memoryAgent } from "./services/MemoryAgent";
 import { riskEngine } from "./services/RiskEngineService";
 import { futuresEngine } from "./services/FuturesEngine";
+import { heartbeatOrchestrator } from "./services/HeartbeatOrchestrator";
+import { workspaceService } from "./services/WorkspaceService";
 import plannerRouter from "./routes/planner";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
@@ -78,109 +80,103 @@ function broadcast(message: unknown) {
 }
 
 async function runAgentPulseFlow(initialContext: any) {
-    isPulseRunning = true;
+    const userId = initialContext.userId || "demo-user";
+    if (isPulseRunning) {
+        console.log("[Pulse] Run already in progress, skipping.");
+        return;
+    }
+
     try {
-        console.log("[Pulse] Starting deterministic agent flow orchestration...");
+        isPulseRunning = true;
+        console.log(`[Pulse] Starting orchestrated flow for ${userId}...`);
 
-        // 1. Heartbeat
-        await heartbeatAgent(initialContext.userId);
+        const result = await heartbeatOrchestrator.runOnce(userId);
+
+        // Broadcast granular updates
+        if (result.context) {
+            broadcast({
+                type: "context.updated",
+                eventId: `ctx_${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                data: result.context
+            });
+        }
+
         broadcast({
-            type: "heartbeat.tick",
-            eventId: `tick_${Date.now()}`,
+            type: "graph.updated",
+            eventId: `graph_${Date.now()}`,
             timestamp: new Date().toISOString(),
-            data: { userId: initialContext.userId, sequence: 1 }
+            data: result.graph.summary
         });
-        await new Promise(r => setTimeout(r, 1000));
 
-        // 2. Context Agent
-        await contextAgent(initialContext);
-        broadcast({
-            type: "context.updated",
-            eventId: `ctx_${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            data: initialContext
-        });
-        await new Promise(r => setTimeout(r, 1000));
-
-        // 3. Risk Agent — live snapshot from graph + memory
-        const riskSnapshot = await riskAgent(initialContext);
         broadcast({
             type: "risk.updated",
             eventId: `risk_${Date.now()}`,
             timestamp: new Date().toISOString(),
-            data: riskSnapshot
+            data: result.risk
         });
-        await new Promise(r => setTimeout(r, 1000));
 
-        // 3.1 Futures Engine — heuristic simulations
-        const futures = await futuresEngine.computeForUser(initialContext.userId);
         broadcast({
             type: "futures.updated",
             eventId: `fut_${Date.now()}`,
             timestamp: new Date().toISOString(),
-            data: futures
+            data: result.futures
         });
-        await new Promise(r => setTimeout(r, 1000));
 
-        // 3.5 Build Graph (Day 6)
-        const graph = await graphBuilder.buildForUser(initialContext.userId);
-        const appCount = graph.nodes.filter(n => n.type === "APPOINTMENT").length;
-        const placeCount = graph.nodes.filter(n => n.type === "PLACE").length;
-        const msgCount = graph.nodes.filter(n => n.type === "MESSAGE_OBLIGATION").length;
-        console.log(`[Pulse] Graph built: ${appCount} appointments, ${placeCount} places, 1 battery node, ${msgCount} message obligations, totalRisksNext90Min=${graph.summary.totalRisksNext90Min}.`);
-
-        // 3.6 Memory Agent check (triggers DailySummarizer if threshold met)
-        await memoryAgent.onHeartbeat(initialContext.userId);
-
-        // 4. Planner Agent
-        const decision = await plannerAgent(initialContext);
-        if (decision.chosen) {
+        if (result.decision.chosen) {
             broadcast({
                 type: "planner.suggested",
                 eventId: `plan_${Date.now()}`,
                 timestamp: new Date().toISOString(),
-                data: decision
+                data: result.decision
             });
         }
-        await new Promise(r => setTimeout(r, 1000));
 
-        // 5. Guardian Agent
-        const guardianDecision = await guardianAgent(decision.chosen);
         broadcast({
             type: "guardian.decided",
             eventId: `guard_${Date.now()}`,
             timestamp: new Date().toISOString(),
             data: {
-                userId: initialContext.userId,
-                actionId: decision.chosen?.id,
+                userId,
+                actionId: result.decision.chosen?.id,
                 timestamp: new Date().toISOString(),
-                mode: guardianDecision.mode,
-                rationale: guardianDecision.rationale
+                mode: result.guardian.mode,
+                rationale: result.guardian.rationale
             }
         });
-        await new Promise(r => setTimeout(r, 1000));
 
-        // 6. Final Intervention
-        if (decision.chosen && guardianDecision.approved) {
-            lastInterventionText = decision.chosen.title;
+        broadcast({
+            type: "heartbeat.policy",
+            eventId: `hb_policy_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            data: {
+                userId,
+                nextRecommendedDelayMs: result.nextDelay
+            }
+        });
+
+        if (result.decision.chosen && result.guardian.approved) {
+            lastInterventionText = result.decision.chosen.title;
             broadcast({
                 type: "intervention.created",
                 eventId: `int_${Date.now()}`,
                 timestamp: new Date().toISOString(),
                 data: {
-                    userId: initialContext.userId,
-                    actionId: decision.chosen.id,
+                    userId,
+                    actionId: result.decision.chosen.id,
                     timestamp: new Date().toISOString(),
-                    headline: decision.chosen.title,
-                    body: decision.chosen.description,
+                    headline: result.decision.chosen.title,
+                    body: result.decision.chosen.description,
                     ctaLabel: "Accept",
                     secondaryCtaLabel: "Dismiss"
                 }
             });
         }
 
-        console.log("[Pulse] Agent flow orchestration completed.");
+        console.log("[Pulse] Orchestrated flow completed.");
         return { alert: lastInterventionText };
+    } catch (error) {
+        console.error("[Pulse] Orchestrated flow error:", error);
     } finally {
         isPulseRunning = false;
     }
@@ -235,23 +231,29 @@ app.get("/demo/state", (_req: Request, res: Response) => {
 });
 
 app.post("/demo/trigger", async (_req: Request, res: Response) => {
+    const scenarioPath = path.join(dataDir, "demo-scenario.json");
+    if (!fs.existsSync(scenarioPath)) {
+        return res.status(500).json({ ok: false, error: "Missing demo scenario file" });
+    }
+    const scenario = readJson(scenarioPath) as any;
+    const userId = scenario.context?.userId || "demo-user";
+
     if (isPulseRunning) {
         return res.status(429).json({
             ok: false,
-            error: "A demo run is already in progress. Trigger skipped."
+            error: "A run is already in progress."
         });
     }
 
     res.json({
         ok: true,
         data: {
-            message: "Pulse demo scenario started"
+            message: "Pulse orchestrated flow started",
+            userId
         }
     });
 
     try {
-        const scenarioPath = path.join(dataDir, "demo-scenario.json");
-        const scenario = readJson(scenarioPath) as JsonObject;
         await runAgentPulseFlow(scenario.context);
     } catch (error) {
         console.error("[Pulse] demo error:", error);
@@ -259,7 +261,8 @@ app.post("/demo/trigger", async (_req: Request, res: Response) => {
 });
 
 app.post("/heartbeat/manual", async (req: Request, res: Response) => {
-    console.log("[Pulse] Manual heartbeat wake requested.");
+    const userId = req.body?.userId || "demo-user";
+    console.log(`[Pulse] Manual heartbeat requested for ${userId}`);
 
     if (isPulseRunning) {
         return res.json({
@@ -271,31 +274,18 @@ app.post("/heartbeat/manual", async (req: Request, res: Response) => {
         });
     }
 
-    // Capture the result of the flow
-    try {
-        const scenarioPath = path.join(dataDir, "demo-scenario.json");
-        const scenario = readJson(scenarioPath) as JsonObject;
-
-        // Return immediate ACK
-        res.json({
-            ok: true,
-            data: {
-                status: "HEARTBEAT_OK",
-                timestamp: new Date().toISOString()
-            }
-        });
-
-        // Run the flow in background
-        const result = await runAgentPulseFlow(scenario.context);
-        if (result && result.alert) {
-            console.log(`[Pulse] Manual run produced alert: ${result.alert}`);
+    res.json({
+        ok: true,
+        data: {
+            status: "HEARTBEAT_OK",
+            timestamp: new Date().toISOString()
         }
-    } catch (error) {
+    });
+
+    // Run the flow in background
+    runAgentPulseFlow({ userId }).catch(error => {
         console.error("[Pulse] Manual heartbeat error:", error);
-        if (!res.headersSent) {
-            res.status(500).json({ ok: false, error: "Internal server error during heartbeat" });
-        }
-    }
+    });
 });
 
 app.get("/demo/events", (_req: Request, res: Response) => {
@@ -322,24 +312,15 @@ app.get("/demo/events", (_req: Request, res: Response) => {
 
 app.get("/config/openclaw-files", (_req: Request, res: Response) => {
     try {
-        const soul = readText(path.join(openclawDir, "SOUL.md"));
-        const agents = readText(path.join(openclawDir, "agents.md"));
-        const user = readText(path.join(openclawDir, "user.md"));
-        const heartbeat = readText(path.join(openclawDir, "heartbeat.md"));
-
+        const config = workspaceService.getConfig();
         res.json({
             ok: true,
-            data: {
-                soul,
-                agents,
-                user,
-                heartbeat
-            }
+            data: config
         });
     } catch (error) {
         res.status(500).json({
             ok: false,
-            error: "Could not read Pulse config files"
+            error: "Could not read OpenClaw config files"
         });
     }
 });

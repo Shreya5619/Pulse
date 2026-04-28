@@ -72,3 +72,35 @@ CREATE TABLE IF NOT EXISTS risk_snapshots (
 CREATE INDEX IF NOT EXISTS idx_risk_snapshots_user ON risk_snapshots(user_id);
 CREATE INDEX IF NOT EXISTS idx_risk_snapshots_user_ts ON risk_snapshots(user_id, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_risk_snapshots_top_score ON risk_snapshots(top_score DESC);
+
+-- Planner Decisions — historical log of agent recommendations
+CREATE TABLE IF NOT EXISTS planner_decisions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL,
+    chosen_id TEXT,
+    chosen_title TEXT,
+    alternatives JSONB NOT NULL DEFAULT '[]'::jsonb,
+    payload JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_planner_decisions_user ON planner_decisions(user_id);
+CREATE INDEX IF NOT EXISTS idx_planner_decisions_user_ts ON planner_decisions(user_id, timestamp DESC);
+
+-- Heartbeat Audit — full trace of every agent pipeline execution
+CREATE TABLE IF NOT EXISTS heartbeat_audit (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL,
+    finished_at TIMESTAMPTZ NOT NULL,
+    context_id UUID,
+    risk_snapshot JSONB,
+    futures_result JSONB,
+    planner_decision JSONB,
+    guardian_decision JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_heartbeat_audit_user ON heartbeat_audit(user_id);
+CREATE INDEX IF NOT EXISTS idx_heartbeat_audit_ts ON heartbeat_audit(user_id, started_at DESC);
