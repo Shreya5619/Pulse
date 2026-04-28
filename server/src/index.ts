@@ -22,6 +22,7 @@ import { graphBuilder } from "./services/GraphBuilder";
 import { memoryAgent } from "./services/MemoryAgent";
 import { riskEngine } from "./services/RiskEngineService";
 import { futuresEngine } from "./services/FuturesEngine";
+import plannerRouter from "./routes/planner";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -33,6 +34,7 @@ app.use("/api", contextRouter);
 app.use("/api/memory", memoryRouter);
 app.use("/api/graph", graphRouter);
 app.use("/api/routing", routingRouter);
+app.use("/api/planner", plannerRouter);
 app.use("/api", futuresRouter);
 
 
@@ -131,55 +133,51 @@ async function runAgentPulseFlow(initialContext: any) {
         await memoryAgent.onHeartbeat(initialContext.userId);
 
         // 4. Planner Agent
-        await plannerAgent({});
-        broadcast({
-            type: "planner.suggested",
-            eventId: `plan_${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            data: {
-                userId: initialContext.userId,
+        const decision = await plannerAgent(initialContext);
+        if (decision.chosen) {
+            broadcast({
+                type: "planner.suggested",
+                eventId: `plan_${Date.now()}`,
                 timestamp: new Date().toISOString(),
-                actionId: "ACTION_LEAVE_NOW",
-                title: "Leave now for campus",
-                description: "Leave now and enable Battery Saver to stay on time for lab.",
-                recommendedAtMinutesToEvent: 25,
-                sideEffects: ["Enable Battery Saver", "Prepare delay note"]
-            }
-        });
+                data: decision
+            });
+        }
         await new Promise(r => setTimeout(r, 1000));
 
         // 5. Guardian Agent
-        await guardianAgent({});
+        const guardianDecision = await guardianAgent(decision.chosen);
         broadcast({
             type: "guardian.decided",
             eventId: `guard_${Date.now()}`,
             timestamp: new Date().toISOString(),
             data: {
                 userId: initialContext.userId,
-                actionId: "ACTION_LEAVE_NOW",
+                actionId: decision.chosen?.id,
                 timestamp: new Date().toISOString(),
-                mode: "ASK_FIRST",
-                rationale: "This action affects commute timing and may notify others."
+                mode: guardianDecision.mode,
+                rationale: guardianDecision.rationale
             }
         });
         await new Promise(r => setTimeout(r, 1000));
 
         // 6. Final Intervention
-        lastInterventionText = "Leave now and enable Battery Saver";
-        broadcast({
-            type: "intervention.created",
-            eventId: `int_${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            data: {
-                userId: initialContext.userId,
-                actionId: "ACTION_LEAVE_NOW",
+        if (decision.chosen && guardianDecision.approved) {
+            lastInterventionText = decision.chosen.title;
+            broadcast({
+                type: "intervention.created",
+                eventId: `int_${Date.now()}`,
                 timestamp: new Date().toISOString(),
-                headline: lastInterventionText,
-                body: "Traffic is worsening and your phone is at 17%. Pulse recommends leaving now so you reach lab on time.",
-                ctaLabel: "Start commute",
-                secondaryCtaLabel: "Dismiss"
-            }
-        });
+                data: {
+                    userId: initialContext.userId,
+                    actionId: decision.chosen.id,
+                    timestamp: new Date().toISOString(),
+                    headline: decision.chosen.title,
+                    body: decision.chosen.description,
+                    ctaLabel: "Accept",
+                    secondaryCtaLabel: "Dismiss"
+                }
+            });
+        }
 
         console.log("[Pulse] Agent flow orchestration completed.");
         return { alert: lastInterventionText };

@@ -1,22 +1,17 @@
+import { plannerEngine } from "../../server/src/services/PlannerEngine";
+
 /**
  * Planner Agent
  * Proposes interventions to mitigate identified risks.
  * 
- * @param risk - The risk profile from Risk Agent.
- * @returns suggestedAction - A list of ranked interventions.
+ * @param initialContext - The user context.
+ * @returns decision - A PlannerDecision object.
  */
-export async function plannerAgent(risk: any): Promise<any> {
-  console.log("Planner Agent: Generating suggested actions...");
+export async function plannerAgent(initialContext: any): Promise<any> {
+  const userId = initialContext.userId || "demo-user";
+  const decision = await plannerEngine.decideForUser(userId);
 
-  // TODO: Implement planning logic
-  return {
-    actions: [
-      {
-        id: "p_001",
-        type: "notification",
-        message: "Everything looks good for your next event."
-      }
-    ],
-    riskReference: risk
-  };
+  console.log("[PlannerAgent] Decision:", JSON.stringify(decision, null, 2));
+  
+  return decision;
 }
