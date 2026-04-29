@@ -142,6 +142,9 @@ class AppState extends ChangeNotifier {
   RiskSnapshot? _currentRiskSnapshot;
   Map<String, dynamic>? _currentFutures;
   String _selectedScenarioId = "RECOMMENDED";
+  Map<String, dynamic>? _lastPlannerDecision;
+  final Set<String> _acceptedActionIds = {};
+  final Set<String> _dismissedActionIds = {};
 
   int get risksNext90Min => _risksNext90Min;
   List<String> get activeRiskTypes => _activeRiskTypes;
@@ -149,7 +152,59 @@ class AppState extends ChangeNotifier {
   RiskSnapshot? get currentRiskSnapshot => _currentRiskSnapshot;
   Map<String, dynamic>? get currentFutures => _currentFutures;
   String get selectedScenarioId => _selectedScenarioId;
-  
+  Map<String, dynamic>? get lastPlannerDecision => _lastPlannerDecision;
+
+  bool isActionAccepted(String id) => _acceptedActionIds.contains(id);
+  bool isActionDismissed(String id) => _dismissedActionIds.contains(id);
+
+  void acceptAction(Map<String, dynamic> action) {
+    final id = action['id'];
+    _acceptedActionIds.add(id);
+    _dismissedActionIds.remove(id);
+    
+    // Emit timeline event
+    _timelineEvents.insert(0, TimelineEvent(
+      id: const Uuid().v4(),
+      timestamp: DateTime.now(),
+      type: 'Action',
+      agent: 'User',
+      text: 'Accepted: ${action['title']}',
+      data: action,
+    ));
+
+    debugPrint('[Pulse AppState] Action accepted: $id');
+    notifyListeners();
+    
+    // Optional: Call backend to sync
+    _syncActionToBackend(id, 'accepted');
+  }
+
+  void dismissAction(Map<String, dynamic> action) {
+    final id = action['id'];
+    _dismissedActionIds.add(id);
+    _acceptedActionIds.remove(id);
+    
+    debugPrint('[Pulse AppState] Action dismissed: $id');
+    notifyListeners();
+    
+    _syncActionToBackend(id, 'dismissed');
+  }
+
+  Future<void> _syncActionToBackend(String actionId, String status) async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/planner/interventions/status');
+      await http.post(url, body: json.encode({
+        'userId': _userId,
+        'actionId': actionId,
+        'status': status,
+        'timestamp': DateTime.now().toUtc().toIso8601String(),
+      }), headers: {'Content-Type': 'application/json'});
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error syncing action status: $e');
+    }
+  }
+
   void selectScenario(String id) {
     _selectedScenarioId = id;
     notifyListeners();
@@ -413,10 +468,14 @@ class AppState extends ChangeNotifier {
     }
   }
 
-    // Update UI State
     if (type == 'futures.updated') {
       debugPrint('[Pulse AppState] Futures update received');
       _currentFutures = data['data'];
+    }
+
+    if (type == 'planner.suggested') {
+      debugPrint('[Pulse AppState] Planner suggestion received');
+      _lastPlannerDecision = data['data'];
     }
 
     if (type == 'risk.updated') {

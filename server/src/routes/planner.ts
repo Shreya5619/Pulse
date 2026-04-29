@@ -35,4 +35,11 @@ router.get("/suggested-actions", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/interventions/status", async (req: Request, res: Response) => {
+  const { userId, actionId, status } = req.body;
+  console.log(`[Planner] Action status updated: user=${userId}, action=${actionId}, status=${status}`);
+  // In a real app, we'd persist this to an AuditLog or UserActions table
+  res.json({ ok: true });
+});
+
 export default router;
