@@ -10,6 +10,9 @@ import '../screens/replay_screen.dart';
 import '../screens/scenario_player_screen.dart';
 import '../screens/gantt_screen.dart';
 import '../widgets/risk_hero_card.dart';
+import '../models/risk_snapshot.dart';
+import '../models/risk_state.dart' as legacy;
+import '../screens/graph_explanation_screen.dart';
 
 
 class HomeScreen extends StatelessWidget {
@@ -36,7 +39,7 @@ class HomeScreen extends StatelessWidget {
                   const RiskHeroCard(),
                   const SizedBox(height: 24),
 
-                  _buildRiskStack(state),
+                  _buildRiskStack(context, state),
                   const SizedBox(height: 24),
                   _buildContextChipsRow(context, state),
                   const SizedBox(height: 80), // Space for bottom banner
@@ -132,103 +135,119 @@ class HomeScreen extends StatelessWidget {
 
 
 
-  Widget _buildRiskStack(AppState state) {
+  Widget _buildRiskStack(BuildContext context, AppState state) {
+    final risks = state.currentRiskSnapshot?.risks ?? [];
+    if (risks.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        width: double.infinity,
+        child: Center(
+          child: Text(
+            "No active risks detected",
+            style: GoogleFonts.outfit(color: Colors.white30, fontSize: 13),
+          ),
+        ),
+      );
+    }
+
     return Column(
-      children: [
-        _riskCard(
-          icon: LucideIcons.clock,
-          color: Colors.redAccent,
-          title: "You'll be 10–15 min late to client review",
-          chips: ["Route congestion", "You leave in 5 min"],
-          score: "0.78",
-          level: "High",
+      children: risks.map((risk) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: _riskCard(
+          risk: risk,
+          onTap: () => _showExplanation(context, state, risk),
         ),
-        const SizedBox(height: 12),
-        _riskCard(
-          icon: LucideIcons.battery,
-          color: Colors.orangeAccent,
-          title: "Phone will die before commute ends",
-          chips: ["Battery 17%", "Draining fast"],
-          score: "0.82",
-          level: "High",
-        ),
-        const SizedBox(height: 12),
-        _riskCard(
-          icon: LucideIcons.inbox,
-          color: Colors.blueAccent,
-          title: "4 pending responses to High priority",
-          chips: ["Avg reply > 2h", "Client messages"],
-          score: "0.45",
-          level: "Med",
-        ),
-      ],
+      )).toList(),
     );
   }
 
-  Widget _riskCard({
-    required IconData icon,
-    required Color color,
-    required String title,
-    required List<String> chips,
-    required String score,
-    required String level,
-  }) {
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 20),
+  void _showExplanation(BuildContext context, AppState state, RiskScore risk) {
+    if (risk.nodeId != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => GraphExplanationScreen(
+            nodeId: risk.nodeId!,
+            riskType: risk.type.name,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+      );
+    }
+  }
+
+  Widget _riskCard({
+    required RiskScore risk,
+    required VoidCallback onTap,
+  }) {
+    IconData icon;
+    switch (risk.type) {
+      case RiskType.lateness: icon = LucideIcons.clock; break;
+      case RiskType.battery: icon = LucideIcons.battery; break;
+      case RiskType.responseDebt: icon = LucideIcons.inbox; break;
+      case RiskType.overload: icon = LucideIcons.alertTriangle; break;
+    }
+
+    return GestureDetector(
+      onTap: onTap,
+      child: GlassCard(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: risk.color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: risk.color, size: 20),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    risk.summary,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    children: risk.causes.map((c) => _tinyChip(c)).toList(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  risk.score.toStringAsFixed(2),
+                  style: GoogleFonts.outfit(
+                    color: risk.color,
                     fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                    fontSize: 16,
                   ),
                 ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  children: chips.map((c) => _tinyChip(c)).toList(),
+                Text(
+                  risk.label.name.toUpperCase(),
+                  style: TextStyle(
+                    color: risk.color.withOpacity(0.5),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                score,
-                style: GoogleFonts.outfit(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              Text(
-                level,
-                style: TextStyle(
-                  color: color.withOpacity(0.5),
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

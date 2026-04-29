@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_state.dart';
 import '../theme/colors.dart';
 import '../widgets/glass_card.dart';
 
@@ -16,28 +18,38 @@ class _FuturesScreenState extends State<FuturesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Next 2 hours",
-                style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+    return Consumer<AppState>(
+      builder: (context, state, child) {
+        final futures = state.currentFutures?['futures'] as List<dynamic>? ?? [];
+        
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Next 2 hours",
+                    style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  const SizedBox(height: 20),
+                  _buildSegmentedControl(),
+                  const SizedBox(height: 24),
+                  if (futures.isNotEmpty)
+                    _buildScenarioCard(futures[_selectedScenario.clamp(0, futures.length - 1)])
+                  else
+                    const Center(child: Text("No projections available", style: TextStyle(color: Colors.white30))),
+                  const SizedBox(height: 32),
+                  if (futures.isNotEmpty)
+                    _buildComparativeGraph(futures),
+                ],
               ),
-              const SizedBox(height: 20),
-              _buildSegmentedControl(),
-              const SizedBox(height: 24),
-              _buildScenarioCard(),
-              const SizedBox(height: 32),
-              _buildComparativeGraph(),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      }
     );
   }
 
@@ -77,29 +89,65 @@ class _FuturesScreenState extends State<FuturesScreen> {
     );
   }
 
-  Widget _buildScenarioCard() {
-    final data = _getScenarioData(_selectedScenario);
+  Widget _buildScenarioCard(dynamic data) {
+    final metrics = data['metrics'];
+    final risks = data['risks'] as List<dynamic>? ?? [];
+    final stressScore = (metrics['stressScore'] as num?)?.toDouble() ?? 0.0;
+    final color = stressScore > 0.7 ? Colors.redAccent : stressScore > 0.4 ? Colors.orangeAccent : Colors.greenAccent;
+
     return GlassCard(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            data.title,
-            style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: data.color),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  data['title'] ?? "Scenario",
+                  style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: color),
+                ),
+              ),
+              _riskIconCount(risks.length),
+            ],
           ),
           const SizedBox(height: 24),
-          _metricRow(LucideIcons.clock, "Arrive ${data.eta}", data.color),
+          _metricRow(LucideIcons.clock, "ETA: ${metrics['etaMinutes'] ?? '?'} min", color),
           const SizedBox(height: 16),
-          _metricRow(LucideIcons.battery, "Battery ${data.battery} at arrival", data.color),
+          _metricRow(LucideIcons.battery, "Battery: ${metrics['batteryPercent'] ?? '?'}% at end", color),
           const SizedBox(height: 16),
-          _metricRow(LucideIcons.messageSquare, "New notification debt ${data.notifs}", data.color),
+          _metricRow(LucideIcons.alertCircle, "Expected late: ${metrics['expectedLatenessMinutes'] ?? 0} min", color),
           const SizedBox(height: 24),
           const Divider(color: Colors.white10),
           const SizedBox(height: 20),
           Text(
-            data.summary,
+            data['description'] ?? "",
             style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _riskIconCount(int count) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: count > 0 ? Colors.redAccent.withOpacity(0.1) : Colors.greenAccent.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(LucideIcons.activity, size: 12, color: count > 0 ? Colors.redAccent : Colors.greenAccent),
+          const SizedBox(width: 4),
+          Text(
+            "$count risks",
+            style: TextStyle(
+              color: count > 0 ? Colors.redAccent : Colors.greenAccent,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -116,7 +164,7 @@ class _FuturesScreenState extends State<FuturesScreen> {
     );
   }
 
-  Widget _buildComparativeGraph() {
+  Widget _buildComparativeGraph(List<dynamic> futures) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -125,11 +173,11 @@ class _FuturesScreenState extends State<FuturesScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            _bar("Do nothing", 0.85, Colors.redAccent),
-            _bar("Recommended", 0.22, Colors.greenAccent),
-            _bar("Alternate", 0.45, Colors.orangeAccent),
-          ],
+          children: futures.map((f) {
+            final stress = (f['metrics']['stressScore'] as num?)?.toDouble() ?? 0.0;
+            final color = stress > 0.7 ? Colors.redAccent : stress > 0.4 ? Colors.orangeAccent : Colors.greenAccent;
+            return _bar(f['title'] ?? "Scenario", stress, color);
+          }).toList(),
         ),
       ],
     );

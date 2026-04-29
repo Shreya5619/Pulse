@@ -11,6 +11,25 @@ import '../models/snapshot.dart';
 import '../models/device_context.dart';
 import '../services/context_services.dart';
 import '../services/local_repository.dart';
+import '../models/risk_snapshot.dart';
+
+class TimelineEvent {
+  final String id;
+  final DateTime timestamp;
+  final String type;
+  final String agent;
+  final String text;
+  final Map<String, dynamic>? data;
+
+  TimelineEvent({
+    required this.id,
+    required this.timestamp,
+    required this.type,
+    required this.agent,
+    required this.text,
+    this.data,
+  });
+}
 
 class AppState extends ChangeNotifier {
   final ContextServices _contextServices = ContextServices();
@@ -29,6 +48,7 @@ class AppState extends ChangeNotifier {
 
   final List<ContextSnapshot> _snapshots = [];
   List<Intervention> _interventions = [];
+  List<TimelineEvent> _timelineEvents = [];
   final List<String> _rawMessages = [];
   bool _isLive = true;
   WebSocketChannel? _channel;
@@ -51,6 +71,7 @@ class AppState extends ChangeNotifier {
   RiskState get currentRisk => _currentRisk;
   List<ContextSnapshot> get snapshots => _snapshots;
   List<Intervention> get interventions => _interventions;
+  List<TimelineEvent> get timelineEvents => _timelineEvents;
   List<String> get rawMessages => _rawMessages;
   bool get isLive => _isLive;
   bool get isReplayMode => _isReplayMode;
@@ -62,10 +83,14 @@ class AppState extends ChangeNotifier {
   int _risksNext90Min = 0;
   List<String> _activeRiskTypes = [];
   DateTime? _lastHeartbeatTime;
+  RiskSnapshot? _currentRiskSnapshot;
+  Map<String, dynamic>? _currentFutures;
 
   int get risksNext90Min => _risksNext90Min;
   List<String> get activeRiskTypes => _activeRiskTypes;
   DateTime? get lastHeartbeatTime => _lastHeartbeatTime;
+  RiskSnapshot? get currentRiskSnapshot => _currentRiskSnapshot;
+  Map<String, dynamic>? get currentFutures => _currentFutures;
 
   int get replayProgress {
     if (_scenarioStart == null ||
@@ -274,7 +299,34 @@ class AppState extends ChangeNotifier {
 
     // Persist to Local DB (Only if live)
     if (!isReplay) {
-      if (type == 'risk.updated') {
+      if (type == 'context.updated') {
+        _timelineEvents.insert(
+          0,
+          TimelineEvent(
+            id: data['eventId'] ?? const Uuid().v4(),
+            timestamp: timestamp,
+            type: 'Context',
+            agent: 'Context',
+            text: 'Device state snapshot ingested.',
+            data: data['data'],
+          ),
+        );
+      } else if (type == 'risk.updated') {
+        final risks = data['data']?['risks'] as List<dynamic>?;
+        if (risks != null && risks.isNotEmpty) {
+          _timelineEvents.insert(
+            0,
+            TimelineEvent(
+              id: data['eventId'] ?? const Uuid().v4(),
+              timestamp: timestamp,
+              type: 'Risk',
+              agent: 'RiskEngine',
+              text:
+                  '${risks.length} risks detected: ${risks.map((r) => r['type']).join(", ")}',
+              data: data['data'],
+            ),
+          );
+        }
         _localRepo.saveRisk(
           timestamp.toIso8601String(),
           data['data']?['level'] ?? 'unknown',
@@ -288,32 +340,55 @@ class AppState extends ChangeNotifier {
           data,
         );
       }
+    } else if (type == 'futures.updated') {
+      debugPrint('[Pulse AppState] Futures update received');
+      _currentFutures = data['data'];
     }
 
     // Update UI State
     if (type == 'risk.updated') {
-      debugPrint('[Pulse AppState] Risk update received for user: ${data['userId']}');
+      debugPrint(
+        '[Pulse AppState] Risk update received for user: ${data['userId']}',
+      );
       final rData = data['data'];
       if (rData != null) {
+        _currentRiskSnapshot = RiskSnapshot.fromJson(rData);
         _currentRisk = RiskState(
-          score: (rData['score'] as num?)?.toDouble() ?? 0.0,
-          level: _parseRiskLevel(rData['level'] as String?),
-          timestamp: timestamp,
-          reasons: List<String>.from(rData['reasons'] ?? []),
-          history: List<double>.from(
-            (rData['history'] ?? []).map((h) => (h as num).toDouble()),
+          score: _currentRiskSnapshot!.risks.isEmpty
+              ? 0.0
+              : _currentRiskSnapshot!.risks
+                    .map((r) => r.score)
+                    .reduce((a, b) => a > b ? a : b),
+          level: _parseRiskLevel(
+            _currentRiskSnapshot!.risks.isEmpty
+                ? 'LOW'
+                : _currentRiskSnapshot!.risks[0].label.name.toUpperCase(),
           ),
+          timestamp: timestamp,
+          reasons: _currentRiskSnapshot!.risks.map((r) => r.summary).toList(),
+          history: [],
         );
       }
     } else if (type == 'intervention.created') {
       final intv = data['data'];
       if (intv != null) {
+        final intvId =
+            data['eventId'] ?? "int_${DateTime.now().millisecondsSinceEpoch}";
+        _timelineEvents.insert(
+          0,
+          TimelineEvent(
+            id: intvId,
+            timestamp: timestamp,
+            type: 'Action',
+            agent: 'Planner',
+            text: '${intv['headline']}: ${intv['body']}',
+            data: intv,
+          ),
+        );
         _interventions.insert(
           0,
           Intervention(
-            id:
-                data['eventId'] ??
-                "int_${DateTime.now().millisecondsSinceEpoch}",
+            id: intvId,
             title: intv['headline'] ?? "New Intervention",
             description: intv['body'] ?? "",
             type: "System",
@@ -329,8 +404,10 @@ class AppState extends ChangeNotifier {
     } else if (type == 'heartbeat.tick') {
       // Only process ticks for our current user
       if (data['userId'] != null && data['userId'] != _userId) return;
-      
-      debugPrint('[Pulse AppState] Heartbeat tick: risksNext90Min=${data['data']?['risksNext90Min']}');
+
+      debugPrint(
+        '[Pulse AppState] Heartbeat tick: risksNext90Min=${data['data']?['risksNext90Min']}',
+      );
       _lastHeartbeatTime = timestamp;
       final hData = data['data'];
       if (hData != null && hData['risksNext90Min'] != null) {
@@ -338,9 +415,11 @@ class AppState extends ChangeNotifier {
       }
     } else if (type == 'graph.updated') {
       if (data['userId'] != null && data['userId'] != _userId) return;
-      
+
       final gData = data['data'];
-      debugPrint('[Pulse AppState] Graph update: risksNext90Min=${gData?['totalRisksNext90Min']}');
+      debugPrint(
+        '[Pulse AppState] Graph update: risksNext90Min=${gData?['totalRisksNext90Min']}',
+      );
       if (gData != null) {
         _risksNext90Min = gData['totalRisksNext90Min'] ?? 0;
         final risks = gData['risks'] as List<dynamic>?;
@@ -589,6 +668,24 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<Map<String, dynamic>?> fetchGraphExplanation(String nodeId) async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse(
+        'http://$host:8080/api/graph/explain/$nodeId?X-User-Id=$_userId',
+      );
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['data'];
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error fetching graph explanation: $e');
+    }
+    return null;
+  }
+
   void _resumeTimer() {
     _replayTimer?.cancel();
     _replayTimer = Timer.periodic(
@@ -647,6 +744,9 @@ class AppState extends ChangeNotifier {
 
     // Reset simulation state
     _interventions = [];
+    _timelineEvents = [];
+    _currentRiskSnapshot = null;
+    _currentFutures = null;
     _replayIndex = 0;
 
     // Replay all events up to the target time instantly
@@ -714,7 +814,7 @@ class AppState extends ChangeNotifier {
       if (defaultTargetPlatform == TargetPlatform.android) {
         // For physical devices or emulators on local network
         // Use your computer's local IP address
-        host = '192.168.0.102';
+        host = '10.123.31.141';
       }
     }
     return host;

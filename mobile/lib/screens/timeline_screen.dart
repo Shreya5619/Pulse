@@ -62,22 +62,21 @@ class _TimelineScreenState extends State<TimelineScreen> {
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                    itemCount: events.length,
+                    itemCount: state.timelineEvents.length,
                     itemBuilder: (context, index) {
-                      final event = events[index];
-                      // Highlight if this event was the most recently added in replay
+                      final event = state.timelineEvents[index];
                       final isReplayHighlight = state.isReplayMode && index == 0;
                       
                       return _buildTimelineItem(
                         {
-                          "time": DateFormat.Hm().format(event.createdAt),
-                          "type": "Action",
-                          "agent": "Planner",
-                          "text": "${event.title}: ${event.description}",
+                          "time": DateFormat.Hm().format(event.timestamp),
+                          "type": event.type,
+                          "agent": event.agent,
+                          "text": event.text,
                           "isNow": isReplayHighlight,
                         },
                         index == 0,
-                        index == events.length - 1,
+                        index == state.timelineEvents.length - 1,
                       );
                     },
                   ),
@@ -160,7 +159,16 @@ class _TimelineScreenState extends State<TimelineScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _badge(event['type'], color),
+                      Row(
+                        children: [
+                          _badge(event['type'], color),
+                          const SizedBox(width: 8),
+                          if (event['type'] == 'Risk')
+                            const Icon(LucideIcons.activity, size: 10, color: Colors.white24),
+                          if (event['type'] == 'Action')
+                            const Icon(LucideIcons.gitBranch, size: 10, color: Colors.white24),
+                        ],
+                      ),
                       Text(
                         event['agent'],
                         style: GoogleFonts.outfit(fontSize: 8, color: Colors.white24, fontWeight: FontWeight.bold, letterSpacing: 1),

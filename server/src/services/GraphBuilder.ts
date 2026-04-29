@@ -154,6 +154,28 @@ export class GraphBuilder {
     return this.graphCache.entries();
   }
 
+  getExplanation(userId: string, nodeId: string) {
+    const cached = this.graphCache.get(userId);
+    if (!cached) return null;
+
+    // Find the target node
+    const target = cached.nodes.find(n => n.id === nodeId);
+    if (!target) return null;
+
+    // Find direct neighbors (1-hop)
+    const relatedEdges = cached.edges.filter(e => e.from === nodeId || e.to === nodeId);
+    const neighborIds = new Set(relatedEdges.map(e => e.from === nodeId ? e.to : e.from));
+    neighborIds.add(nodeId);
+
+    const relatedNodes = cached.nodes.filter(n => neighborIds.has(n.id));
+
+    return {
+      target,
+      nodes: relatedNodes,
+      edges: relatedEdges
+    };
+  }
+
   private calculateScores(nodes: GraphNode[], edges: GraphEdge[], context: ContextSnapshot, memory: MemoryState) {
     const nowTime = new Date(context.timestamp).getTime();
 

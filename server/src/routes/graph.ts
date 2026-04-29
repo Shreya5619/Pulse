@@ -127,6 +127,35 @@ router.get("/risk/history", async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/graph/explain/:nodeId
+ * Returns a subgraph explanation for a specific node.
+ */
+router.get("/explain/:nodeId", async (req: Request, res: Response) => {
+    try {
+        const userId = (
+            req.header("X-User-Id") || 
+            req.query.userId || 
+            req.query["X-User-Id"] || 
+            "lifecanvas_studios"
+        ) as string;
+        const { nodeId } = req.params;
+
+        const explanation = graphBuilder.getExplanation(userId, nodeId);
+        if (!explanation) {
+            return res.status(404).json({ ok: false, error: "Node or graph not found" });
+        }
+
+        res.json({
+            ok: true,
+            data: explanation
+        });
+    } catch (error: any) {
+        console.error("[Pulse] Graph explanation error:", error);
+        res.status(500).json({ ok: false, error: "Failed to generate graph explanation", message: error.message });
+    }
+});
+
+/**
  * GET /api/graph
  * Fallback to full graph.
  */
