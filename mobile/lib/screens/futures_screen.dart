@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/colors.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/route_eta_strip.dart';
 
 class FuturesScreen extends StatefulWidget {
   const FuturesScreen({super.key});
@@ -34,6 +35,8 @@ class _FuturesScreenState extends State<FuturesScreen> {
                     "Next 2 hours",
                     style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
+                  const SizedBox(height: 12),
+                  const RouteEtaStrip(isMini: true),
                   const SizedBox(height: 20),
                   _buildSegmentedControl(),
                   const SizedBox(height: 24),
@@ -113,11 +116,13 @@ class _FuturesScreenState extends State<FuturesScreen> {
             ],
           ),
           const SizedBox(height: 24),
-          _metricRow(LucideIcons.clock, "ETA: ${metrics['etaMinutes'] ?? '?'} min", color),
+          _metricRow(LucideIcons.clock, _formatScenarioEta(data, metrics), color),
           const SizedBox(height: 16),
           _metricRow(LucideIcons.battery, "Battery: ${metrics['batteryPercent'] ?? '?'}% at end", color),
           const SizedBox(height: 16),
-          _metricRow(LucideIcons.alertCircle, "Expected late: ${metrics['expectedLatenessMinutes'] ?? 0} min", color),
+          _metricRow(LucideIcons.alertCircle, metrics['expectedLatenessMinutes'] > 0 
+            ? "Expected late: ${metrics['expectedLatenessMinutes']} min" 
+            : "On time arrival", color),
           const SizedBox(height: 24),
           const Divider(color: Colors.white10),
           const SizedBox(height: 20),
@@ -197,6 +202,19 @@ class _FuturesScreenState extends State<FuturesScreen> {
         Text(label.split(" ")[0], style: const TextStyle(color: Colors.white24, fontSize: 8)),
       ],
     );
+  }
+
+  String _formatScenarioEta(dynamic data, dynamic metrics) {
+    final etaMinutes = metrics['etaMinutes'] ?? 0;
+    final lateness = metrics['expectedLatenessMinutes'] ?? 0;
+    final status = lateness > 0 ? "(late)" : "(on time)";
+    
+    // For demo, we can derive a "leave at" time based on the scenario type
+    String leaveAt = "09:40";
+    if (data['id'] == "DO_NOTHING") leaveAt = "09:55";
+    if (data['id'] == "ALTERNATE") leaveAt = "10:10";
+
+    return "Leave at $leaveAt · ETA ${etaMinutes} min $status";
   }
 
   _ScenarioData _getScenarioData(int index) {

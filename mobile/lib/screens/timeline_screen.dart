@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../providers/app_state.dart';
 import '../theme/colors.dart';
+import '../widgets/route_eta_strip.dart';
 
 class TimelineScreen extends StatefulWidget {
   const TimelineScreen({super.key});
@@ -59,6 +60,10 @@ class _TimelineScreenState extends State<TimelineScreen> {
             child: Column(
               children: [
                 _buildFilterBar(),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  child: RouteEtaStrip(isMini: true),
+                ),
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),

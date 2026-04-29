@@ -13,6 +13,7 @@ import '../widgets/risk_hero_card.dart';
 import '../models/risk_snapshot.dart';
 import '../models/risk_state.dart' as legacy;
 import '../screens/graph_explanation_screen.dart';
+import '../widgets/route_eta_strip.dart';
 
 
 class HomeScreen extends StatelessWidget {
@@ -35,6 +36,8 @@ class HomeScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildHeaderStrip(context, state),
+                  const SizedBox(height: 16),
+                  const RouteEtaStrip(),
                   const SizedBox(height: 24),
                   const RiskHeroCard(),
                   const SizedBox(height: 24),
@@ -155,6 +158,7 @@ class HomeScreen extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 12),
         child: _riskCard(
           risk: risk,
+          state: state,
           onTap: () => _showExplanation(context, state, risk),
         ),
       )).toList(),
@@ -177,6 +181,7 @@ class HomeScreen extends StatelessWidget {
 
   Widget _riskCard({
     required RiskScore risk,
+    required AppState state,
     required VoidCallback onTap,
   }) {
     IconData icon;
@@ -216,6 +221,14 @@ class HomeScreen extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (risk.type == RiskType.lateness && state.etaInfo.hasRoute)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        "Current route ETA ${state.etaInfo.etaDisplay} · you'll be ${state.etaInfo.leaveInMinutes != null && state.etaInfo.leaveInMinutes! < 0 ? state.etaInfo.leaveInMinutes!.abs() : 0} min late.",
+                        style: GoogleFonts.outfit(fontSize: 10, color: Colors.redAccent.withOpacity(0.8)),
+                      ),
+                    ),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,

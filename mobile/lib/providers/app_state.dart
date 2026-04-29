@@ -31,6 +31,58 @@ class TimelineEvent {
   });
 }
 
+class AppointmentEtaInfo {
+  final bool hasRoute;
+  final String? reason;
+  final int? durationSeconds;
+  final int? distanceMeters;
+  final String? travelMode;
+  final Map<String, dynamic>? worstSegment;
+  final String? eventId;
+  final String? eventTitle;
+  final String? eventTime;
+  final String? destinationName;
+  final int? leaveInMinutes;
+  final String? latenessRisk;
+  final String? etaDisplay;
+
+  AppointmentEtaInfo({
+    required this.hasRoute,
+    this.reason,
+    this.durationSeconds,
+    this.distanceMeters,
+    this.travelMode,
+    this.worstSegment,
+    this.eventId,
+    this.eventTitle,
+    this.eventTime,
+    this.destinationName,
+    this.leaveInMinutes,
+    this.latenessRisk,
+    this.etaDisplay,
+  });
+
+  factory AppointmentEtaInfo.fromJson(Map<String, dynamic> json) {
+    return AppointmentEtaInfo(
+      hasRoute: json['hasRoute'] ?? false,
+      reason: json['reason'],
+      durationSeconds: json['durationSeconds'],
+      distanceMeters: json['distanceMeters'],
+      travelMode: json['travelMode'],
+      worstSegment: json['worstSegment'],
+      eventId: json['eventId'],
+      eventTitle: json['eventTitle'],
+      eventTime: json['eventTime'],
+      destinationName: json['destinationName'],
+      leaveInMinutes: json['leaveInMinutes'],
+      latenessRisk: json['latenessRisk'],
+      etaDisplay: json['etaDisplay'],
+    );
+  }
+
+  factory AppointmentEtaInfo.empty() => AppointmentEtaInfo(hasRoute: false);
+}
+
 class AppState extends ChangeNotifier {
   final ContextServices _contextServices = ContextServices();
   final LocalRepository _localRepo = LocalRepository();
@@ -52,6 +104,10 @@ class AppState extends ChangeNotifier {
   final List<String> _rawMessages = [];
   bool _isLive = true;
   WebSocketChannel? _channel;
+
+  // ETA State
+  AppointmentEtaInfo _etaInfo = AppointmentEtaInfo.empty();
+  AppointmentEtaInfo get etaInfo => _etaInfo;
 
   // Replay Mode State
   bool _isReplayMode = false;
@@ -111,6 +167,14 @@ class AppState extends ChangeNotifier {
     _initContextIngestion();
     // Keep internal simulation for fallback or UI stability
     _startSimulatedStream();
+    
+    // Initial ETA fetch
+    fetchAppointmentEta();
+    
+    // Periodic ETA refresh
+    Timer.periodic(const Duration(minutes: 2), (timer) {
+      if (!_isReplayMode) fetchAppointmentEta();
+    });
   }
 
   Future<void> _initLocalData() async {
@@ -587,7 +651,9 @@ class AppState extends ChangeNotifier {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         debugPrint('[Pulse API] Success: Snapshot ingested by backend.');
-        // debugPrint('[Pulse API] Response: ${response.body}');
+        
+        // Refresh ETA after successful context ingestion
+        fetchAppointmentEta();
 
         // Save to Local DB
         await _localRepo.saveSnapshot(
@@ -805,6 +871,24 @@ class AppState extends ChangeNotifier {
         return RiskLevel.highRisk;
       default:
         return RiskLevel.safe;
+    }
+  }
+
+  Future<void> fetchAppointmentEta() async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/routing/next-appointment-eta?userId=$_userId');
+      
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['ok'] == true) {
+          _etaInfo = AppointmentEtaInfo.fromJson(data['data']);
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error fetching appointment ETA: $e');
     }
   }
 

@@ -64,13 +64,29 @@ router.get("/next-appointment-eta", async (req, res) => {
 
     const result = await routingService.getRoute(from, to);
 
+    const now = new Date(context.timestamp);
+    const eventTime = new Date(nextEvent.start_time);
+    const travelSeconds = result.durationSeconds;
+    const leaveByTime = new Date(eventTime.getTime() - travelSeconds * 1000);
+    const leaveInMinutes = Math.round((leaveByTime.getTime() - now.getTime()) / 60000);
+    
+    const latenessRisk = leaveInMinutes < 5 ? "at_risk" : "nominal";
+
     res.json({
       ok: true,
       data: {
         hasRoute: true,
         durationSeconds: result.durationSeconds,
         distanceMeters: result.distanceMeters,
-        eventId: nextEvent.id
+        travelMode: result.travelMode || "car",
+        worstSegment: result.worstSegment,
+        eventId: nextEvent.id,
+        eventTitle: nextEvent.title,
+        eventTime: nextEvent.start_time,
+        destinationName: nextEvent.location_text || "Destination",
+        leaveInMinutes: leaveInMinutes,
+        latenessRisk: latenessRisk,
+        etaDisplay: `${Math.round(result.durationSeconds / 60)} min`
       }
     });
   } catch (err) {
