@@ -24,6 +24,44 @@ class PlannerEngine {
     };
   }
 
+  async getActionsForRisk(userId: string, riskType: string, nodeId?: string): Promise<PlannerAction[]> {
+    const riskSnapshot = await riskEngine.computeForUser(userId);
+    const futures = await futuresEngine.computeForUser(userId);
+    const memory = await memoryStore.loadAll(userId);
+
+    const allCandidates = this.buildCandidates(riskSnapshot, futures, memory);
+
+    // Filter candidates relevant to this risk type/node
+    let relevant = allCandidates.filter(c => {
+      if (riskType === 'lateness') return c.id === 'ACTION_LEAVE_NOW' || c.id === 'ACTION_RECOMMEND_CHARGING_STOP';
+      if (riskType === 'battery') return c.id === 'ACTION_ENABLE_BATTERY_SAVER' || c.id === 'ACTION_RECOMMEND_CHARGING_STOP';
+      if (riskType === 'overload') return c.id === 'ACTION_SUPPRESS_NOISY_NOTIFICATIONS';
+      if (riskType === 'response_debt') return c.id === 'ACTION_PREPARE_DELAY_MESSAGE';
+      return false;
+    });
+
+    // If we have a specific nodeId, prioritize actions that apply to it
+    if (nodeId) {
+      relevant = relevant.sort((a, b) => (a.appliesToEventId === nodeId ? -1 : 1));
+    }
+
+    // Ensure we have at least some generic actions if nothing specific found
+    if (relevant.length === 0) {
+      if (riskType === 'lateness') {
+         relevant.push({
+           id: "ACTION_PREPARE_DELAY_MESSAGE",
+           title: "Send 'Running 10 minutes late'",
+           description: "Quick update to the organizer.",
+           approvalMode: "ASK_FIRST",
+           reasons: ["Mitigate lateness impact"],
+           sideEffects: []
+         });
+      }
+    }
+
+    return relevant.slice(0, 3);
+  }
+
   private buildCandidates(
     risk: RiskSnapshot,
     futures: FuturesResult,

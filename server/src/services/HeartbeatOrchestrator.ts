@@ -9,6 +9,7 @@ import { heartbeatRepo } from "../db/HeartbeatRepository";
 import { logEvent } from "../utils/logger";
 import { computeNextHeartbeatDelay } from "./HeartbeatPolicy";
 import { workspaceService } from "./WorkspaceService";
+import { memoryAgent } from "./MemoryAgent";
 
 export class HeartbeatOrchestrator {
   async runOnce(userId: string) {
@@ -82,7 +83,10 @@ export class HeartbeatOrchestrator {
       details: guardian
     });
 
-    // 7. Persist an audit record
+    // 7. Memory Agent (Contextual Summarization)
+    await memoryAgent.onHeartbeat(userId);
+
+    // 8. Persist an audit record
     await heartbeatRepo.save({
       userId,
       startedAt: t0,

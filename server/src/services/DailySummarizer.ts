@@ -4,17 +4,17 @@ import { ContextSnapshot } from "../../../shared/memory"; // Assuming it's re-ex
 
 export class DailySummarizer {
   /**
-   * Summarizes the last 7 days of context for a user and updates their memory.
+   * Summarizes the last 24 hours of context for a user and updates their memory.
    */
   async summarize(userId: string): Promise<void> {
     console.log(`[DailySummarizer] Starting summary for user: ${userId}`);
 
     const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    const snapshots = await contextSnapshotRepo.findRange(userId, sevenDaysAgo, now);
+    const snapshots = await contextSnapshotRepo.findRange(userId, twentyFourHoursAgo, now);
     if (snapshots.length === 0) {
-      console.warn(`[DailySummarizer] No snapshots found for user ${userId} in the last 7 days.`);
+      console.warn(`[DailySummarizer] No snapshots found for user ${userId} in the last 24 hours.`);
       return;
     }
 

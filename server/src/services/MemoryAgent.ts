@@ -3,20 +3,16 @@ import { memoryStore } from "./MemoryStore";
 
 export class MemoryAgent {
   private lastSummaryTime: number = 0;
-  private snapshotCounter: number = 0;
-  private readonly SUMMARY_THRESHOLD = 50; // Summarize every 50 snapshots
-  private readonly TIME_THRESHOLD = 24 * 60 * 60 * 1000; // or once per 24 hours
+  private readonly TIME_THRESHOLD = 24 * 60 * 60 * 1000; // once per 24 hours
 
   /**
    * Called on every heartbeat to check if a new summary is needed.
    */
   async onHeartbeat(userId: string): Promise<void> {
-    this.snapshotCounter++;
     const now = Date.now();
 
-    const needsSummary = 
-      this.snapshotCounter >= this.SUMMARY_THRESHOLD || 
-      (now - this.lastSummaryTime) >= this.TIME_THRESHOLD;
+    // Check if 24 hours have passed since the last summary
+    const needsSummary = (now - this.lastSummaryTime) >= this.TIME_THRESHOLD;
 
     if (needsSummary) {
       await this.runSummary(userId);

@@ -734,6 +734,24 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<List<dynamic>> fetchSuggestedActions(String riskType, {String? nodeId}) async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse(
+        'http://$host:8080/api/planner/suggested-actions?userId=$_userId&riskType=$riskType&nodeId=${nodeId ?? ""}',
+      );
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['data'] as List<dynamic>;
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error fetching suggested actions: $e');
+    }
+    return [];
+  }
+
   Future<Map<String, dynamic>?> fetchGraphExplanation(String nodeId) async {
     try {
       final host = _getBackendHost();

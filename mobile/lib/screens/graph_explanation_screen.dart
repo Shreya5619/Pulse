@@ -22,6 +22,7 @@ class GraphExplanationScreen extends StatefulWidget {
 
 class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
   Map<String, dynamic>? _explanation;
+  List<dynamic> _suggestedActions = [];
   bool _isLoading = true;
 
   @override
@@ -32,10 +33,17 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
 
   Future<void> _loadExplanation() async {
     final state = Provider.of<AppState>(context, listen: false);
-    final data = await state.fetchGraphExplanation(widget.nodeId);
+    
+    // Load both explanation and suggested actions in parallel
+    final results = await Future.wait([
+      state.fetchGraphExplanation(widget.nodeId),
+      state.fetchSuggestedActions(widget.riskType, nodeId: widget.nodeId),
+    ]);
+
     if (mounted) {
       setState(() {
-        _explanation = data;
+        _explanation = results[0] as Map<String, dynamic>?;
+        _suggestedActions = results[1] as List<dynamic>;
         _isLoading = false;
       });
     }
@@ -74,6 +82,20 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
                       ),
                       const SizedBox(height: 16),
                       ..._buildNeighborCards(),
+                      if (_suggestedActions.isNotEmpty) ...[
+                        const SizedBox(height: 32),
+                        Text(
+                          "Suggested Interventions",
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white30,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ..._buildActionCards(),
+                      ],
+                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
@@ -164,6 +186,69 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
                         style: const TextStyle(color: Colors.white30, fontSize: 10),
                       ),
                   ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }).toList();
+  }
+
+  List<Widget> _buildActionCards() {
+    return _suggestedActions.map((action) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: GlassCard(
+          padding: const EdgeInsets.all(16),
+          borderColor: AppColors.primary.withOpacity(0.3),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(LucideIcons.zap, size: 14, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      action['title'] ?? "Intervention",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                action['description'] ?? "",
+                style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    // Logic to execute action
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary.withOpacity(0.15),
+                    foregroundColor: AppColors.primary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    side: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+                  ),
+                  child: const Text("EXECUTE INTERVENTION", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
                 ),
               ),
             ],
