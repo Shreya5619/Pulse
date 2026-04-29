@@ -13,6 +13,8 @@ import '../widgets/risk_hero_card.dart';
 import '../models/risk_snapshot.dart';
 import '../models/risk_state.dart' as legacy;
 import '../screens/graph_explanation_screen.dart';
+import '../screens/multi_mode_eta_screen.dart';
+
 
 
 class HomeScreen extends StatelessWidget {
@@ -98,6 +100,13 @@ class HomeScreen extends StatelessWidget {
         ),
         Row(
           children: [
+            IconButton(
+              icon: const Icon(LucideIcons.mapPin, size: 18, color: Colors.white30),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const MultiModeEtaScreen()),
+              ),
+            ),
             IconButton(
               icon: const Icon(LucideIcons.calendar, size: 18, color: Colors.white30),
               onPressed: () => Navigator.push(

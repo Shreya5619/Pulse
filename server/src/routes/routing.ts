@@ -79,4 +79,31 @@ router.get("/next-appointment-eta", async (req, res) => {
   }
 });
 
+/**
+ * GET /api/routing/multi-mode-eta
+ * Query params: fromLat, fromLon, toLat, toLon
+ */
+router.get("/multi-mode-eta", async (req, res) => {
+  try {
+    const { fromLat, fromLon, toLat, toLon } = req.query;
+
+    if (!fromLat || !fromLon || !toLat || !toLon) {
+      return res.status(400).json({ ok: false, error: "Missing coordinates" });
+    }
+
+    const result = await routingService.getMultiModeRoutes(
+      { lat: Number(fromLat), lon: Number(fromLon) },
+      { lat: Number(toLat), lon: Number(toLon) }
+    );
+
+    res.json({
+      ok: true,
+      data: result
+    });
+  } catch (err) {
+    console.error("[Routing] /multi-mode-eta error:", err);
+    res.status(500).json({ ok: false, error: "Multi-mode routing failed" });
+  }
+});
+
 export default router;

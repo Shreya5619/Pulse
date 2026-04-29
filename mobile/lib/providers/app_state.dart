@@ -809,15 +809,8 @@ class AppState extends ChangeNotifier {
   }
 
   String _getBackendHost() {
-    String host = 'localhost';
-    if (!kIsWeb) {
-      if (defaultTargetPlatform == TargetPlatform.android) {
-        // For physical devices or emulators on local network
-        // Use your computer's local IP address
-        host = '10.123.31.141';
-      }
-    }
-    return host;
+    // ADB Reverse Tunnel active - always route through USB loopback
+    return 'localhost';
   }
 
   @override
