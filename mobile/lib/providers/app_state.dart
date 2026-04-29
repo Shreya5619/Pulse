@@ -423,48 +423,73 @@ class AppState extends ChangeNotifier {
         ? DateTime.parse(timestampStr)
         : DateTime.now();
 
-    // Persist to Local DB (Only if live)
-    if (!isReplay) {
-      if (type == 'context.updated') {
-        _timelineEvents.insert(
-          0,
-          TimelineEvent(
-            id: data['eventId'] ?? const Uuid().v4(),
-            timestamp: timestamp,
-            type: 'Context',
-            agent: 'Context',
-            text: 'Device state snapshot ingested.',
-            data: data['data'],
-          ),
-        );
-      } else if (type == 'risk.updated') {
-        final risks = data['data']?['risks'] as List<dynamic>?;
-        if (risks != null && risks.isNotEmpty) {
-          _timelineEvents.insert(
-            0,
-            TimelineEvent(
-              id: data['eventId'] ?? const Uuid().v4(),
-              timestamp: timestamp,
-              type: 'Risk',
-              agent: 'RiskEngine',
-              text:
-                  '${risks.length} risks detected: ${risks.map((r) => r['type']).join(", ")}',
-              data: data['data'],
-            ),
-          );
-        }
+    // Event capture for Timeline (for both live and replay)
+    if (type == 'context.updated') {
+      _timelineEvents.insert(0, TimelineEvent(
+        id: data['eventId'] ?? const Uuid().v4(),
+        timestamp: timestamp,
+        type: 'Context',
+        agent: 'Context',
+        text: 'Device state snapshot ingested.',
+        data: data['data'],
+      ));
+    } else if (type == 'risk.updated') {
+      final risks = data['data']?['risks'] as List<dynamic>? ?? [];
+      if (risks.isNotEmpty) {
+        _timelineEvents.insert(0, TimelineEvent(
+          id: data['eventId'] ?? const Uuid().v4(),
+          timestamp: timestamp,
+          type: 'Risk',
+          agent: 'RiskEngine',
+          text: '${risks.length} risks detected: ${risks.map((r) => r['type']).join(", ")}',
+          data: data['data'],
+        ));
+      }
+      if (!isReplay) {
         _localRepo.saveRisk(
           timestamp.toIso8601String(),
           data['data']?['level'] ?? 'unknown',
           data,
         );
-      } else if (type == 'intervention.created') {
+    } else if (type == 'planner.suggested') {
+      _lastPlannerDecision = data['data'];
+      final chosen = data['data']?['chosen'];
+      if (chosen != null) {
+        _timelineEvents.insert(0, TimelineEvent(
+          id: data['eventId'] ?? const Uuid().v4(),
+          timestamp: timestamp,
+          type: 'Action',
+          agent: 'Planner',
+          text: 'Suggested: ${chosen['title']}',
+          data: chosen,
+        ));
+      }
+    } else if (type == 'guardian.decided') {
+      _timelineEvents.insert(0, TimelineEvent(
+        id: data['eventId'] ?? const Uuid().v4(),
+        timestamp: timestamp,
+        type: 'Outcome',
+        agent: 'Guardian',
+        text: 'Approved: ${data['data']?['rationale'] ?? 'Security check passed'}',
+        data: data['data'],
+      ));
+    } else if (type == 'intervention.created') {
+       _timelineEvents.insert(0, TimelineEvent(
+        id: data['eventId'] ?? const Uuid().v4(),
+        timestamp: timestamp,
+        type: 'Outcome',
+        agent: 'System',
+        text: 'Intervention active: ${data['data']?['headline']}',
+        data: data['data'],
+      ));
+       if (!isReplay) {
         _localRepo.saveTimelineEvent(
           data['eventId'] ?? const Uuid().v4(),
           timestamp.toIso8601String(),
           type!,
           data,
         );
+      }
     }
   }
 
