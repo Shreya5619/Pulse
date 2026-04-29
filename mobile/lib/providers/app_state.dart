@@ -141,12 +141,19 @@ class AppState extends ChangeNotifier {
   DateTime? _lastHeartbeatTime;
   RiskSnapshot? _currentRiskSnapshot;
   Map<String, dynamic>? _currentFutures;
+  String _selectedScenarioId = "RECOMMENDED";
 
   int get risksNext90Min => _risksNext90Min;
   List<String> get activeRiskTypes => _activeRiskTypes;
   DateTime? get lastHeartbeatTime => _lastHeartbeatTime;
   RiskSnapshot? get currentRiskSnapshot => _currentRiskSnapshot;
   Map<String, dynamic>? get currentFutures => _currentFutures;
+  String get selectedScenarioId => _selectedScenarioId;
+  
+  void selectScenario(String id) {
+    _selectedScenarioId = id;
+    notifyListeners();
+  }
 
   int get replayProgress {
     if (_scenarioStart == null ||
@@ -403,13 +410,15 @@ class AppState extends ChangeNotifier {
           type!,
           data,
         );
-      }
-    } else if (type == 'futures.updated') {
+    }
+  }
+
+    // Update UI State
+    if (type == 'futures.updated') {
       debugPrint('[Pulse AppState] Futures update received');
       _currentFutures = data['data'];
     }
 
-    // Update UI State
     if (type == 'risk.updated') {
       debugPrint(
         '[Pulse AppState] Risk update received for user: ${data['userId']}',
@@ -889,6 +898,34 @@ class AppState extends ChangeNotifier {
         return RiskLevel.highRisk;
       default:
         return RiskLevel.safe;
+    }
+  }
+
+  Future<void> fetchFutures() async {
+    if (_isReplayMode) return;
+    final host = _getBackendHost();
+    final url = Uri.parse('http://$host:8080/api/futures?userId=$_userId');
+    debugPrint('[Pulse AppState] Fetching futures from: $url');
+    
+    try {
+      final response = await http.get(url).timeout(const Duration(seconds: 10));
+      debugPrint('[Pulse AppState] Futures response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['ok'] == true) {
+          _currentFutures = data['data'];
+          final count = (_currentFutures?['futures'] as List?)?.length ?? 0;
+          debugPrint('[Pulse AppState] Futures loaded: $count scenarios');
+          notifyListeners();
+        } else {
+          debugPrint('[Pulse AppState] Futures API error: ${data['error']}');
+        }
+      } else {
+        debugPrint('[Pulse AppState] Futures API failed: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error fetching futures: $e');
     }
   }
 

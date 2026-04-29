@@ -78,12 +78,14 @@ class PlannerEngine {
     if (lateness && lateness.score >= 0.6) {
       candidates.push({
         id: "ACTION_LEAVE_NOW",
-        title: "Leave now for your next commitment",
-        description: "Based on traffic and your usual buffer, leaving now reduces your risk of being late.",
+        title: "Leave now and take cab to Office HQ",
+        description: "Switching to a cab now saves 15 mins of walking in traffic.",
         approvalMode: "ASK_FIRST",
         reasons: lateness.causes || [],
         sideEffects: ["May trigger navigation", "May send an optional delay message"],
-        appliesToEventId: lateness.nodeId
+        appliesToEventId: lateness.nodeId,
+        category: "Commute",
+        impact: "Cuts lateness risk from High to Low"
       });
     }
 
@@ -91,11 +93,13 @@ class PlannerEngine {
     if (battery && battery.score >= 0.6) {
       candidates.push({
         id: "ACTION_ENABLE_BATTERY_SAVER",
-        title: "Enable Battery Saver",
-        description: "Battery is likely to fall below a safe level before your next event.",
+        title: "Enable Battery Saver mode",
+        description: "Optimizes background syncing and brightness to preserve power.",
         approvalMode: "ASK_FIRST",
         reasons: battery.causes || [],
-        sideEffects: ["Reduces background activity", "May delay some notifications"]
+        sideEffects: ["Reduces background activity", "May delay some notifications"],
+        category: "Focus",
+        impact: "Ensures device remains active until destination"
       });
     }
 
@@ -103,11 +107,13 @@ class PlannerEngine {
     if (overload && overload.score >= 0.6) {
       candidates.push({
         id: "ACTION_SUPPRESS_NOISY_NOTIFICATIONS",
-        title: "Silence noisy apps for 1 hour",
-        description: "You have a dense schedule and many notifications; muting noisy apps lowers overload.",
+        title: "Suppress noisy senders for 60 min",
+        description: "Temporarily filters low-priority notifications to reduce overload.",
         approvalMode: "ASK_FIRST",
         reasons: overload.causes || [],
-        sideEffects: ["Temporarily mutes selected apps"]
+        sideEffects: ["Temporarily mutes selected apps"],
+        category: "Focus",
+        impact: "Reduces cognitive load during peak stress"
       });
     }
 
@@ -115,11 +121,13 @@ class PlannerEngine {
     if (response && response.score >= 0.6) {
       candidates.push({
         id: "ACTION_PREPARE_DELAY_MESSAGE",
-        title: "Draft a quick update",
-        description: "You have pending messages to important contacts; Pulse can draft a short update.",
+        title: "Send 'Running 10 minutes late'",
+        description: "Pulse has drafted a polite update for your next appointment.",
         approvalMode: "ASK_FIRST",
         reasons: response.causes || [],
-        sideEffects: ["Creates a draft, you tap to send"]
+        sideEffects: ["Creates a draft, you tap to send"],
+        category: "Communication",
+        impact: "Proactively manages attendee expectations"
       });
     }
 
@@ -128,11 +136,13 @@ class PlannerEngine {
     if (alt && alt.metrics.batteryPercent !== undefined && alt.metrics.batteryPercent > 20) {
       candidates.push({
         id: "ACTION_RECOMMEND_CHARGING_STOP",
-        title: "Add a short charging stop",
-        description: "A brief charging stop keeps your battery safe for the rest of the trip.",
+        title: "Plan a charging stop",
+        description: "A brief 15-min charge at a nearby station is recommended.",
         approvalMode: "ASK_FIRST",
         reasons: [`Alternate future keeps battery at ~${Math.round(alt.metrics.batteryPercent)}%`],
-        sideEffects: ["Slightly changes route or departure time"]
+        sideEffects: ["Slightly changes route or departure time"],
+        category: "Commute",
+        impact: "Prevents total battery depletion before arrival"
       });
     }
 

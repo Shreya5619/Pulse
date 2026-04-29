@@ -16,6 +16,8 @@ export interface PlannerAction {
   reasons: string[];       // why we picked this
   sideEffects: string[];   // what else happens
   appliesToEventId?: string;
+  category?: "Commute" | "Focus" | "Communication" | "General";
+  impact?: string;         // what happens if accepted
 }
 
 export interface PlannerDecision {
