@@ -9,6 +9,8 @@ import '../screens/context_debug_screen.dart';
 import '../screens/replay_screen.dart';
 import '../screens/scenario_player_screen.dart';
 import '../screens/gantt_screen.dart';
+import '../widgets/risk_hero_card.dart';
+
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -31,8 +33,9 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   _buildHeaderStrip(context, state),
                   const SizedBox(height: 24),
-                  _buildBigSummaryCard(state),
+                  const RiskHeroCard(),
                   const SizedBox(height: 24),
+
                   _buildRiskStack(state),
                   const SizedBox(height: 24),
                   _buildContextChipsRow(context, state),
@@ -127,67 +130,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBigSummaryCard(AppState state) {
-    return GlassCard(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "3 risks forming in next 90 minutes",
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-              height: 1.2,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _statusChip("Lateness", Colors.redAccent),
-              _statusChip("Battery", Colors.orangeAccent),
-              _statusChip("Overload", Colors.purpleAccent),
-              _statusChip("Response Debt", Colors.blueAccent),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              const Icon(LucideIcons.info, size: 12, color: Colors.white30),
-              const SizedBox(width: 6),
-              Text(
-                "Tap a card below to see why.",
-                style: GoogleFonts.outfit(fontSize: 11, color: Colors.white30),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _statusChip(String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
 
   Widget _buildRiskStack(AppState state) {
     return Column(

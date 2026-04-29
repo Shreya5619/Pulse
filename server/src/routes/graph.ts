@@ -12,7 +12,12 @@ const router = Router();
  */
 router.get("/summary", async (req: Request, res: Response) => {
     try {
-        const userId = (req.header("X-User-Id") || req.query.userId || req.query["X-User-Id"] || "lifecanvas_studios") as string;
+        const userId = (
+            req.header("X-User-Id") || 
+            req.query.userId || 
+            req.query["X-User-Id"] || 
+            "lifecanvas_studios"
+        ) as string;
 
         let graph = graphBuilder.getCachedGraph(userId);
         if (!graph) {
@@ -65,7 +70,13 @@ router.get("/full", async (req: Request, res: Response) => {
  */
 router.get("/risk", async (req: Request, res: Response) => {
     try {
-        const userId = (req.header("X-User-Id") || req.query.userId || "lifecanvas_studios") as string;
+        const userId = (
+            req.header("X-User-Id") || 
+            req.query.userId || 
+            req.query["X-User-Id"] || 
+            "lifecanvas_studios"
+        ) as string;
+
         console.log(`[GraphRoute] GET /risk hit for user: ${userId}`);
 
         const snapshot = await riskEngine.computeForUser(userId);
@@ -87,7 +98,13 @@ router.get("/risk", async (req: Request, res: Response) => {
  */
 router.get("/risk/history", async (req: Request, res: Response) => {
     try {
-        const userId = (req.header("X-User-Id") || req.query.userId || "lifecanvas_studios") as string;
+        const userId = (
+            req.header("X-User-Id") || 
+            req.query.userId || 
+            req.query["X-User-Id"] || 
+            "lifecanvas_studios"
+        ) as string;
+
         const now = new Date();
         const from = req.query.from ? new Date(req.query.from as string) : new Date(now.getTime() - 24 * 60 * 60 * 1000);
         const to = req.query.to ? new Date(req.query.to as string) : now;

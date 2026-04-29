@@ -16,6 +16,7 @@ class AppState extends ChangeNotifier {
   final ContextServices _contextServices = ContextServices();
   final LocalRepository _localRepo = LocalRepository();
   DeviceContext _deviceContext = DeviceContext.initial();
+  String _userId = "user1";
 
   DeviceContext get deviceContext => _deviceContext;
   RiskState _currentRisk = RiskState(
@@ -56,13 +57,27 @@ class AppState extends ChangeNotifier {
   String get currentScenarioName => _currentScenarioName;
   DateTime? get simulatedTime => _simulatedTime;
   double get replaySpeed => _replaySpeed;
+
+  // Risk Summary State (OpenClaw Heartbeat)
+  int _risksNext90Min = 0;
+  List<String> _activeRiskTypes = [];
+  DateTime? _lastHeartbeatTime;
+
+  int get risksNext90Min => _risksNext90Min;
+  List<String> get activeRiskTypes => _activeRiskTypes;
+  DateTime? get lastHeartbeatTime => _lastHeartbeatTime;
+
   int get replayProgress {
-    if (_scenarioStart == null || _scenarioEnd == null || _simulatedTime == null) return 0;
+    if (_scenarioStart == null ||
+        _scenarioEnd == null ||
+        _simulatedTime == null)
+      return 0;
     final total = _scenarioEnd!.difference(_scenarioStart!).inSeconds;
     final current = _simulatedTime!.difference(_scenarioStart!).inSeconds;
-    if (total == 0) return 0;
     return ((current / total) * 100).clamp(0, 100).toInt();
   }
+
+  String get userId => _userId;
 
   AppState() {
     _initLocalData();
@@ -253,7 +268,9 @@ class AppState extends ChangeNotifier {
   void _processPulseEvent(Map<String, dynamic> data, {bool isReplay = false}) {
     final type = data['type'] as String?;
     final timestampStr = data['timestamp'] as String?;
-    final timestamp = timestampStr != null ? DateTime.parse(timestampStr) : DateTime.now();
+    final timestamp = timestampStr != null
+        ? DateTime.parse(timestampStr)
+        : DateTime.now();
 
     // Persist to Local DB (Only if live)
     if (!isReplay) {
@@ -275,6 +292,7 @@ class AppState extends ChangeNotifier {
 
     // Update UI State
     if (type == 'risk.updated') {
+      debugPrint('[Pulse AppState] Risk update received for user: ${data['userId']}');
       final rData = data['data'];
       if (rData != null) {
         _currentRisk = RiskState(
@@ -282,29 +300,56 @@ class AppState extends ChangeNotifier {
           level: _parseRiskLevel(rData['level'] as String?),
           timestamp: timestamp,
           reasons: List<String>.from(rData['reasons'] ?? []),
-          history: List<double>.from((rData['history'] ?? []).map((h) => (h as num).toDouble())),
+          history: List<double>.from(
+            (rData['history'] ?? []).map((h) => (h as num).toDouble()),
+          ),
         );
       }
     } else if (type == 'intervention.created') {
       final intv = data['data'];
       if (intv != null) {
-        _interventions.insert(0, Intervention(
-          id: data['eventId'] ?? "int_${DateTime.now().millisecondsSinceEpoch}",
-          title: intv['headline'] ?? "New Intervention",
-          description: intv['body'] ?? "",
-          type: "System",
-          priority: 1,
-          status: InterventionStatus.pending,
-          steps: [],
-          impact: "",
-          reason: "",
-          createdAt: timestamp,
-        ));
+        _interventions.insert(
+          0,
+          Intervention(
+            id:
+                data['eventId'] ??
+                "int_${DateTime.now().millisecondsSinceEpoch}",
+            title: intv['headline'] ?? "New Intervention",
+            description: intv['body'] ?? "",
+            type: "System",
+            priority: 1,
+            status: InterventionStatus.pending,
+            steps: [],
+            impact: "",
+            reason: "",
+            createdAt: timestamp,
+          ),
+        );
       }
     } else if (type == 'heartbeat.tick') {
-       // Logic for updating heartbeat pulse in UI
+      // Only process ticks for our current user
+      if (data['userId'] != null && data['userId'] != _userId) return;
+      
+      debugPrint('[Pulse AppState] Heartbeat tick: risksNext90Min=${data['data']?['risksNext90Min']}');
+      _lastHeartbeatTime = timestamp;
+      final hData = data['data'];
+      if (hData != null && hData['risksNext90Min'] != null) {
+        _risksNext90Min = hData['risksNext90Min'];
+      }
+    } else if (type == 'graph.updated') {
+      if (data['userId'] != null && data['userId'] != _userId) return;
+      
+      final gData = data['data'];
+      debugPrint('[Pulse AppState] Graph update: risksNext90Min=${gData?['totalRisksNext90Min']}');
+      if (gData != null) {
+        _risksNext90Min = gData['totalRisksNext90Min'] ?? 0;
+        final risks = gData['risks'] as List<dynamic>?;
+        if (risks != null) {
+          _activeRiskTypes = risks.map((r) => r['type'].toString()).toList();
+        }
+      }
     }
-    
+
     notifyListeners();
   }
 
@@ -364,7 +409,7 @@ class AppState extends ChangeNotifier {
   Future<void> _sendContextSnapshot(String reason) async {
     try {
       final now = DateTime.now();
-      final userId = "user1"; // As requested in headers
+      // Use the instance userId
 
       final host = _getBackendHost();
       final url = Uri.parse('http://$host:8080/api/snapshots');
@@ -520,17 +565,17 @@ class AppState extends ChangeNotifier {
 
   void startReplay(String name, List<dynamic> trace, {double speed = 1.0}) {
     stopReplay(); // Clear existing
-    
+
     // Backup live state
     _liveRisk = _currentRisk;
     _liveInterventions = List.from(_interventions);
-    
+
     _isReplayMode = true;
     _currentScenarioName = name;
     _currentTrace = trace;
     _replaySpeed = speed;
     _replayIndex = 0;
-    
+
     if (_currentTrace.isEmpty) return;
 
     // Determine bounds
@@ -539,7 +584,7 @@ class AppState extends ChangeNotifier {
     _simulatedTime = _scenarioStart;
 
     debugPrint('[Pulse Replay] Starting "$name" at ${speed}x');
-    
+
     _resumeTimer();
     notifyListeners();
   }
@@ -547,7 +592,9 @@ class AppState extends ChangeNotifier {
   void _resumeTimer() {
     _replayTimer?.cancel();
     _replayTimer = Timer.periodic(
-      const Duration(milliseconds: 100), // High frequency update for smooth clock
+      const Duration(
+        milliseconds: 100,
+      ), // High frequency update for smooth clock
       (timer) {
         if (!_isReplayMode) {
           timer.cancel();
@@ -564,9 +611,13 @@ class AppState extends ChangeNotifier {
         while (_replayIndex < _currentTrace.length) {
           final event = _currentTrace[_replayIndex];
           final eventTime = DateTime.parse(event['timestamp']);
-          
-          if (eventTime.isBefore(_simulatedTime!) || eventTime.isAtSameMomentAs(_simulatedTime!)) {
-            _processPulseEvent(Map<String, dynamic>.from(event), isReplay: true);
+
+          if (eventTime.isBefore(_simulatedTime!) ||
+              eventTime.isAtSameMomentAs(_simulatedTime!)) {
+            _processPulseEvent(
+              Map<String, dynamic>.from(event),
+              isReplay: true,
+            );
             _replayIndex++;
             stateChanged = true;
           } else {
@@ -574,40 +625,43 @@ class AppState extends ChangeNotifier {
           }
         }
 
-        if (_simulatedTime!.isAfter(_scenarioEnd!) || _simulatedTime!.isAtSameMomentAs(_scenarioEnd!)) {
+        if (_simulatedTime!.isAfter(_scenarioEnd!) ||
+            _simulatedTime!.isAtSameMomentAs(_scenarioEnd!)) {
           _replayTimer?.cancel();
         }
 
         notifyListeners();
-      }
+      },
     );
   }
 
   void seekToProgress(double progress) {
-    if (!_isReplayMode || _scenarioStart == null || _scenarioEnd == null) return;
-    
+    if (!_isReplayMode || _scenarioStart == null || _scenarioEnd == null)
+      return;
+
     _replayTimer?.cancel();
-    
+
     final totalSeconds = _scenarioEnd!.difference(_scenarioStart!).inSeconds;
     final targetSeconds = (totalSeconds * (progress / 100)).toInt();
     _simulatedTime = _scenarioStart!.add(Duration(seconds: targetSeconds));
-    
+
     // Reset simulation state
     _interventions = [];
     _replayIndex = 0;
-    
+
     // Replay all events up to the target time instantly
     for (var i = 0; i < _currentTrace.length; i++) {
       final event = _currentTrace[i];
       final eventTime = DateTime.parse(event['timestamp']);
-      if (eventTime.isBefore(_simulatedTime!) || eventTime.isAtSameMomentAs(_simulatedTime!)) {
+      if (eventTime.isBefore(_simulatedTime!) ||
+          eventTime.isAtSameMomentAs(_simulatedTime!)) {
         _processPulseEvent(Map<String, dynamic>.from(event), isReplay: true);
         _replayIndex = i + 1;
       } else {
         break;
       }
     }
-    
+
     _resumeTimer();
     notifyListeners();
   }
@@ -619,11 +673,11 @@ class AppState extends ChangeNotifier {
     _scenarioStart = null;
     _scenarioEnd = null;
     _replayIndex = 0;
-    
+
     // Restore live state
     if (_liveRisk != null) _currentRisk = _liveRisk!;
     if (_liveInterventions != null) _interventions = _liveInterventions!;
-    
+
     notifyListeners();
   }
 
@@ -660,7 +714,7 @@ class AppState extends ChangeNotifier {
       if (defaultTargetPlatform == TargetPlatform.android) {
         // For physical devices or emulators on local network
         // Use your computer's local IP address
-        host = '192.168.1.4';
+        host = '192.168.0.102';
       }
     }
     return host;

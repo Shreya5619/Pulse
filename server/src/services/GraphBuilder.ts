@@ -150,6 +150,10 @@ export class GraphBuilder {
     return this.graphCache.get(userId);
   }
 
+  getCacheEntries() {
+    return this.graphCache.entries();
+  }
+
   private calculateScores(nodes: GraphNode[], edges: GraphEdge[], context: ContextSnapshot, memory: MemoryState) {
     const nowTime = new Date(context.timestamp).getTime();
 

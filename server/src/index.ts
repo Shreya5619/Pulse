@@ -25,6 +25,7 @@ import { futuresEngine } from "./services/FuturesEngine";
 import { heartbeatOrchestrator } from "./services/HeartbeatOrchestrator";
 import { workspaceService } from "./services/WorkspaceService";
 import plannerRouter from "./routes/planner";
+import { runAgentPulseFlow } from "./services/PulseOrchestrator";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -70,7 +71,7 @@ function sendJson(ws: WebSocket, message: unknown) {
     }
 }
 
-function broadcast(message: unknown) {
+export function broadcast(message: unknown) {
     const payload = JSON.stringify(message);
     for (const client of wss.clients) {
         if (client.readyState === WebSocket.OPEN) {
@@ -79,108 +80,7 @@ function broadcast(message: unknown) {
     }
 }
 
-async function runAgentPulseFlow(initialContext: any) {
-    const userId = initialContext.userId || "demo-user";
-    if (isPulseRunning) {
-        console.log("[Pulse] Run already in progress, skipping.");
-        return;
-    }
-
-    try {
-        isPulseRunning = true;
-        console.log(`[Pulse] Starting orchestrated flow for ${userId}...`);
-
-        const result = await heartbeatOrchestrator.runOnce(userId);
-
-        // Broadcast granular updates
-        if (result.context) {
-            broadcast({
-                type: "context.updated",
-                eventId: `ctx_${Date.now()}`,
-                timestamp: new Date().toISOString(),
-                data: result.context
-            });
-        }
-
-        broadcast({
-            type: "graph.updated",
-            eventId: `graph_${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            data: result.graph.summary
-        });
-
-        broadcast({
-            type: "risk.updated",
-            eventId: `risk_${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            data: result.risk
-        });
-
-        broadcast({
-            type: "futures.updated",
-            eventId: `fut_${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            data: result.futures
-        });
-
-        if (result.decision.chosen) {
-            broadcast({
-                type: "planner.suggested",
-                eventId: `plan_${Date.now()}`,
-                timestamp: new Date().toISOString(),
-                data: result.decision
-            });
-        }
-
-        broadcast({
-            type: "guardian.decided",
-            eventId: `guard_${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            data: {
-                userId,
-                actionId: result.decision.chosen?.id,
-                timestamp: new Date().toISOString(),
-                mode: result.guardian.mode,
-                rationale: result.guardian.rationale
-            }
-        });
-
-        broadcast({
-            type: "heartbeat.policy",
-            eventId: `hb_policy_${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            data: {
-                userId,
-                nextRecommendedDelayMs: result.nextDelay
-            }
-        });
-
-        if (result.decision.chosen && result.guardian.approved) {
-            lastInterventionText = result.decision.chosen.title;
-            broadcast({
-                type: "intervention.created",
-                eventId: `int_${Date.now()}`,
-                timestamp: new Date().toISOString(),
-                data: {
-                    userId,
-                    actionId: result.decision.chosen.id,
-                    timestamp: new Date().toISOString(),
-                    headline: result.decision.chosen.title,
-                    body: result.decision.chosen.description,
-                    ctaLabel: "Accept",
-                    secondaryCtaLabel: "Dismiss"
-                }
-            });
-        }
-
-        console.log("[Pulse] Orchestrated flow completed.");
-        return { alert: lastInterventionText };
-    } catch (error) {
-        console.error("[Pulse] Orchestrated flow error:", error);
-    } finally {
-        isPulseRunning = false;
-    }
-}
+// Moved to PulseOrchestrator
 
 async function replayDemoFlow() {
     const eventsPath = path.join(dataDir, "demo-events.json");
@@ -254,7 +154,7 @@ app.post("/demo/trigger", async (_req: Request, res: Response) => {
     });
 
     try {
-        await runAgentPulseFlow(scenario.context);
+        await runAgentPulseFlow(scenario.context, broadcast);
     } catch (error) {
         console.error("[Pulse] demo error:", error);
     }
@@ -283,7 +183,7 @@ app.post("/heartbeat/manual", async (req: Request, res: Response) => {
     });
 
     // Run the flow in background
-    runAgentPulseFlow({ userId }).catch(error => {
+    runAgentPulseFlow({ userId }, broadcast).catch(error => {
         console.error("[Pulse] Manual heartbeat error:", error);
     });
 });
@@ -356,23 +256,25 @@ let tickSequence = 1;
 
 // Background auto-tick every 5 seconds (lightweight: uses cached graph)
 setInterval(() => {
-    // Derive a live risk score from the cached graph if available
-    const cached = graphBuilder.getCachedGraph("lifecanvas_studios");
-    const topRisks = cached?.summary?.risks || [];
-    const topScore = topRisks.length > 0 ? Math.max(...topRisks.map(r => r.score)) : 0;
+    // For each user in the cache, broadcast their tick
+    for (const [userId, cached] of graphBuilder.getCacheEntries()) {
+        const topRisks = cached?.summary?.risks || [];
+        const topScore = topRisks.length > 0 ? Math.max(...topRisks.map(r => r.score)) : 0;
 
-    broadcast({
-        type: "heartbeat.tick",
-        eventId: `tick_auto_${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        data: {
-            sequence: tickSequence++,
-            state: topScore >= 0.4 ? "risk_forming" : "nominal",
-            score: parseFloat(topScore.toFixed(2)),
-            source: "graph_cache",
-            risksNext90Min: cached?.summary?.totalRisksNext90Min ?? 0
-        }
-    });
+        broadcast({
+            type: "heartbeat.tick",
+            userId,
+            eventId: `tick_auto_${Date.now()}_${userId}`,
+            timestamp: new Date().toISOString(),
+            data: {
+                sequence: tickSequence++,
+                state: topScore >= 0.4 ? "risk_forming" : "nominal",
+                score: parseFloat(topScore.toFixed(2)),
+                source: "graph_cache",
+                risksNext90Min: cached?.summary?.totalRisksNext90Min ?? 0
+            }
+        });
+    }
 }, HEARTBEAT_TICK_MS);
 
 httpServer.listen(PORT, HOST, () => {

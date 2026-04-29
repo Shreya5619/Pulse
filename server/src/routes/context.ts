@@ -1,6 +1,8 @@
 import { Router, Request, Response } from "express";
 import { normalizeContext } from "../normalization/contextNormalizer";
 import { contextSnapshotRepo } from "../db/ContextSnapshotRepository";
+import { runAgentPulseFlow } from "../services/PulseOrchestrator";
+import { broadcast } from "../index";
 
 const router = Router();
 
@@ -28,8 +30,10 @@ router.post("/snapshots", async (req: Request, res: Response) => {
         await contextSnapshotRepo.save(normalized);
 
 
-        // 4. TODO: Enqueue for risk engine
-        // enqueueRiskAssessment(normalized);
+        // 4. Trigger risk engine flow (non-blocking)
+        runAgentPulseFlow(normalized, broadcast).catch(err => {
+            console.error("[Pulse] Error triggering flow after snapshot:", err);
+        });
 
         // 5. Response (Echo Mode enabled for dev)
         res.status(201).json({
