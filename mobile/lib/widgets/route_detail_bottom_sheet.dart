@@ -93,7 +93,7 @@ class RouteDetailBottomSheet extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
+          color: Colors.white.withValues(alpha: 0.05),
           shape: BoxShape.circle,
         ),
         child: const Icon(LucideIcons.x, size: 20, color: Colors.white),
@@ -107,9 +107,9 @@ class RouteDetailBottomSheet extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.02),
+        color: Colors.white.withValues(alpha: 0.02),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -121,7 +121,11 @@ class RouteDetailBottomSheet extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [AppColors.primary, Colors.orangeAccent, AppColors.primary],
+                  colors: [
+                    AppColors.primary,
+                    Colors.orangeAccent,
+                    AppColors.primary,
+                  ],
                 ),
               ),
             ),
@@ -172,15 +176,20 @@ class RouteDetailBottomSheet extends StatelessWidget {
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.black,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
-            child: const Text("Use this route", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              "Use this route",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ),
         const SizedBox(width: 16),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
+            color: Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(16),
           ),
           child: IconButton(

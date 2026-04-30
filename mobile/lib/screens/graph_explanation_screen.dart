@@ -33,7 +33,7 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
 
   Future<void> _loadExplanation() async {
     final state = Provider.of<AppState>(context, listen: false);
-    
+
     // Load both explanation and suggested actions in parallel
     final results = await Future.wait([
       state.fetchGraphExplanation(widget.nodeId),
@@ -62,43 +62,50 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            )
           : _explanation == null
-              ? const Center(child: Text("Explanation not available", style: TextStyle(color: Colors.white54)))
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildTargetNodeCard(),
-                      const SizedBox(height: 24),
-                      Text(
-                        "Contributing Factors",
-                        style: GoogleFonts.outfit(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white30,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      ..._buildNeighborCards(),
-                      if (_suggestedActions.isNotEmpty) ...[
-                        const SizedBox(height: 32),
-                        Text(
-                          "Suggested Interventions",
-                          style: GoogleFonts.outfit(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white30,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ..._buildActionCards(),
-                      ],
-                      const SizedBox(height: 40),
-                    ],
+          ? const Center(
+              child: Text(
+                "Explanation not available",
+                style: TextStyle(color: Colors.white54),
+              ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTargetNodeCard(),
+                  const SizedBox(height: 24),
+                  Text(
+                    "Contributing Factors",
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white30,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  ..._buildNeighborCards(),
+                  if (_suggestedActions.isNotEmpty) ...[
+                    const SizedBox(height: 32),
+                    Text(
+                      "Suggested Interventions",
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white30,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ..._buildActionCards(),
+                  ],
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
     );
   }
 
@@ -156,7 +163,9 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
 
     return neighbors.map((node) {
       final edge = edges.firstWhere(
-        (e) => (e['from'] == node['id'] && e['to'] == targetId) || (e['to'] == node['id'] && e['from'] == targetId),
+        (e) =>
+            (e['from'] == node['id'] && e['to'] == targetId) ||
+            (e['to'] == node['id'] && e['from'] == targetId),
         orElse: () => null,
       );
 
@@ -183,7 +192,10 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
                     if (edge != null)
                       Text(
                         "${edge['type']} (weight: ${edge['weight']})",
-                        style: const TextStyle(color: Colors.white30, fontSize: 10),
+                        style: const TextStyle(
+                          color: Colors.white30,
+                          fontSize: 10,
+                        ),
                       ),
                   ],
                 ),
@@ -201,7 +213,7 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
         padding: const EdgeInsets.only(bottom: 12),
         child: GlassCard(
           padding: const EdgeInsets.all(16),
-          borderColor: AppColors.primary.withOpacity(0.3),
+          borderColor: AppColors.primary.withValues(alpha: 0.3),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -210,10 +222,14 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(LucideIcons.zap, size: 14, color: AppColors.primary),
+                    child: const Icon(
+                      LucideIcons.zap,
+                      size: 14,
+                      color: AppColors.primary,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -231,7 +247,11 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
               const SizedBox(height: 12),
               Text(
                 action['description'] ?? "",
-                style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.4),
+                style: const TextStyle(
+                  color: Colors.white60,
+                  fontSize: 12,
+                  height: 1.4,
+                ),
               ),
               const SizedBox(height: 16),
               SizedBox(
@@ -242,13 +262,24 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary.withOpacity(0.15),
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.15),
                     foregroundColor: AppColors.primary,
                     elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    side: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    side: BorderSide(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                    ),
                   ),
-                  child: const Text("EXECUTE INTERVENTION", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                  child: const Text(
+                    "EXECUTE INTERVENTION",
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -262,12 +293,29 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
     IconData icon;
     Color color;
     switch (type) {
-      case 'NOW': icon = LucideIcons.clock; color = Colors.blueAccent; break;
-      case 'PLACE': icon = LucideIcons.mapPin; color = Colors.greenAccent; break;
-      case 'APPOINTMENT': icon = LucideIcons.calendar; color = Colors.redAccent; break;
-      case 'BATTERY_STATE': icon = LucideIcons.battery; color = Colors.orangeAccent; break;
-      case 'MESSAGE_OBLIGATION': icon = LucideIcons.messageSquare; color = Colors.purpleAccent; break;
-      default: icon = LucideIcons.circle; color = Colors.white30;
+      case 'NOW':
+        icon = LucideIcons.clock;
+        color = Colors.blueAccent;
+        break;
+      case 'PLACE':
+        icon = LucideIcons.mapPin;
+        color = Colors.greenAccent;
+        break;
+      case 'APPOINTMENT':
+        icon = LucideIcons.calendar;
+        color = Colors.redAccent;
+        break;
+      case 'BATTERY_STATE':
+        icon = LucideIcons.battery;
+        color = Colors.orangeAccent;
+        break;
+      case 'MESSAGE_OBLIGATION':
+        icon = LucideIcons.messageSquare;
+        color = Colors.purpleAccent;
+        break;
+      default:
+        icon = LucideIcons.circle;
+        color = Colors.white30;
     }
     return Icon(icon, color: color, size: size);
   }
@@ -287,7 +335,11 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
             Text(
               "${(s * 100).toStringAsFixed(0)}%",
               style: TextStyle(
-                color: s > 0.7 ? Colors.redAccent : s > 0.4 ? Colors.orangeAccent : Colors.greenAccent,
+                color: s > 0.7
+                    ? Colors.redAccent
+                    : s > 0.4
+                    ? Colors.orangeAccent
+                    : Colors.greenAccent,
                 fontWeight: FontWeight.bold,
                 fontSize: 11,
               ),
@@ -299,8 +351,12 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
             value: s,
-            backgroundColor: Colors.white.withOpacity(0.05),
-            color: s > 0.7 ? Colors.redAccent : s > 0.4 ? Colors.orangeAccent : Colors.greenAccent,
+            backgroundColor: Colors.white.withValues(alpha: 0.05),
+            color: s > 0.7
+                ? Colors.redAccent
+                : s > 0.4
+                ? Colors.orangeAccent
+                : Colors.greenAccent,
             minHeight: 4,
           ),
         ),

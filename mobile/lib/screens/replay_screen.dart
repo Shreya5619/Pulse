@@ -19,17 +19,25 @@ class _ReplayScreenState extends State<ReplayScreen> {
       {
         "type": "heartbeat.tick",
         "timestamp": "2026-04-28T08:00:00Z",
-        "data": {"status": "nominal", "score": 0.1}
+        "data": {"status": "nominal", "score": 0.1},
       },
       {
         "type": "risk.updated",
         "timestamp": "2026-04-28T08:05:00Z",
-        "data": {"level": "low", "score": 0.3, "reason": "Traffic detected on route"}
+        "data": {
+          "level": "low",
+          "score": 0.3,
+          "reason": "Traffic detected on route",
+        },
       },
       {
         "type": "risk.updated",
         "timestamp": "2026-04-28T08:15:00Z",
-        "data": {"level": "high", "score": 0.7, "reason": "Severe delay + Low Battery"}
+        "data": {
+          "level": "high",
+          "score": 0.7,
+          "reason": "Severe delay + Low Battery",
+        },
       },
       {
         "type": "intervention.created",
@@ -37,20 +45,21 @@ class _ReplayScreenState extends State<ReplayScreen> {
         "eventId": "int_replay_001",
         "data": {
           "headline": "Switch to Battery Saver",
-          "body": "Traffic delay is now 20 mins. Switch to power saving mode to ensure you reach the meeting with charge."
-        }
+          "body":
+              "Traffic delay is now 20 mins. Switch to power saving mode to ensure you reach the meeting with charge.",
+        },
       },
       {
         "type": "heartbeat.tick",
         "timestamp": "2026-04-28T08:20:00Z",
-        "data": {"status": "action_taken", "score": 0.4}
-      }
+        "data": {"status": "action_taken", "score": 0.4},
+      },
     ],
     "Back-to-Back Meetings": [
       {
         "type": "heartbeat.tick",
         "timestamp": "2026-04-28T13:00:00Z",
-        "data": {"status": "nominal"}
+        "data": {"status": "nominal"},
       },
       {
         "type": "intervention.created",
@@ -58,10 +67,11 @@ class _ReplayScreenState extends State<ReplayScreen> {
         "eventId": "int_replay_002",
         "data": {
           "headline": "Coffee Break Suggested",
-          "body": "You have a 10m gap between meetings. Pulse suggests a quick break to avoid burnout."
-        }
-      }
-    ]
+          "body":
+              "You have a 10m gap between meetings. Pulse suggests a quick break to avoid burnout.",
+        },
+      },
+    ],
   };
 
   @override
@@ -71,7 +81,10 @@ class _ReplayScreenState extends State<ReplayScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E21),
       appBar: AppBar(
-        title: const Text("Replay Simulator", style: TextStyle(color: Colors.white)),
+        title: const Text(
+          "Replay Simulator",
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
@@ -89,10 +102,12 @@ class _ReplayScreenState extends State<ReplayScreen> {
               style: TextStyle(color: Colors.white70, fontSize: 14),
             ),
             const SizedBox(height: 12),
-            ..._scenarios.keys.map((name) => _buildScenarioCard(name, appState)).toList(),
-            
+            ..._scenarios.keys
+                .map((name) => _buildScenarioCard(name, appState))
+                .toList(),
+
             const Spacer(),
-            
+
             if (appState.isReplayMode) _buildPlaybackControls(appState),
           ],
         ),
@@ -108,7 +123,9 @@ class _ReplayScreenState extends State<ReplayScreen> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blueAccent.withOpacity(0.2) : Colors.white.withOpacity(0.05),
+          color: isSelected
+              ? Colors.blueAccent.withValues(alpha: 0.2)
+              : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? Colors.blueAccent : Colors.white10,
@@ -135,7 +152,7 @@ class _ReplayScreenState extends State<ReplayScreen> {
                   appState.startReplay(name, _scenarios[name]!);
                 },
                 child: const Text("START"),
-              )
+              ),
           ],
         ),
       ),
@@ -146,7 +163,7 @@ class _ReplayScreenState extends State<ReplayScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
@@ -157,10 +174,19 @@ class _ReplayScreenState extends State<ReplayScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("SIMULATED TIME", style: TextStyle(color: Colors.white30, fontSize: 10)),
+                  const Text(
+                    "SIMULATED TIME",
+                    style: TextStyle(color: Colors.white30, fontSize: 10),
+                  ),
                   Text(
-                    DateFormat.Hms().format(appState.simulatedTime ?? DateTime.now()),
-                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                    DateFormat.Hms().format(
+                      appState.simulatedTime ?? DateTime.now(),
+                    ),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -170,7 +196,7 @@ class _ReplayScreenState extends State<ReplayScreen> {
                   _speedButton(appState, 5.0),
                   _speedButton(appState, 10.0),
                 ],
-              )
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -185,12 +211,14 @@ class _ReplayScreenState extends State<ReplayScreen> {
             icon: const Icon(LucideIcons.stopCircle),
             label: const Text("STOP SIMULATION"),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.redAccent.withOpacity(0.2),
+              backgroundColor: Colors.redAccent.withValues(alpha: 0.2),
               foregroundColor: Colors.redAccent,
               minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -210,7 +238,10 @@ class _ReplayScreenState extends State<ReplayScreen> {
         ),
         child: Text(
           "${speed.toInt()}x",
-          style: TextStyle(color: isSelected ? Colors.white : Colors.white30, fontSize: 12),
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white30,
+            fontSize: 12,
+          ),
         ),
       ),
     );

@@ -1,0 +1,21 @@
+{
+  "user_id": "user1",
+  "battery": {
+    "level": 0.85,
+    "is_charging": false
+  },
+  "location": {
+    "lat": 12.9716,
+    "lon": 77.5946
+  },
+  "calendar": {
+    "next_event": {
+      "id": "test_event",
+      "title": "Sync Test",
+      "start_time": "2026-04-30T21:00:00Z",
+      "end_time": "2026-04-30T22:00:00Z",
+      "importance": "high"
+    }
+  },
+  "notifications": []
+}

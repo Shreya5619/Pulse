@@ -3,10 +3,10 @@ import { memoryStore } from "./MemoryStore";
 import { ContextSnapshot } from "../../../shared/memory"; // Assuming it's re-exported or similar
 
 export class DailySummarizer {
-  /**
+   /**
    * Summarizes the last 24 hours of context for a user and updates their memory.
    */
-  async summarize(userId: string): Promise<void> {
+  async summarize(userId: string): Promise<{ preferences: any[], patterns: any[] }> {
     console.log(`[DailySummarizer] Starting summary for user: ${userId}`);
 
     const now = new Date();
@@ -15,7 +15,7 @@ export class DailySummarizer {
     const snapshots = await contextSnapshotRepo.findRange(userId, twentyFourHoursAgo, now);
     if (snapshots.length === 0) {
       console.warn(`[DailySummarizer] No snapshots found for user ${userId} in the last 24 hours.`);
-      return;
+      return { preferences: [], patterns: [] };
     }
 
     // 1. Group by day
@@ -32,7 +32,11 @@ export class DailySummarizer {
     const commuteSummary = this.analyzeCommute(snapshotsByDay);
     const notificationSummary = this.analyzeNotifications(snapshots);
 
-    // 3. Save to MemoryStore
+    // 3. Derive Preferences and Patterns
+    const preferences = this.derivePreferences(snapshots, commuteSummary, notificationSummary);
+    const patterns = this.derivePatterns(habitSummary, batterySummary);
+
+    // 4. Save to MemoryStore
     await memoryStore.save(userId, {
       habits: habitSummary as any,
       battery: batterySummary as any,
@@ -41,6 +45,62 @@ export class DailySummarizer {
     }, 'daily_summarizer');
 
     console.log(`[DailySummarizer] Summary completed for user: ${userId}`);
+    return { preferences, patterns };
+  }
+
+  private derivePreferences(snapshots: any[], commute: any, notifications: any) {
+    const preferences = [];
+
+    // Commute Preference
+    if (commute.routes && commute.routes.length > 0) {
+      preferences.push({
+        category: "COMMUTE_MODE",
+        scope: commute.routes[0].to_label || "DEFAULT",
+        value: commute.routes[0].usual_mode.toUpperCase(),
+        confidence: 0.8
+      });
+    }
+
+    // Notification Tolerance
+    const totalNotifications = snapshots.reduce((acc, s) => acc + (s.notifications?.length || 0), 0);
+    if (totalNotifications > 100) {
+      preferences.push({
+        category: "NOTIFICATION_TOLERANCE",
+        scope: "DEFAULT",
+        value: "LOW",
+        confidence: 0.7
+      });
+    }
+
+    // Lateness Tolerance (Heuristic)
+    preferences.push({
+      category: "LATENESS_TOLERANCE",
+      scope: "CASUAL_MEETUP",
+      value: "MEDIUM",
+      confidence: 0.6
+    });
+
+    return preferences;
+  }
+
+  private derivePatterns(habits: any, battery: any) {
+    const patterns = [];
+
+    if (habits.patterns?.routines?.morning_departure_median) {
+      patterns.push({
+        description: `Typically leaves for morning events around ${habits.patterns.routines.morning_departure_median} mins from midnight.`,
+        scope: "MORNING_ROUTINE"
+      });
+    }
+
+    if (battery.profile?.risky_hours?.length > 0) {
+      patterns.push({
+        description: "Historically low battery during evening hours.",
+        scope: "BATTERY_MANAGEMENT"
+      });
+    }
+
+    return patterns;
   }
 
   private analyzeHabits(days: Record<string, any[]>) {

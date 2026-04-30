@@ -59,9 +59,18 @@ export function assessLateness(
   etaMinutes: number,
   buffer: number,
   eventLabel: string,
-  nodeId?: string
+  nodeId?: string,
+  preferences: any[] = []
 ): RiskScore {
-  const score = latenessRisk(minutesToEvent, etaMinutes, buffer);
+  let score = latenessRisk(minutesToEvent, etaMinutes, buffer);
+  
+  // Apply preferences
+  const tolerance = preferences.find(p => p.category === 'LATENESS_TOLERANCE' && (p.scope === 'DEFAULT' || eventLabel.includes(p.scope)));
+  if (tolerance) {
+    if (tolerance.value === 'LOW') score = Math.min(1, score * 1.2);
+    if (tolerance.value === 'HIGH') score = score * 0.8;
+  }
+
   const label = scoreToLabel(score);
   const slack = minutesToEvent - etaMinutes - buffer;
 
@@ -114,9 +123,17 @@ export function assessBattery(
   currentPct: number,
   horizonMinutes: number,
   dischargePerHour: number,
-  nodeId?: string
+  nodeId?: string,
+  preferences: any[] = []
 ): RiskScore {
-  const score = batteryRisk(currentPct, horizonMinutes, dischargePerHour);
+  let score = batteryRisk(currentPct, horizonMinutes, dischargePerHour);
+
+  // Apply preferences
+  const tolerance = preferences.find(p => p.category === 'BATTERY_TOLERANCE');
+  if (tolerance) {
+    if (tolerance.value === 'HIGH') score = Math.min(1, score * 1.2); // Anxious about battery
+  }
+
   const label = scoreToLabel(score);
   const predictedPct = currentPct - (dischargePerHour * horizonMinutes) / 60;
 

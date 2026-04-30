@@ -14,7 +14,7 @@ import '../models/risk_snapshot.dart';
 import '../models/risk_state.dart' as legacy;
 import '../screens/graph_explanation_screen.dart';
 import '../widgets/route_eta_strip.dart';
-
+import '../screens/twin_graph_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -65,14 +65,6 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "Now until 90 min",
-                style: GoogleFonts.outfit(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
-                ),
-              ),
               const SizedBox(height: 4),
               Row(
                 children: [
@@ -110,23 +102,47 @@ class HomeScreen extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                icon: const Icon(LucideIcons.calendar, size: 18, color: Colors.white30),
+                icon: const Icon(
+                  LucideIcons.calendar,
+                  size: 18,
+                  color: Colors.white30,
+                ),
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const GanttScreen()),
                 ),
               ),
+              IconButton(
+                icon: const Icon(
+                  LucideIcons.gitBranch,
+                  size: 18,
+                  color: Colors.white30,
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TwinGraphScreen(),
+                  ),
+                ),
+              ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
+                  color: Colors.white.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: Colors.white10),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(LucideIcons.clock, size: 14, color: Colors.blueAccent),
+                    const Icon(
+                      LucideIcons.clock,
+                      size: 14,
+                      color: Colors.blueAccent,
+                    ),
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
@@ -164,9 +180,9 @@ class HomeScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -178,7 +194,11 @@ class HomeScreen extends StatelessWidget {
           ),
           Text(
             "'$title'",
-            style: GoogleFonts.outfit(fontSize: 11, color: color, fontWeight: FontWeight.bold),
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const Text(
             " path",
@@ -188,8 +208,6 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
-
-
 
   Widget _buildRiskStack(BuildContext context, AppState state) {
     final risks = state.currentRiskSnapshot?.risks ?? [];
@@ -207,14 +225,18 @@ class HomeScreen extends StatelessWidget {
     }
 
     return Column(
-      children: risks.map((risk) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: _riskCard(
-          risk: risk,
-          state: state,
-          onTap: () => _showExplanation(context, state, risk),
-        ),
-      )).toList(),
+      children: risks
+          .map(
+            (risk) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _riskCard(
+                risk: risk,
+                state: state,
+                onTap: () => _showExplanation(context, state, risk),
+              ),
+            ),
+          )
+          .toList(),
     );
   }
 
@@ -239,10 +261,18 @@ class HomeScreen extends StatelessWidget {
   }) {
     IconData icon;
     switch (risk.type) {
-      case RiskType.lateness: icon = LucideIcons.clock; break;
-      case RiskType.battery: icon = LucideIcons.battery; break;
-      case RiskType.responseDebt: icon = LucideIcons.inbox; break;
-      case RiskType.overload: icon = LucideIcons.alertTriangle; break;
+      case RiskType.lateness:
+        icon = LucideIcons.clock;
+        break;
+      case RiskType.battery:
+        icon = LucideIcons.battery;
+        break;
+      case RiskType.responseDebt:
+        icon = LucideIcons.inbox;
+        break;
+      case RiskType.overload:
+        icon = LucideIcons.alertTriangle;
+        break;
     }
 
     return GestureDetector(
@@ -254,7 +284,7 @@ class HomeScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: risk.color.withOpacity(0.1),
+                color: risk.color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: risk.color, size: 20),
@@ -279,7 +309,10 @@ class HomeScreen extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
                         "Current route ETA ${state.etaInfo.etaDisplay} · you'll be ${state.etaInfo.leaveInMinutes != null && state.etaInfo.leaveInMinutes! < 0 ? state.etaInfo.leaveInMinutes!.abs() : 0} min late.",
-                        style: GoogleFonts.outfit(fontSize: 10, color: Colors.redAccent.withOpacity(0.8)),
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          color: Colors.redAccent.withValues(alpha: 0.8),
+                        ),
                       ),
                     ),
                   const SizedBox(height: 6),
@@ -305,7 +338,7 @@ class HomeScreen extends StatelessWidget {
                 Text(
                   risk.label.name.toUpperCase(),
                   style: TextStyle(
-                    color: risk.color.withOpacity(0.5),
+                    color: risk.color.withValues(alpha: 0.5),
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                   ),
@@ -322,7 +355,7 @@ class HomeScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -372,11 +405,16 @@ class HomeScreen extends StatelessWidget {
               );
             },
             icon: const Icon(LucideIcons.list, size: 14),
-            label: const Text("VIEW RAW CONTEXT STREAM", style: TextStyle(fontSize: 10, letterSpacing: 1.1)),
+            label: const Text(
+              "VIEW RAW CONTEXT STREAM",
+              style: TextStyle(fontSize: 10, letterSpacing: 1.1),
+            ),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white30,
               side: const BorderSide(color: Colors.white10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           ),
@@ -390,9 +428,9 @@ class HomeScreen extends StatelessWidget {
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.03),
+        color: Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Row(
         children: [

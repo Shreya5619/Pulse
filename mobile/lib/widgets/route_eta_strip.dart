@@ -20,16 +20,19 @@ class RouteEtaStrip extends StatelessWidget {
 
         if (!eta.hasRoute) {
           if (isMini) return const SizedBox.shrink();
-          return _buildFallbackStrip(context, eta.reason ?? "No travel detected");
+          return _buildFallbackStrip(
+            context,
+            eta.reason ?? "No travel detected",
+          );
         }
 
         return GestureDetector(
           onTap: () => _showRouteDetails(context, state),
           child: GlassCard(
             padding: EdgeInsets.all(isMini ? 12 : 16),
-            borderColor: eta.latenessRisk == 'at_risk' 
-              ? AppColors.danger.withOpacity(0.3) 
-              : AppColors.primary.withOpacity(0.1),
+            borderColor: eta.latenessRisk == 'at_risk'
+                ? AppColors.danger.withValues(alpha: 0.3)
+                : AppColors.primary.withValues(alpha: 0.1),
             child: Row(
               children: [
                 _buildModeIcon(eta.travelMode),
@@ -72,14 +75,19 @@ class RouteEtaStrip extends StatelessWidget {
   Widget _buildModeIcon(String? mode) {
     IconData icon;
     switch (mode) {
-      case 'metro': icon = LucideIcons.train; break;
-      case 'walking': icon = LucideIcons.footprints; break;
-      default: icon = LucideIcons.car;
+      case 'metro':
+        icon = LucideIcons.train;
+        break;
+      case 'walking':
+        icon = LucideIcons.footprints;
+        break;
+      default:
+        icon = LucideIcons.car;
     }
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
+        color: AppColors.primary.withValues(alpha: 0.1),
         shape: BoxShape.circle,
       ),
       child: Icon(icon, size: 16, color: AppColors.primary),
@@ -89,13 +97,13 @@ class RouteEtaStrip extends StatelessWidget {
   Widget _buildEtaPill(AppointmentEtaInfo eta) {
     final isAtRisk = eta.latenessRisk == 'at_risk';
     final color = isAtRisk ? AppColors.danger : AppColors.success;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -110,10 +118,12 @@ class RouteEtaStrip extends StatelessWidget {
           ),
           if (eta.leaveInMinutes != null)
             Text(
-              eta.leaveInMinutes! <= 0 ? "Leave now" : "Leave in ${eta.leaveInMinutes}m",
+              eta.leaveInMinutes! <= 0
+                  ? "Leave now"
+                  : "Leave in ${eta.leaveInMinutes}m",
               style: GoogleFonts.outfit(
                 fontSize: 8,
-                color: color.withOpacity(0.7),
+                color: color.withValues(alpha: 0.7),
               ),
             ),
         ],
@@ -124,8 +134,10 @@ class RouteEtaStrip extends StatelessWidget {
   Widget _buildFallbackStrip(BuildContext context, String message) {
     String displayMessage = message;
     if (message == "No context") displayMessage = "Searching for context...";
-    if (message == "No event") displayMessage = "No travel needed in next 2 hours.";
-    if (message == "No event location") displayMessage = "Add location to next event to see ETA.";
+    if (message == "No event")
+      displayMessage = "No travel needed in next 2 hours.";
+    if (message == "No event location")
+      displayMessage = "Add location to next event to see ETA.";
 
     return GlassCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

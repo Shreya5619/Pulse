@@ -26,6 +26,7 @@ import { heartbeatOrchestrator } from "./services/HeartbeatOrchestrator";
 import { workspaceService } from "./services/WorkspaceService";
 import plannerRouter from "./routes/planner";
 import { runAgentPulseFlow } from "./services/PulseOrchestrator";
+import twinRouter from "./routes/twin";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
@@ -41,6 +42,7 @@ app.use("/api/planner", plannerRouter);
 app.use("/api", futuresRouter);
 import commRouter from "./routes/comm";
 app.use("/api/comm", commRouter);
+app.use("/api/twin", twinRouter);
 
 
 const httpServer = createServer(app);

@@ -19,7 +19,11 @@ class DigestScreen extends StatelessWidget {
             children: [
               Text(
                 "Notification digest",
-                style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                style: GoogleFonts.outfit(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
               Text(
                 "Last 60 min",
@@ -30,7 +34,8 @@ class DigestScreen extends StatelessWidget {
                 context,
                 title: "Urgent (2)",
                 summary: "May affect today's schedule.",
-                details: "Client Review host: 'Can we move to 10:15?'\nBattery Alert: Power bank not detected.",
+                details:
+                    "Client Review host: 'Can we move to 10:15?'\nBattery Alert: Power bank not detected.",
                 color: Colors.redAccent,
                 icon: LucideIcons.alertCircle,
               ),
@@ -39,7 +44,8 @@ class DigestScreen extends StatelessWidget {
                 context,
                 title: "Important (7)",
                 summary: "Could be handled by end of day.",
-                details: "7 Slack messages across 3 channels.\nMostly project updates and feedback.",
+                details:
+                    "7 Slack messages across 3 channels.\nMostly project updates and feedback.",
                 color: Colors.orangeAccent,
                 icon: LucideIcons.messageCircle,
               ),
@@ -48,7 +54,8 @@ class DigestScreen extends StatelessWidget {
                 context,
                 title: "Noisy / Ignorable (41)",
                 summary: "Muted for next 60 min in commute mode.",
-                details: "Email promos, social media pings, and news alerts.\nAutomatically archived by Pulse.",
+                details:
+                    "Email promos, social media pings, and news alerts.\nAutomatically archived by Pulse.",
                 color: Colors.white24,
                 icon: LucideIcons.bellOff,
               ),
@@ -75,7 +82,10 @@ class DigestScreen extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
               child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(width: 20),
@@ -83,24 +93,45 @@ class DigestScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text(summary, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                  Text(
+                    summary,
+                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
                 ],
               ),
             ),
-            const Icon(LucideIcons.chevronRight, color: Colors.white10, size: 16),
+            const Icon(
+              LucideIcons.chevronRight,
+              color: Colors.white10,
+              size: 16,
+            ),
           ],
         ),
       ),
     );
   }
 
-  void _showDetails(BuildContext context, String title, String details, Color color) {
+  void _showDetails(
+    BuildContext context,
+    String title,
+    String details,
+    Color color,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0F1426),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
       builder: (context) => Container(
         padding: const EdgeInsets.all(32),
         child: Column(
@@ -110,26 +141,63 @@ class DigestScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(title, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold)),
-                IconButton(icon: const Icon(LucideIcons.x, color: Colors.white30), onPressed: () => Navigator.pop(context)),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(LucideIcons.x, color: Colors.white30),
+                  onPressed: () => Navigator.pop(context),
+                ),
               ],
             ),
             const SizedBox(height: 24),
-            Text(details, style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.6)),
+            Text(
+              details,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                height: 1.6,
+              ),
+            ),
             const SizedBox(height: 32),
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 16)),
-                    child: const Text("Mark done", style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: const Text(
+                      "Mark done",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 OutlinedButton(
                   onPressed: () => Navigator.pop(context),
-                  style: OutlinedButton.styleFrom(foregroundColor: Colors.white70, side: const BorderSide(color: Colors.white10), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white70,
+                    side: const BorderSide(color: Colors.white10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
+                  ),
                   child: const Icon(LucideIcons.bellOff, size: 20),
                 ),
               ],

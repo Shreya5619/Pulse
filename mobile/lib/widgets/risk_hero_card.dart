@@ -15,9 +15,11 @@ class RiskHeroCard extends StatelessWidget {
     return Consumer<AppState>(
       builder: (context, state, child) {
         final count = state.risksNext90Min;
-        debugPrint('[Pulse UI] RiskHeroCard count: $count, types: ${state.activeRiskTypes}');
+        debugPrint(
+          '[Pulse UI] RiskHeroCard count: $count, types: ${state.activeRiskTypes}',
+        );
         final riskTypes = state.activeRiskTypes;
-        
+
         final now = DateTime.now();
         final windowEnd = now.add(const Duration(minutes: 90));
         final timeFormatter = DateFormat('HH:mm');
@@ -35,7 +37,8 @@ class RiskHeroCard extends StatelessWidget {
             ? "Everything looks nominal for now."
             : riskTypes.map((t) => typeMap[t] ?? t).join(" + ");
 
-        final title = "$count ${count == 1 ? 'risk' : 'risks'} forming in next 90 minutes";
+        final title =
+            "$count ${count == 1 ? 'risk' : 'risks'} forming in next 90 minutes";
 
         return GestureDetector(
           onTap: () {
@@ -67,18 +70,19 @@ class RiskHeroCard extends StatelessWidget {
                     Expanded(
                       child: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 500),
-                        transitionBuilder: (Widget child, Animation<double> animation) {
-                          return FadeTransition(
-                            opacity: animation,
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0.0, 0.2),
-                                end: Offset.zero,
-                              ).animate(animation),
-                              child: child,
-                            ),
-                          );
-                        },
+                        transitionBuilder:
+                            (Widget child, Animation<double> animation) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0.0, 0.2),
+                                    end: Offset.zero,
+                                  ).animate(animation),
+                                  child: child,
+                                ),
+                              );
+                            },
                         child: Text(
                           title,
                           key: ValueKey(count),
@@ -98,7 +102,7 @@ class RiskHeroCard extends StatelessWidget {
                   timeRange,
                   style: GoogleFonts.outfit(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.5),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -111,13 +115,24 @@ class RiskHeroCard extends StatelessWidget {
                     runSpacing: 8,
                     children: riskTypes.isEmpty
                         ? [_statusChip("Nominal", Colors.greenAccent)]
-                        : riskTypes.map((t) => _statusChip(typeMap[t] ?? t, _getColorForType(t))).toList(),
+                        : riskTypes
+                              .map(
+                                (t) => _statusChip(
+                                  typeMap[t] ?? t,
+                                  _getColorForType(t),
+                                ),
+                              )
+                              .toList(),
                   ),
                 ),
                 const SizedBox(height: 20),
                 Row(
                   children: [
-                    const Icon(LucideIcons.activity, size: 12, color: Colors.white30),
+                    const Icon(
+                      LucideIcons.activity,
+                      size: 12,
+                      color: Colors.white30,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: AnimatedSwitcher(
@@ -127,7 +142,7 @@ class RiskHeroCard extends StatelessWidget {
                           key: ValueKey(summaryLine),
                           style: GoogleFonts.outfit(
                             fontSize: 11,
-                            color: Colors.white.withOpacity(0.4),
+                            color: Colors.white.withValues(alpha: 0.4),
                             fontStyle: FontStyle.italic,
                           ),
                           maxLines: 1,
@@ -149,9 +164,9 @@ class RiskHeroCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,

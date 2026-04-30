@@ -27,8 +27,9 @@ class _FuturesScreenState extends State<FuturesScreen> {
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, state, child) {
-        final futures = state.currentFutures?['futures'] as List<dynamic>? ?? [];
-        
+        final futures =
+            state.currentFutures?['futures'] as List<dynamic>? ?? [];
+
         return Scaffold(
           backgroundColor: AppColors.background,
           body: SafeArea(
@@ -44,30 +45,43 @@ class _FuturesScreenState extends State<FuturesScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            state.isReplayMode ? "Historical Projections" : "Future Projections",
+                            state.isReplayMode
+                                ? "Historical Projections"
+                                : "Future Projections",
                             style: GoogleFonts.outfit(
-                              fontSize: 24, 
-                              fontWeight: FontWeight.bold, 
-                              color: Colors.white
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            state.isReplayMode 
-                              ? "REPLAYING HISTORICAL SNAPSHOT" 
-                              : "Simulating the next 2 hours",
+                            state.isReplayMode
+                                ? "REPLAYING HISTORICAL SNAPSHOT"
+                                : "Simulating the next 2 hours",
                             style: GoogleFonts.outfit(
-                              fontSize: 13, 
-                              color: state.isReplayMode ? AppColors.primary : Colors.white30,
-                              fontWeight: state.isReplayMode ? FontWeight.bold : FontWeight.normal
+                              fontSize: 13,
+                              color: state.isReplayMode
+                                  ? AppColors.primary
+                                  : Colors.white30,
+                              fontWeight: state.isReplayMode
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
                         ],
                       ),
                       if (!state.isReplayMode)
                         IconButton(
-                          icon: const Icon(LucideIcons.refreshCw, size: 20, color: AppColors.primary),
-                          onPressed: () => Provider.of<AppState>(context, listen: false).fetchFutures(),
+                          icon: const Icon(
+                            LucideIcons.refreshCw,
+                            size: 20,
+                            color: AppColors.primary,
+                          ),
+                          onPressed: () => Provider.of<AppState>(
+                            context,
+                            listen: false,
+                          ).fetchFutures(),
                         ),
                     ],
                   ),
@@ -78,35 +92,52 @@ class _FuturesScreenState extends State<FuturesScreen> {
                 ),
                 const SizedBox(height: 16),
                 Expanded(
-                  child: futures.isEmpty 
-                    ? const Center(child: Text("No projections available", style: TextStyle(color: Colors.white30)))
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
-                        itemCount: futures.length,
-                        separatorBuilder: (context, index) => const SizedBox(height: 20),
-                        itemBuilder: (context, index) {
-                          final data = futures[index];
-                          final isSelected = state.selectedScenarioId == data['id'];
-                          return _buildScenarioCard(context, state, data, isSelected);
-                        },
-                      ),
+                  child: futures.isEmpty
+                      ? const Center(
+                          child: Text(
+                            "No projections available",
+                            style: TextStyle(color: Colors.white30),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
+                          itemCount: futures.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 20),
+                          itemBuilder: (context, index) {
+                            final data = futures[index];
+                            final isSelected =
+                                state.selectedScenarioId == data['id'];
+                            return _buildScenarioCard(
+                              context,
+                              state,
+                              data,
+                              isSelected,
+                            );
+                          },
+                        ),
                 ),
               ],
             ),
           ),
         );
-      }
+      },
     );
   }
 
-  Widget _buildScenarioCard(BuildContext context, AppState state, dynamic data, bool isSelected) {
+  Widget _buildScenarioCard(
+    BuildContext context,
+    AppState state,
+    dynamic data,
+    bool isSelected,
+  ) {
     final metrics = data['metrics'];
     final stressScore = (metrics['stressScore'] as num?)?.toDouble() ?? 0.0;
-    final color = stressScore > 0.7 
-        ? AppColors.danger 
-        : stressScore > 0.4 
-            ? Colors.orangeAccent 
-            : AppColors.success;
+    final color = stressScore > 0.7
+        ? AppColors.danger
+        : stressScore > 0.4
+        ? Colors.orangeAccent
+        : AppColors.success;
 
     return GestureDetector(
       onTap: () {
@@ -115,7 +146,7 @@ class _FuturesScreenState extends State<FuturesScreen> {
       },
       child: GlassCard(
         padding: const EdgeInsets.all(20),
-        borderColor: isSelected ? color.withOpacity(0.8) : Colors.white10,
+        borderColor: isSelected ? color.withValues(alpha: 0.8) : Colors.white10,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -128,9 +159,9 @@ class _FuturesScreenState extends State<FuturesScreen> {
                     Text(
                       data['title'] ?? "Scenario",
                       style: GoogleFonts.outfit(
-                        fontSize: 18, 
-                        fontWeight: FontWeight.bold, 
-                        color: isSelected ? color : Colors.white
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? color : Colors.white,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -143,24 +174,24 @@ class _FuturesScreenState extends State<FuturesScreen> {
             ),
             const SizedBox(height: 20),
             _metricRow(
-              LucideIcons.clock, 
+              LucideIcons.clock,
               _formatLateness(metrics['expectedLatenessMinutes'] ?? 0),
-              color
+              color,
             ),
             _metricRow(
-              LucideIcons.battery, 
+              LucideIcons.battery,
               "Battery: ~${metrics['batteryPercent'] ?? '?'}% at end",
-              color
+              color,
             ),
             _metricRow(
-              LucideIcons.bell, 
+              LucideIcons.bell,
               "+${metrics['notificationCount'] ?? 0} new notifications",
-              color
+              color,
             ),
             _metricRow(
-              LucideIcons.layers, 
+              LucideIcons.layers,
               "${metrics['overlapCount'] ?? 0} overlapping blocks",
-              color
+              color,
             ),
             const SizedBox(height: 20),
             Row(
@@ -169,10 +200,10 @@ class _FuturesScreenState extends State<FuturesScreen> {
                 Text(
                   "RISK TREND",
                   style: GoogleFonts.outfit(
-                    fontSize: 9, 
-                    fontWeight: FontWeight.bold, 
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
                     color: Colors.white24,
-                    letterSpacing: 1.2
+                    letterSpacing: 1.2,
                   ),
                 ),
                 _buildMiniRiskChart(stressScore, color),
@@ -189,12 +220,12 @@ class _FuturesScreenState extends State<FuturesScreen> {
     Color color = Colors.white24;
     if (id == "RECOMMENDED") {
       text = "OPTIMAL";
-      color = AppColors.primary.withOpacity(0.3);
+      color = AppColors.primary.withValues(alpha: 0.3);
     } else if (id == "DO_NOTHING") {
       text = "HIGH RISK";
-      color = AppColors.danger.withOpacity(0.2);
+      color = AppColors.danger.withValues(alpha: 0.2);
     }
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
@@ -203,7 +234,11 @@ class _FuturesScreenState extends State<FuturesScreen> {
       ),
       child: Text(
         text,
-        style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 8,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
@@ -211,7 +246,7 @@ class _FuturesScreenState extends State<FuturesScreen> {
   String _formatLateness(int mins) {
     if (mins <= 0) return "Arrive on time";
     if (mins < 10) return "Arrive slightly late ($mins min)";
-    return "Arrive $mins–${mins+5} min late";
+    return "Arrive $mins–${mins + 5} min late";
   }
 
   Widget _metricRow(IconData icon, String text, Color color) {
@@ -233,9 +268,9 @@ class _FuturesScreenState extends State<FuturesScreen> {
   Widget _buildMiniRiskChart(double score, Color color) {
     return Row(
       children: [
-        _bar(score * 0.4, color.withOpacity(0.3)),
+        _bar(score * 0.4, color.withValues(alpha: 0.3)),
         const SizedBox(width: 2),
-        _bar(score * 0.7, color.withOpacity(0.6)),
+        _bar(score * 0.7, color.withValues(alpha: 0.6)),
         const SizedBox(width: 2),
         _bar(score, color),
       ],
@@ -253,17 +288,34 @@ class _FuturesScreenState extends State<FuturesScreen> {
     );
   }
 
-  void _showScenarioDetails(BuildContext context, AppState state, dynamic data) {
+  void _showScenarioDetails(
+    BuildContext context,
+    AppState state,
+    dynamic data,
+  ) {
     final metrics = data['metrics'];
     final id = data['id'];
-    
+
     List<String> interventions = [];
     if (id == "RECOMMENDED") {
-      interventions = ["Leave 15 min earlier", "Enable commute mode", "Send 'running late' message", "Plan a charging stop"];
+      interventions = [
+        "Leave 15 min earlier",
+        "Enable commute mode",
+        "Send 'running late' message",
+        "Plan a charging stop",
+      ];
     } else if (id == "ALTERNATE") {
-      interventions = ["Plan 15 min charging stop", "Arrive 10 min late", "Full battery visibility"];
+      interventions = [
+        "Plan 15 min charging stop",
+        "Arrive 10 min late",
+        "Full battery visibility",
+      ];
     } else {
-      interventions = ["Maintain current routine", "Accept potential delays", "No battery saving"];
+      interventions = [
+        "Maintain current routine",
+        "Accept potential delays",
+        "No battery saving",
+      ];
     }
 
     showModalBottomSheet(
@@ -277,29 +329,56 @@ class _FuturesScreenState extends State<FuturesScreen> {
           children: [
             Text(
               "Strategy: ${data['title']}",
-              style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+              style: GoogleFonts.outfit(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               data['description'] ?? "",
-              style: const TextStyle(color: Colors.white60, fontSize: 13, height: 1.5),
+              style: const TextStyle(
+                color: Colors.white60,
+                fontSize: 13,
+                height: 1.5,
+              ),
             ),
             const SizedBox(height: 24),
             Text(
               "REQUIRED ACTIONS",
-              style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary, letterSpacing: 1.2),
+              style: GoogleFonts.outfit(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+                letterSpacing: 1.2,
+              ),
             ),
             const SizedBox(height: 12),
-            ...interventions.map((i) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  const Icon(LucideIcons.check, size: 14, color: AppColors.primary),
-                  const SizedBox(width: 12),
-                  Text(i, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                ],
-              ),
-            )).toList(),
+            ...interventions
+                .map(
+                  (i) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          LucideIcons.check,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          i,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+                .toList(),
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
@@ -308,16 +387,26 @@ class _FuturesScreenState extends State<FuturesScreen> {
                   Navigator.pop(context);
                   // Deep link would go here - for now just feedback
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Plan applied and synced to Dashboard")),
+                    const SnackBar(
+                      content: Text("Plan applied and synced to Dashboard"),
+                    ),
                   );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text("APPLY THIS PLAN", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                child: const Text(
+                  "APPLY THIS PLAN",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
               ),
             ),
           ],

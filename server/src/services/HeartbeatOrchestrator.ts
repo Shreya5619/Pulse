@@ -10,6 +10,8 @@ import { logEvent } from "../utils/logger";
 import { computeNextHeartbeatDelay } from "./HeartbeatPolicy";
 import { workspaceService } from "./WorkspaceService";
 import { memoryAgent } from "./MemoryAgent";
+import { GraphAdapter } from "./GraphAdapter";
+import { broadcast } from "../index";
 
 export class HeartbeatOrchestrator {
   async runOnce(userId: string) {
@@ -30,6 +32,11 @@ export class HeartbeatOrchestrator {
       details: context
     });
 
+    if (context) {
+      // Sync to Neo4j Digital Twin
+      await GraphAdapter.applySnapshotToNeo4j(userId, context);
+    }
+
     // 2. Build graph
     const graph = await graphBuilder.buildForUser(userId);
     logEvent({
@@ -49,6 +56,15 @@ export class HeartbeatOrchestrator {
       phase: "RISK",
       summary: `Risk assessed: ${risk.risks.length} risks found, top_score=${topRisk.toFixed(2)}`,
       details: risk
+    });
+
+    // Sync risks back to Neo4j
+    await GraphAdapter.updateRiskInNeo4j(userId, risk);
+
+    broadcast({
+      type: "TWIN_UPDATED",
+      userId,
+      timestamp: new Date().toISOString()
     });
 
     // 4. Futures

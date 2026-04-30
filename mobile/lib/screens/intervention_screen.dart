@@ -7,7 +7,6 @@ import '../theme/colors.dart';
 import '../widgets/glass_card.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-
 class InterventionScreen extends StatelessWidget {
   const InterventionScreen({super.key});
 
@@ -62,18 +61,15 @@ class InterventionScreen extends StatelessWidget {
             Text(
               "Guardian Actions",
               style: GoogleFonts.outfit(
-                fontSize: 28, 
-                fontWeight: FontWeight.bold, 
-                color: Colors.white
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               "Pulse Planner's recommended interventions",
-              style: GoogleFonts.outfit(
-                fontSize: 14, 
-                color: Colors.white30
-              ),
+              style: GoogleFonts.outfit(fontSize: 14, color: Colors.white30),
             ),
           ],
         ),
@@ -87,11 +83,11 @@ class InterventionScreen extends StatelessWidget {
 
     return GlassCard(
       padding: const EdgeInsets.all(24),
-      borderColor: isAccepted 
-          ? AppColors.success.withOpacity(0.5) 
-          : isDismissed 
-              ? Colors.white10 
-              : AppColors.primary.withOpacity(0.3),
+      borderColor: isAccepted
+          ? AppColors.success.withValues(alpha: 0.5)
+          : isDismissed
+          ? Colors.white10
+          : AppColors.primary.withValues(alpha: 0.3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -100,19 +96,23 @@ class InterventionScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(LucideIcons.zap, color: AppColors.primary, size: 20),
+                child: const Icon(
+                  LucideIcons.zap,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Text(
                 "PRIMARY SUGGESTION",
                 style: GoogleFonts.outfit(
-                  fontSize: 10, 
-                  fontWeight: FontWeight.bold, 
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
                   color: AppColors.primary,
-                  letterSpacing: 1.2
+                  letterSpacing: 1.2,
                 ),
               ),
             ],
@@ -121,24 +121,28 @@ class InterventionScreen extends StatelessWidget {
           Text(
             action['title'] ?? "Action",
             style: GoogleFonts.outfit(
-              fontSize: 20, 
-              fontWeight: FontWeight.bold, 
-              color: Colors.white
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             action['impact'] ?? action['description'] ?? "",
             style: GoogleFonts.outfit(
-              fontSize: 14, 
+              fontSize: 14,
               color: AppColors.success,
-              fontWeight: FontWeight.w500
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 12),
           Text(
             action['description'] ?? "",
-            style: const TextStyle(color: Colors.white60, fontSize: 13, height: 1.5),
+            style: const TextStyle(
+              color: Colors.white60,
+              fontSize: 13,
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 24),
           if (!isAccepted && !isDismissed)
@@ -150,10 +154,15 @@ class InterventionScreen extends StatelessWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    child: const Text("ACCEPT PLAN", style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      "ACCEPT PLAN",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -161,16 +170,27 @@ class InterventionScreen extends StatelessWidget {
                   onPressed: () => state.dismissAction(action),
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.white30,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 14,
+                    ),
                   ),
                   child: const Text("Dismiss"),
                 ),
               ],
             )
           else if (isAccepted)
-            _buildStatusIndicator(LucideIcons.checkCircle2, "ACCEPTED", AppColors.success)
+            _buildStatusIndicator(
+              LucideIcons.checkCircle2,
+              "ACCEPTED",
+              AppColors.success,
+            )
           else
-            _buildStatusIndicator(LucideIcons.xCircle, "DISMISSED", Colors.white24),
+            _buildStatusIndicator(
+              LucideIcons.xCircle,
+              "DISMISSED",
+              Colors.white24,
+            ),
         ],
       ),
     );
@@ -181,9 +201,9 @@ class InterventionScreen extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -193,10 +213,10 @@ class InterventionScreen extends StatelessWidget {
           Text(
             text,
             style: GoogleFonts.outfit(
-              fontSize: 12, 
-              fontWeight: FontWeight.bold, 
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
               color: color,
-              letterSpacing: 1
+              letterSpacing: 1,
             ),
           ),
         ],
@@ -204,24 +224,35 @@ class InterventionScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildGroupedActions(BuildContext context, AppState state, List<dynamic> actions) {
+  Widget _buildGroupedActions(
+    BuildContext context,
+    AppState state,
+    List<dynamic> actions,
+  ) {
     final commute = actions.where((a) => a['category'] == "Commute").toList();
     final focus = actions.where((a) => a['category'] == "Focus").toList();
-    final comms = actions.where((a) => a['category'] == "Communication").toList();
-    final general = actions.where((a) => a['category'] == null || a['category'] == "General").toList();
+    final comms = actions
+        .where((a) => a['category'] == "Communication")
+        .toList();
+    final general = actions
+        .where((a) => a['category'] == null || a['category'] == "General")
+        .toList();
 
     return SliverList(
       delegate: SliverChildListDelegate([
-        if (commute.isNotEmpty) _buildCategoryHeader("Commute", LucideIcons.car),
+        if (commute.isNotEmpty)
+          _buildCategoryHeader("Commute", LucideIcons.car),
         ...commute.map((a) => _buildActionRow(context, state, a)),
-        
+
         if (focus.isNotEmpty) _buildCategoryHeader("Focus", LucideIcons.brain),
         ...focus.map((a) => _buildActionRow(context, state, a)),
-        
-        if (comms.isNotEmpty) _buildCategoryHeader("Communication", LucideIcons.messageSquare),
+
+        if (comms.isNotEmpty)
+          _buildCategoryHeader("Communication", LucideIcons.messageSquare),
         ...comms.map((a) => _buildActionRow(context, state, a)),
-        
-        if (general.isNotEmpty) _buildCategoryHeader("Other", LucideIcons.moreHorizontal),
+
+        if (general.isNotEmpty)
+          _buildCategoryHeader("Other", LucideIcons.moreHorizontal),
         ...general.map((a) => _buildActionRow(context, state, a)),
       ]),
     );
@@ -237,10 +268,10 @@ class InterventionScreen extends StatelessWidget {
           Text(
             title.toUpperCase(),
             style: GoogleFonts.outfit(
-              fontSize: 11, 
-              fontWeight: FontWeight.bold, 
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
               color: Colors.white24,
-              letterSpacing: 1.2
+              letterSpacing: 1.2,
             ),
           ),
         ],
@@ -251,7 +282,7 @@ class InterventionScreen extends StatelessWidget {
   Widget _buildActionRow(BuildContext context, AppState state, dynamic action) {
     final isAccepted = state.isActionAccepted(action['id']);
     final isDismissed = state.isActionDismissed(action['id']);
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Opacity(
@@ -269,15 +300,18 @@ class InterventionScreen extends StatelessWidget {
                     Text(
                       action['title'] ?? "",
                       style: GoogleFonts.outfit(
-                        fontSize: 14, 
-                        fontWeight: FontWeight.w600, 
-                        color: isAccepted ? AppColors.success : Colors.white
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isAccepted ? AppColors.success : Colors.white,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       action['impact'] ?? "",
-                      style: const TextStyle(fontSize: 11, color: Colors.white30),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.white30,
+                      ),
                     ),
                   ],
                 ),
@@ -292,16 +326,29 @@ class InterventionScreen extends StatelessWidget {
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
-                    child: const Text("Approve", style: TextStyle(fontSize: 12)),
+                    child: const Text(
+                      "Approve",
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                 )
               else if (isAccepted)
-                const Icon(LucideIcons.check, size: 16, color: AppColors.success)
+                const Icon(
+                  LucideIcons.check,
+                  size: 16,
+                  color: AppColors.success,
+                )
               else
                 IconButton(
-                  icon: const Icon(LucideIcons.rotateCcw, size: 14, color: Colors.white24),
+                  icon: const Icon(
+                    LucideIcons.rotateCcw,
+                    size: 14,
+                    color: Colors.white24,
+                  ),
                   onPressed: () => state.acceptAction(action),
                 ),
             ],
@@ -335,7 +382,7 @@ class InterventionScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(iconData, color: color, size: 18),
@@ -349,11 +396,19 @@ class InterventionScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(LucideIcons.shieldCheck, size: 64, color: Colors.white10),
+            const Icon(
+              LucideIcons.shieldCheck,
+              size: 64,
+              color: Colors.white10,
+            ),
             const SizedBox(height: 24),
             Text(
               "No interventions needed",
-              style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+              style: GoogleFonts.outfit(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -368,10 +423,10 @@ class InterventionScreen extends StatelessWidget {
 
   void _handleAccept(BuildContext context, AppState state, dynamic action) {
     state.acceptAction(action);
-    
+
     final id = action['id'] as String;
     String message = "Plan updated; Pulse will track ETA against this.";
-    
+
     if (id.contains("NOTIFICATIONS")) {
       message = "Noisy senders muted for 60 minutes.";
     } else if (id.contains("MESSAGE")) {
@@ -382,13 +437,17 @@ class InterventionScreen extends StatelessWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: AppColors.success.withOpacity(0.9),
+        backgroundColor: AppColors.success.withValues(alpha: 0.9),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  void _showDraftSheet(BuildContext context, dynamic action, {String? manualText}) {
+  void _showDraftSheet(
+    BuildContext context,
+    dynamic action, {
+    String? manualText,
+  }) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -400,19 +459,27 @@ class InterventionScreen extends StatelessWidget {
           children: [
             Text(
               "Drafting Message",
-              style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+              style: GoogleFonts.outfit(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.white10),
               ),
               child: Text(
-                manualText ?? "Hey! Just letting you know I'm running about 10 minutes late due to traffic. Should be there shortly!",
-                style: const TextStyle(color: Colors.white70, fontStyle: FontStyle.italic),
+                manualText ??
+                    "Hey! Just letting you know I'm running about 10 minutes late due to traffic. Should be there shortly!",
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontStyle: FontStyle.italic,
+                ),
               ),
             ),
             const SizedBox(height: 32),
@@ -422,16 +489,25 @@ class InterventionScreen extends StatelessWidget {
                 onPressed: () {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Draft copied to clipboard and messaging app opened")),
+                    const SnackBar(
+                      content: Text(
+                        "Draft copied to clipboard and messaging app opened",
+                      ),
+                    ),
                   );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text("COPY & OPEN MESSAGING", style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text(
+                  "COPY & OPEN MESSAGING",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ),
           ],
@@ -486,9 +562,7 @@ class _CommActionCardState extends State<CommActionCard> {
     final Uri smsUri = Uri(
       scheme: 'sms',
       path: recipientPath,
-      queryParameters: <String, String>{
-        'body': _draftText!,
-      },
+      queryParameters: <String, String>{'body': _draftText!},
     );
 
     if (await canLaunchUrl(smsUri)) {
@@ -508,7 +582,7 @@ class _CommActionCardState extends State<CommActionCard> {
 
     return GlassCard(
       padding: const EdgeInsets.all(20),
-      borderColor: AppColors.success.withOpacity(0.3),
+      borderColor: AppColors.success.withValues(alpha: 0.3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -517,7 +591,11 @@ class _CommActionCardState extends State<CommActionCard> {
             children: [
               Row(
                 children: [
-                  const Icon(LucideIcons.messageCircle, color: AppColors.success, size: 18),
+                  const Icon(
+                    LucideIcons.messageCircle,
+                    color: AppColors.success,
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     "SMART NOTIFICATION",
@@ -534,25 +612,40 @@ class _CommActionCardState extends State<CommActionCard> {
                 const SizedBox(
                   width: 12,
                   height: 12,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.success),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.success,
+                  ),
                 ),
             ],
           ),
           const SizedBox(height: 16),
           Text(
             "Drafting for:",
-            style: GoogleFonts.outfit(fontSize: 12, color: Colors.white30, fontWeight: FontWeight.bold),
+            style: GoogleFonts.outfit(
+              fontSize: 12,
+              color: Colors.white30,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 8),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: ["General", "Manager", "Customer", "Family"].map((role) {
+              children: ["General", "Manager", "Customer", "Family"].map((
+                role,
+              ) {
                 final isSelected = _selectedRole == role;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
-                    label: Text(role, style: TextStyle(fontSize: 11, color: isSelected ? Colors.black : Colors.white70)),
+                    label: Text(
+                      role,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isSelected ? Colors.black : Colors.white70,
+                      ),
+                    ),
                     selected: isSelected,
                     onSelected: (val) {
                       if (val) {
@@ -561,8 +654,10 @@ class _CommActionCardState extends State<CommActionCard> {
                       }
                     },
                     selectedColor: AppColors.success,
-                    backgroundColor: Colors.white.withOpacity(0.05),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    backgroundColor: Colors.white.withValues(alpha: 0.05),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     showCheckmark: false,
                   ),
                 );
@@ -574,7 +669,7 @@ class _CommActionCardState extends State<CommActionCard> {
             padding: const EdgeInsets.all(12),
             width: double.infinity,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.03),
+              color: Colors.white.withValues(alpha: 0.03),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.white10),
             ),
@@ -600,7 +695,9 @@ class _CommActionCardState extends State<CommActionCard> {
                       backgroundColor: AppColors.success,
                       foregroundColor: Colors.black,
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ),
@@ -613,7 +710,11 @@ class _CommActionCardState extends State<CommActionCard> {
               ],
             )
           else
-            _buildStatusIndicator(LucideIcons.checkCircle2, "SENT", AppColors.success),
+            _buildStatusIndicator(
+              LucideIcons.checkCircle2,
+              "SENT",
+              AppColors.success,
+            ),
         ],
       ),
     );
@@ -624,9 +725,9 @@ class _CommActionCardState extends State<CommActionCard> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,

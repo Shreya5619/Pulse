@@ -7,8 +7,10 @@ import {
   assessLateness, 
   assessBattery, 
   assessResponseDebt, 
+  assessResponseDebt, 
   assessOverload 
 } from "./RiskEngine";
+import { GraphAdapter } from "./GraphAdapter";
 
 // ──────────────────────────────────────────────────────────────────
 // Graph Helpers
@@ -81,6 +83,7 @@ export class RiskEngineService {
   async computeForUser(userId: string): Promise<RiskSnapshot> {
     const graph = await graphBuilder.buildForUser(userId);
     const memory = await memoryStore.loadAll(userId);
+    const preferences = await GraphAdapter.getUserPreferences(userId);
     const now = new Date().toISOString();
     const nowMs = Date.now();
 
@@ -92,7 +95,7 @@ export class RiskEngineService {
       const { node, minutesToEvent, etaMinutes } = nextAppt;
       const buffer = memory.habits?.patterns?.typical_lateness ?? 5;
       risks.push(
-        assessLateness(minutesToEvent, etaMinutes, buffer, node.label, node.id)
+        assessLateness(minutesToEvent, etaMinutes, buffer, node.label, node.id, preferences)
       );
     }
 
@@ -120,7 +123,7 @@ export class RiskEngineService {
           : 120;
 
       risks.push(
-        assessBattery(currentPct, horizonMinutes, drainRate, battNode.id)
+        assessBattery(currentPct, horizonMinutes, drainRate, battNode.id, preferences)
       );
     }
 

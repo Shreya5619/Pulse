@@ -12,6 +12,7 @@ import '../models/device_context.dart';
 import '../services/context_services.dart';
 import '../services/local_repository.dart';
 import '../models/risk_snapshot.dart';
+import '../models/twin_graph.dart';
 
 class TimelineEvent {
   final String id;
@@ -143,11 +144,7 @@ class AppState extends ChangeNotifier {
   Map<String, dynamic>? _currentFutures;
   String _selectedScenarioId = "RECOMMENDED";
   Map<String, dynamic>? _lastPlannerDecision;
-  Map<String, dynamic>? get proposedCommAction => _proposedCommAction;
-
-  final Set<String> _acceptedActionIds = {};
-  final Set<String> _dismissedActionIds = {};
-  Map<String, dynamic>? _proposedCommAction;
+  TwinGraph? _twinGraph;
 
   int get risksNext90Min => _risksNext90Min;
   List<String> get activeRiskTypes => _activeRiskTypes;
@@ -156,6 +153,12 @@ class AppState extends ChangeNotifier {
   Map<String, dynamic>? get currentFutures => _currentFutures;
   String get selectedScenarioId => _selectedScenarioId;
   Map<String, dynamic>? get lastPlannerDecision => _lastPlannerDecision;
+  TwinGraph? get twinGraph => _twinGraph;
+  Map<String, dynamic>? get proposedCommAction => _proposedCommAction;
+
+  final Set<String> _acceptedActionIds = {};
+  final Set<String> _dismissedActionIds = {};
+  Map<String, dynamic>? _proposedCommAction;
 
   bool isActionAccepted(String id) => _acceptedActionIds.contains(id);
   bool isActionDismissed(String id) => _dismissedActionIds.contains(id);
@@ -606,6 +609,10 @@ class AppState extends ChangeNotifier {
           _activeRiskTypes = risks.map((r) => r['type'].toString()).toList();
         }
       }
+    } else if (type == 'TWIN_UPDATED') {
+      if (data['userId'] != null && data['userId'] != _userId) return;
+      debugPrint('[Pulse AppState] Twin Graph update triggered');
+      fetchTwinGraph();
     }
 
     notifyListeners();
@@ -785,6 +792,22 @@ class AppState extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('[Pulse API] Exception sending snapshot: $e');
+    }
+  }
+
+  Future<void> fetchTwinGraph() async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/twin/graph?userId=$_userId');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _twinGraph = TwinGraph.fromJson(data);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error fetching twin graph: $e');
     }
   }
 

@@ -19,16 +19,68 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
 
   final Map<String, List<Map<String, dynamic>>> _traceData = {
     "Commute – Low battery": [
-      {"type": "heartbeat.tick", "timestamp": "2026-04-28T08:00:00Z", "data": {"status": "nominal"}},
-      {"type": "risk.updated", "timestamp": "2026-04-28T08:05:00Z", "data": {"level": "low", "score": 32.0, "reasons": ["Traffic forming"], "history": [20, 22, 25, 28, 32]}},
-      {"type": "risk.updated", "timestamp": "2026-04-28T08:15:00Z", "data": {"level": "high", "score": 78.0, "reasons": ["Battery 15%", "Traffic delay"], "history": [32, 45, 55, 65, 78]}},
-      {"type": "intervention.created", "timestamp": "2026-04-28T08:16:00Z", "eventId": "int_001", "data": {"headline": "Switch to cab + Battery Saver", "body": "Traffic is heavy. Switching to a cab now saves 15 min walk."}},
-      {"type": "risk.updated", "timestamp": "2026-04-28T08:30:00Z", "data": {"level": "med", "score": 45.0, "reasons": ["In cab", "Charging"], "history": [78, 70, 60, 50, 45]}},
+      {
+        "type": "heartbeat.tick",
+        "timestamp": "2026-04-28T08:00:00Z",
+        "data": {"status": "nominal"},
+      },
+      {
+        "type": "risk.updated",
+        "timestamp": "2026-04-28T08:05:00Z",
+        "data": {
+          "level": "low",
+          "score": 32.0,
+          "reasons": ["Traffic forming"],
+          "history": [20, 22, 25, 28, 32],
+        },
+      },
+      {
+        "type": "risk.updated",
+        "timestamp": "2026-04-28T08:15:00Z",
+        "data": {
+          "level": "high",
+          "score": 78.0,
+          "reasons": ["Battery 15%", "Traffic delay"],
+          "history": [32, 45, 55, 65, 78],
+        },
+      },
+      {
+        "type": "intervention.created",
+        "timestamp": "2026-04-28T08:16:00Z",
+        "eventId": "int_001",
+        "data": {
+          "headline": "Switch to cab + Battery Saver",
+          "body": "Traffic is heavy. Switching to a cab now saves 15 min walk.",
+        },
+      },
+      {
+        "type": "risk.updated",
+        "timestamp": "2026-04-28T08:30:00Z",
+        "data": {
+          "level": "med",
+          "score": 45.0,
+          "reasons": ["In cab", "Charging"],
+          "history": [78, 70, 60, 50, 45],
+        },
+      },
     ],
     "Back-to-back meetings": [
-      {"type": "heartbeat.tick", "timestamp": "2026-04-28T13:00:00Z", "data": {"status": "nominal"}},
-      {"type": "risk.updated", "timestamp": "2026-04-28T13:10:00Z", "data": {"level": "med", "score": 52.0, "reasons": ["Overload"], "history": [10, 20, 35, 45, 52]}},
-    ]
+      {
+        "type": "heartbeat.tick",
+        "timestamp": "2026-04-28T13:00:00Z",
+        "data": {"status": "nominal"},
+      },
+      {
+        "type": "risk.updated",
+        "timestamp": "2026-04-28T13:10:00Z",
+        "data": {
+          "level": "med",
+          "score": 52.0,
+          "reasons": ["Overload"],
+          "history": [10, 20, 35, 45, 52],
+        },
+      },
+    ],
   };
 
   @override
@@ -46,12 +98,19 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(LucideIcons.chevronLeft, color: Colors.white),
+                    icon: const Icon(
+                      LucideIcons.chevronLeft,
+                      color: Colors.white,
+                    ),
                     onPressed: () => Navigator.pop(context),
                   ),
                   Text(
                     "Scenario Player",
-                    style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: GoogleFonts.outfit(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                 ],
               ),
@@ -60,11 +119,27 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
               const SizedBox(height: 24),
               _buildPlaybackControls(appState),
               const SizedBox(height: 32),
-              const Text("DASHBOARD PREVIEW", style: TextStyle(color: Colors.white30, fontSize: 10, letterSpacing: 1.2, fontWeight: FontWeight.bold)),
+              const Text(
+                "DASHBOARD PREVIEW",
+                style: TextStyle(
+                  color: Colors.white30,
+                  fontSize: 10,
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 16),
               _buildMiniDashboard(appState),
               const SizedBox(height: 32),
-              const Text("SCENARIO KPIs", style: TextStyle(color: Colors.white30, fontSize: 10, letterSpacing: 1.2, fontWeight: FontWeight.bold)),
+              const Text(
+                "SCENARIO KPIs",
+                style: TextStyle(
+                  color: Colors.white30,
+                  fontSize: 10,
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 16),
               _buildKPIs(),
             ],
@@ -77,21 +152,36 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
   Widget _buildTraceDropdown() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white10)),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white10),
+      ),
       child: DropdownButton<String>(
         value: _selectedTrace,
         dropdownColor: const Color(0xFF0F1426),
         underline: const SizedBox(),
         isExpanded: true,
         icon: const Icon(LucideIcons.chevronDown, color: Colors.white30),
-        items: _traceData.keys.map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(color: Colors.white, fontSize: 14)))).toList(),
+        items: _traceData.keys
+            .map(
+              (s) => DropdownMenuItem(
+                value: s,
+                child: Text(
+                  s,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                ),
+              ),
+            )
+            .toList(),
         onChanged: (v) => setState(() => _selectedTrace = v!),
       ),
     );
   }
 
   Widget _buildPlaybackControls(AppState appState) {
-    bool isActive = appState.isReplayMode && appState.currentScenarioName == _selectedTrace;
+    bool isActive =
+        appState.isReplayMode && appState.currentScenarioName == _selectedTrace;
 
     return GlassCard(
       padding: const EdgeInsets.all(20),
@@ -101,18 +191,26 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
-                icon: Icon(isActive ? LucideIcons.stopCircle : LucideIcons.play, color: isActive ? Colors.redAccent : Colors.white),
+                icon: Icon(
+                  isActive ? LucideIcons.stopCircle : LucideIcons.play,
+                  color: isActive ? Colors.redAccent : Colors.white,
+                ),
                 onPressed: () {
-                   if (isActive) {
-                     appState.stopReplay();
-                   } else {
-                     appState.startReplay(_selectedTrace, _traceData[_selectedTrace]!);
-                   }
+                  if (isActive) {
+                    appState.stopReplay();
+                  } else {
+                    appState.startReplay(
+                      _selectedTrace,
+                      _traceData[_selectedTrace]!,
+                    );
+                  }
                 },
               ),
               Expanded(
                 child: Slider(
-                  value: appState.isReplayMode ? appState.replayProgress.toDouble() : 0.0,
+                  value: appState.isReplayMode
+                      ? appState.replayProgress.toDouble()
+                      : 0.0,
                   max: 100,
                   onChanged: (v) {
                     if (appState.isReplayMode) appState.seekToProgress(v);
@@ -122,7 +220,9 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
                 ),
               ),
               Text(
-                appState.simulatedTime != null ? DateFormat.Hm().format(appState.simulatedTime!) : "--:--",
+                appState.simulatedTime != null
+                    ? DateFormat.Hm().format(appState.simulatedTime!)
+                    : "--:--",
                 style: const TextStyle(color: Colors.white, fontSize: 12),
               ),
             ],
@@ -136,9 +236,24 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
                 onTap: () => appState.setReplaySpeed(s),
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(color: isSelected ? AppColors.primary : Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(8)),
-                  child: Text("${s.toInt()}x", style: TextStyle(color: isSelected ? Colors.white : Colors.white30, fontSize: 12, fontWeight: FontWeight.bold)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.primary
+                        : Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    "${s.toInt()}x",
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.white30,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               );
             }).toList(),
@@ -151,26 +266,44 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
   Widget _buildMiniDashboard(AppState appState) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.02), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.05))),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.02),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("Current Risk", style: TextStyle(color: Colors.white30, fontSize: 10)),
-              Text("${(appState.currentRisk.score).toInt()}", style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+              const Text(
+                "Current Risk",
+                style: TextStyle(color: Colors.white30, fontSize: 10),
+              ),
+              Text(
+                "${(appState.currentRisk.score).toInt()}",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: appState.currentRisk.levelColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8)
+              color: appState.currentRisk.levelColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               appState.currentRisk.levelText.toUpperCase(),
-              style: TextStyle(color: appState.currentRisk.levelColor, fontSize: 10, fontWeight: FontWeight.bold)
+              style: TextStyle(
+                color: appState.currentRisk.levelColor,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -194,8 +327,18 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-          Text(value, style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.bold)),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white70, fontSize: 13),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );

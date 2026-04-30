@@ -1,5 +1,6 @@
 import { dailySummarizer } from "./DailySummarizer";
 import { memoryStore } from "./MemoryStore";
+import { GraphAdapter } from "./GraphAdapter";
 
 export class MemoryAgent {
   private lastSummaryTime: number = 0;
@@ -26,9 +27,12 @@ export class MemoryAgent {
     console.log(`[MemoryAgent] Running scheduled summary for user: ${userId}`);
     
     try {
-      await dailySummarizer.summarize(userId);
+      const { preferences, patterns } = await dailySummarizer.summarize(userId);
+      
+      // Update Neo4j Digital Twin with structured preferences
+      await GraphAdapter.applyPreferencesToNeo4j(userId, { preferences, patterns });
+
       this.lastSummaryTime = Date.now();
-      this.snapshotCounter = 0;
 
       // Log the update with specific metrics
       const habits = await memoryStore.getHabits(userId);
