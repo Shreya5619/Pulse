@@ -5,6 +5,7 @@ import { memoryStore } from "./MemoryStore";
 import { RiskSnapshot } from "../types/risk";
 import { FuturesResult } from "../types/futures";
 import { MemoryState } from "../../../shared/memory";
+import { contextSnapshotRepo } from "../db/ContextSnapshotRepository";
 
 class PlannerEngine {
   async decideForUser(userId: string): Promise<PlannerDecision> {
@@ -12,8 +13,9 @@ class PlannerEngine {
     const riskSnapshot = await riskEngine.computeForUser(userId);
     const futures = await futuresEngine.computeForUser(userId);
     const memory = await memoryStore.loadAll(userId);
+    const context = await contextSnapshotRepo.findLatestByUser(userId);
 
-    const candidates = this.buildCandidates(riskSnapshot, futures, memory);
+    const candidates = this.buildCandidates(riskSnapshot, futures, memory, context);
     const chosen = this.pickBest(candidates, memory);
 
     return {
@@ -28,8 +30,9 @@ class PlannerEngine {
     const riskSnapshot = await riskEngine.computeForUser(userId);
     const futures = await futuresEngine.computeForUser(userId);
     const memory = await memoryStore.loadAll(userId);
+    const context = await contextSnapshotRepo.findLatestByUser(userId);
 
-    const allCandidates = this.buildCandidates(riskSnapshot, futures, memory);
+    const allCandidates = this.buildCandidates(riskSnapshot, futures, memory, context);
 
     // Filter candidates relevant to this risk type/node
     let relevant = allCandidates.filter(c => {
@@ -65,9 +68,12 @@ class PlannerEngine {
   private buildCandidates(
     risk: RiskSnapshot,
     futures: FuturesResult,
-    memory: MemoryState
+    memory: MemoryState,
+    context: any
   ): PlannerAction[] {
     const candidates: PlannerAction[] = [];
+    const suggestedRecipient = context?.calendar?.next_event?.organizer_contact || "123-456-7890"; // Hardcoded fallback as requested
+
 
     const lateness = risk.risks.find(r => r.type === "lateness");
     const battery  = risk.risks.find(r => r.type === "battery");
@@ -85,7 +91,10 @@ class PlannerEngine {
         sideEffects: ["May trigger navigation", "May send an optional delay message"],
         appliesToEventId: lateness.nodeId,
         category: "Commute",
-        impact: "Cuts lateness risk from High to Low"
+        impact: "Cuts lateness risk from High to Low",
+        templateId: "ON_THE_WAY",
+        channel: "SMS",
+        suggestedRecipient
       });
     }
 
@@ -99,7 +108,10 @@ class PlannerEngine {
         reasons: battery.causes || [],
         sideEffects: ["Reduces background activity", "May delay some notifications"],
         category: "Focus",
-        impact: "Ensures device remains active until destination"
+        impact: "Ensures device remains active until destination",
+        templateId: "BATTERY_LOW",
+        channel: "SMS",
+        suggestedRecipient
       });
     }
 
@@ -127,7 +139,10 @@ class PlannerEngine {
         reasons: response.causes || [],
         sideEffects: ["Creates a draft, you tap to send"],
         category: "Communication",
-        impact: "Proactively manages attendee expectations"
+        impact: "Proactively manages attendee expectations",
+        templateId: "RUNNING_LATE",
+        channel: "SMS",
+        suggestedRecipient
       });
     }
 

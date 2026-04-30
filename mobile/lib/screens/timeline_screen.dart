@@ -194,6 +194,29 @@ class _TimelineScreenState extends State<TimelineScreen> {
                         fontWeight: isNew ? FontWeight.w600 : FontWeight.normal
                       ),
                     ),
+                    if (event.data != null && event.data!['templateId'] != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.success.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(LucideIcons.messageSquare, size: 12, color: AppColors.success),
+                              const SizedBox(width: 6),
+                              Text(
+                                "Suggested: notify host",
+                                style: GoogleFonts.outfit(fontSize: 10, color: AppColors.success, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     if (event.data != null && event.type == "Risk")
                       Padding(
                         padding: const EdgeInsets.only(top: 8),

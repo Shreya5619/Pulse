@@ -18,6 +18,9 @@ export interface PlannerAction {
   appliesToEventId?: string;
   category?: "Commute" | "Focus" | "Communication" | "General";
   impact?: string;         // what happens if accepted
+  channel?: 'SMS' | 'TELEGRAM' | 'NONE';
+  templateId?: 'RUNNING_LATE' | 'BATTERY_LOW' | 'ON_THE_WAY';
+  suggestedRecipient?: string; // phone / Telegram handle
 }
 
 export interface PlannerDecision {

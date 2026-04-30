@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/colors.dart';
 import '../widgets/glass_card.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 
 class InterventionScreen extends StatelessWidget {
   const InterventionScreen({super.key});
@@ -28,6 +30,13 @@ class InterventionScreen extends StatelessWidget {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: _buildHeroCard(context, state, chosen),
+                    ),
+                  ),
+                if (state.proposedCommAction != null)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                      child: CommActionCard(action: state.proposedCommAction!),
                     ),
                   ),
                 if (chosen == null && alternatives.isEmpty)
@@ -379,7 +388,7 @@ class InterventionScreen extends StatelessWidget {
     );
   }
 
-  void _showDraftSheet(BuildContext context, dynamic action) {
+  void _showDraftSheet(BuildContext context, dynamic action, {String? manualText}) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -401,9 +410,9 @@ class InterventionScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.white10),
               ),
-              child: const Text(
-                "Hey! Just letting you know I'm running about 10 minutes late due to traffic. Should be there shortly!",
-                style: TextStyle(color: Colors.white70, fontStyle: FontStyle.italic),
+              child: Text(
+                manualText ?? "Hey! Just letting you know I'm running about 10 minutes late due to traffic. Should be there shortly!",
+                style: const TextStyle(color: Colors.white70, fontStyle: FontStyle.italic),
               ),
             ),
             const SizedBox(height: 32),
@@ -427,6 +436,213 @@ class InterventionScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class CommActionCard extends StatefulWidget {
+  final Map<String, dynamic> action;
+  const CommActionCard({super.key, required this.action});
+
+  @override
+  State<CommActionCard> createState() => _CommActionCardState();
+}
+
+class _CommActionCardState extends State<CommActionCard> {
+  String _selectedRole = "General";
+  String? _draftText;
+  String? _recipient;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDraft();
+  }
+
+  Future<void> _fetchDraft() async {
+    setState(() => _isLoading = true);
+    final state = Provider.of<AppState>(context, listen: false);
+    final prepared = await state.prepareCommAction(
+      widget.action['actionId'],
+      role: _selectedRole,
+    );
+    if (prepared != null) {
+      setState(() {
+        _draftText = prepared['text'];
+        _recipient = prepared['recipient'];
+        _isLoading = false;
+      });
+    } else {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _handleSend(AppState state, {bool pickContact = false}) async {
+    if (_draftText == null) return;
+
+    final String recipientPath = pickContact ? "" : (_recipient ?? "");
+    final Uri smsUri = Uri(
+      scheme: 'sms',
+      path: recipientPath,
+      queryParameters: <String, String>{
+        'body': _draftText!,
+      },
+    );
+
+    if (await canLaunchUrl(smsUri)) {
+      await launchUrl(smsUri);
+      state.completeCommAction(widget.action['actionId']);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Could not launch messaging app")),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = Provider.of<AppState>(context);
+    final isAccepted = state.isActionAccepted(widget.action['actionId']);
+
+    return GlassCard(
+      padding: const EdgeInsets.all(20),
+      borderColor: AppColors.success.withOpacity(0.3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(LucideIcons.messageCircle, color: AppColors.success, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    "SMART NOTIFICATION",
+                    style: GoogleFonts.outfit(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.success,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+              if (_isLoading)
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.success),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "Drafting for:",
+            style: GoogleFonts.outfit(fontSize: 12, color: Colors.white30, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: ["General", "Manager", "Customer", "Family"].map((role) {
+                final isSelected = _selectedRole == role;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(role, style: TextStyle(fontSize: 11, color: isSelected ? Colors.black : Colors.white70)),
+                    selected: isSelected,
+                    onSelected: (val) {
+                      if (val) {
+                        setState(() => _selectedRole = role);
+                        _fetchDraft();
+                      }
+                    },
+                    selectedColor: AppColors.success,
+                    backgroundColor: Colors.white.withOpacity(0.05),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    showCheckmark: false,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.03),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: Text(
+              _draftText ?? (widget.action['previewText'] ?? "Drafting..."),
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                color: Colors.white70,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (!isAccepted)
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _handleSend(state),
+                    icon: const Icon(LucideIcons.send, size: 14),
+                    label: Text("SEND TO ${_selectedRole.toUpperCase()}"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: () => _handleSend(state, pickContact: true),
+                  icon: const Icon(LucideIcons.userPlus, color: Colors.white30),
+                  tooltip: "Select different contact",
+                ),
+              ],
+            )
+          else
+            _buildStatusIndicator(LucideIcons.checkCircle2, "SENT", AppColors.success),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusIndicator(IconData icon, String text, Color color) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: GoogleFonts.outfit(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: color,
+              letterSpacing: 1,
+            ),
+          ),
+        ],
       ),
     );
   }
