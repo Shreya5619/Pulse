@@ -93,6 +93,8 @@ export class GraphAdapter {
              MERGE (notif:Notification {id: n.id})
              SET notif.app = n.app_package,
                  notif.sender = n.sender,
+                 notif.title = n.title,
+                 notif.body = n.body,
                  notif.category = n.category,
                  notif.postedAt = n.posted_at
              MERGE (p)-[:HAS_NOTIFICATION]->(notif)`,
@@ -226,13 +228,15 @@ export class GraphAdapter {
          OPTIONAL MATCH (p)-[r1:HAS_EVENT]->(e:Event)
          WHERE e.startTime >= $now AND e.startTime <= $horizon
          OPTIONAL MATCH (e)-[r2:AT_LOCATION]->(loc:Location)
-         OPTIONAL MATCH (p)-[r3:HAS_BATTERY]->(b:BatteryState)
-         WITH p, e, r1, r2, loc, b ORDER BY b.timestamp DESC LIMIT 5
-         OPTIONAL MATCH (p)-[r4:HAS_NOTIFICATION]->(n:Notification)
+         OPTIONAL MATCH (p)-[:HAS_BATTERY]->(b:BatteryState)
+         WITH p, e, loc, b ORDER BY b.timestamp DESC LIMIT 5
+         OPTIONAL MATCH (p)-[:HAS_NOTIFICATION]->(n:Notification)
          WHERE n.postedAt >= $now_minus_60
-         OPTIONAL MATCH (p)-[r5:HAS_PREFERENCE]->(pr:Preference)
+         WITH p, e, loc, b, n ORDER BY n.postedAt DESC
+         WITH p, e, loc, b, collect(distinct n)[0..10] as notifications
+         OPTIONAL MATCH (p)-[:HAS_PREFERENCE]->(pr:Preference)
          RETURN p, collect(distinct e) as events, collect(distinct loc) as locations,
-                collect(distinct b) as batteries, collect(distinct n) as notifications,
+                collect(distinct b) as batteries, notifications,
                 collect(distinct pr) as preferences`,
         { 
           userId, 
@@ -271,7 +275,7 @@ export class GraphAdapter {
             id: 'PERSON_' + person.properties.id,
             label: 'Guardian User',
             type: 'person',
-            x: 200, y: 50,
+            x: 500, y: 100,
             risk: 0
         });
     }
@@ -284,8 +288,8 @@ export class GraphAdapter {
             id: eId,
             label: e.properties.title,
             type: 'event',
-            x: 100 + (idx * 200),
-            y: 250,
+            x: 200 + (idx * 300),
+            y: 500,
             risk: e.properties.riskScore || 0
         });
         edges.push({ from: 'PERSON_' + userId, to: eId, type: 'HAS_EVENT' });
@@ -300,7 +304,7 @@ export class GraphAdapter {
             id: bId,
             label: `Battery: ${Math.round(b.properties.level * 100)}%`,
             type: 'battery',
-            x: 50, y: 150,
+            x: 200, y: 250,
             risk: b.properties.riskScore || 0
         });
         edges.push({ from: 'PERSON_' + userId, to: bId, type: 'HAS_BATTERY' });
@@ -310,11 +314,15 @@ export class GraphAdapter {
     const notifs = record.get('notifications');
     notifs.forEach((n: any, idx: number) => {
         const nId = 'NOTIF_' + n.properties.id;
+        const sender = n.properties.sender || 'System';
+        const title = n.properties.title ? `: ${n.properties.title}` : '';
+        const body = n.properties.body ? `\n${n.properties.body}` : '';
+
         nodes.push({
             id: nId,
-            label: `Msg: ${n.properties.sender || 'System'}`,
+            label: `${sender}${title}${body}`,
             type: 'notification',
-            x: 350, y: 150 + (idx * 60),
+            x: 800, y: 250 + (idx * 80),
             risk: 0
         });
         edges.push({ from: 'PERSON_' + userId, to: nId, type: 'HAS_NOTIFICATION' });
@@ -328,7 +336,7 @@ export class GraphAdapter {
             id: prId,
             label: `${pr.properties.category}: ${pr.properties.value}`,
             type: 'preference',
-            x: 50, y: 300 + (idx * 60),
+            x: 100, y: 600 + (idx * 80),
             risk: 0
         });
         edges.push({ from: 'PERSON_' + userId, to: prId, type: 'HAS_PREFERENCE' });

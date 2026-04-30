@@ -58,16 +58,26 @@ export function normalizeContext(raw: any): ContextSnapshot {
   };
 
   // 4. Normalize Notifications
-  const notifications = (raw.notifications || []).map((n: any) => ({
-    id: n.id || String(Math.random()),
-    app_package: n.app_package || "unknown",
-    sender: n.sender || null,
-    category: mapNotificationCategory(n),
-    is_ongoing: !!n.is_ongoing,
-    posted_at: new Date(n.posted_at || Date.now()).toISOString(),
-    is_ongoing_call: !!n.is_ongoing_call,
-    is_otp_hint: !!n.is_otp_hint,
-  }));
+  const notifications = (raw.notifications || []).map((n: any) => {
+    const postedAt = new Date(n.posted_at || Date.now()).toISOString();
+    // Generate a stable ID based on content to prevent duplicates if the app doesn't provide one
+    const stableId = n.id || crypto.createHash('md5')
+      .update(`${n.app_package || ''}-${n.sender || ''}-${n.title || ''}-${n.body || ''}-${postedAt}`)
+      .digest('hex');
+
+    return {
+      id: stableId,
+      app_package: n.app_package || "unknown",
+      sender: n.sender || null,
+      title: n.title || null,
+      body: n.body || null,
+      category: mapNotificationCategory(n),
+      is_ongoing: !!n.is_ongoing,
+      posted_at: postedAt,
+      is_ongoing_call: !!n.is_ongoing_call,
+      is_otp_hint: !!n.is_otp_hint,
+    };
+  });
 
   // 5. Device State
   const device_state = {

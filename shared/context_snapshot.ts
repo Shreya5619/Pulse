@@ -38,6 +38,8 @@ export const NotificationItemSchema = z.object({
   posted_at: z.string().datetime(),
   is_ongoing_call: z.boolean().optional(),
   is_otp_hint: z.boolean().optional(),
+  title: z.string().optional().nullable(),
+  body: z.string().optional().nullable(),
 });
 
 export const BatteryBandSchema = z.enum(["critical", "low", "ok", "high"]);

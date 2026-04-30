@@ -48,20 +48,26 @@ class _TwinGraphScreenState extends State<TwinGraphScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          return Stack(
-            children: [
-              CustomPaint(
-                size: Size.infinite,
-                painter: EdgePainter(graph.edges, graph.nodes),
-              ),
-              ...graph.nodes.map(
-                (node) => Positioned(
-                  left: node.x,
-                  top: node.y,
-                  child: TwinNodeWidget(node: node),
+          return InteractiveViewer(
+            boundaryMargin: const EdgeInsets.all(1000),
+            minScale: 0.1,
+            maxScale: 2.0,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                CustomPaint(
+                  size: const Size(2000, 2000),
+                  painter: EdgePainter(graph.edges, graph.nodes),
                 ),
-              ),
-            ],
+                ...graph.nodes.map(
+                  (node) => Positioned(
+                    left: node.x,
+                    top: node.y,
+                    child: TwinNodeWidget(node: node),
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),
