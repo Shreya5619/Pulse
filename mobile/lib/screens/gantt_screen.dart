@@ -269,51 +269,58 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          const Text(
-            'PULSE • Timeline',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.5,
-              color: Colors.white,
+          const Flexible(
+            child: Text(
+              'PULSE • Timeline',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.5,
+                color: Colors.white,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           // Colour legend (tiny, scrollable)
-          Container(
-            constraints: const BoxConstraints(maxHeight: 50, maxWidth: 200),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: appOrder.where((app) => app != 'Screen').map((app) {
-                  final color =
-                      appActivities[app]?.firstOrNull?.color ?? Colors.grey;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: color,
-                            borderRadius: BorderRadius.circular(2),
+          Flexible(
+            flex: 2,
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 50, maxWidth: 220),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: appOrder.where((app) => app != 'Screen').map((app) {
+                    final color =
+                        appActivities[app]?.firstOrNull?.color ?? Colors.grey;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          app,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.white70,
+                          const SizedBox(width: 4),
+                          Text(
+                            app,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.white70,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
             ),
           ),
