@@ -16,7 +16,6 @@ import '../screens/graph_explanation_screen.dart';
 import '../screens/multi_mode_eta_screen.dart';
 
 
-
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
   @override
@@ -40,11 +39,9 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 24),
                   const RiskHeroCard(),
                   const SizedBox(height: 24),
-
                   _buildRiskStack(context, state),
                   const SizedBox(height: 24),
                   _buildContextChipsRow(context, state),
-                  const SizedBox(height: 80), // Space for bottom banner
                 ],
               ),
             ),
