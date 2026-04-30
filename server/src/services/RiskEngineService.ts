@@ -84,6 +84,7 @@ export class RiskEngineService {
     const graph = await graphBuilder.buildForUser(userId);
     const memory = await memoryStore.loadAll(userId);
     const preferences = await GraphAdapter.getUserPreferences(userId);
+    const personality = await GraphAdapter.getUserPersonality(userId);
     const now = new Date().toISOString();
     const nowMs = Date.now();
 
@@ -95,7 +96,7 @@ export class RiskEngineService {
       const { node, minutesToEvent, etaMinutes } = nextAppt;
       const buffer = memory.habits?.patterns?.typical_lateness ?? 5;
       risks.push(
-        assessLateness(minutesToEvent, etaMinutes, buffer, node.label, node.id, preferences)
+        assessLateness(minutesToEvent, etaMinutes, buffer, node.label, node.id, preferences, personality)
       );
     }
 
@@ -123,7 +124,7 @@ export class RiskEngineService {
           : 120;
 
       risks.push(
-        assessBattery(currentPct, horizonMinutes, drainRate, battNode.id, preferences)
+        assessBattery(currentPct, horizonMinutes, drainRate, battNode.id, preferences, personality)
       );
     }
 
@@ -134,7 +135,7 @@ export class RiskEngineService {
     if (msgNodes.length > 0) {
       const oldestMinutes = 30;
       risks.push(
-        assessResponseDebt(msgNodes.length, oldestMinutes, msgNodes[0].id)
+        assessResponseDebt(msgNodes.length, oldestMinutes, msgNodes[0].id, personality)
       );
     }
 
@@ -164,7 +165,7 @@ export class RiskEngineService {
         ? graph.context.notifications.length
         : 0;
 
-      risks.push(assessOverload(eventsIn90, overlapScore, notifRate));
+      risks.push(assessOverload(eventsIn90, overlapScore, notifRate, undefined, personality));
     }
 
     // ── Build & Persist ─────────────────────────────────────────

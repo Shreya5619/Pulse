@@ -10,6 +10,7 @@
  */
 
 import { RiskScore, RiskLabel, RiskSnapshot } from "../types/risk";
+import { PersonalityAnalysis } from "../services/PersonalityAnalyzer";
 
 // ──────────────────────────────────────────────────────────────────
 // Helpers
@@ -60,7 +61,8 @@ export function assessLateness(
   buffer: number,
   eventLabel: string,
   nodeId?: string,
-  preferences: any[] = []
+  preferences: any[] = [],
+  personality?: PersonalityAnalysis
 ): RiskScore {
   let score = latenessRisk(minutesToEvent, etaMinutes, buffer);
   
@@ -69,6 +71,11 @@ export function assessLateness(
   if (tolerance) {
     if (tolerance.value === 'LOW') score = Math.min(1, score * 1.2);
     if (tolerance.value === 'HIGH') score = score * 0.8;
+  }
+
+  // Apply Personality Traits
+  if (personality?.traits.includes("Goal-oriented")) {
+    score = Math.min(1, score * 1.15); // Higher sensitivity to being late
   }
 
   const label = scoreToLabel(score);
@@ -124,7 +131,8 @@ export function assessBattery(
   horizonMinutes: number,
   dischargePerHour: number,
   nodeId?: string,
-  preferences: any[] = []
+  preferences: any[] = [],
+  personality?: PersonalityAnalysis
 ): RiskScore {
   let score = batteryRisk(currentPct, horizonMinutes, dischargePerHour);
 
@@ -132,6 +140,11 @@ export function assessBattery(
   const tolerance = preferences.find(p => p.category === 'BATTERY_TOLERANCE');
   if (tolerance) {
     if (tolerance.value === 'HIGH') score = Math.min(1, score * 1.2); // Anxious about battery
+  }
+
+  // Apply Sentiment
+  if (personality?.sentiment === "Stressed" || personality?.sentiment === "Overwhelmed") {
+    score = Math.min(1, score * 1.1); // Being low on battery is more stressful when already stressed
   }
 
   const label = scoreToLabel(score);
@@ -183,9 +196,16 @@ export function responseDebtRisk(
 export function assessResponseDebt(
   importantPending: number,
   oldestMinutes: number,
-  nodeId?: string
+  nodeId?: string,
+  personality?: PersonalityAnalysis
 ): RiskScore {
-  const score = responseDebtRisk(importantPending, oldestMinutes);
+  let score = responseDebtRisk(importantPending, oldestMinutes);
+  
+  // Apply Personality Traits
+  if (personality?.traits.includes("Highly responsive to work") || personality?.traits.includes("Highly responsive")) {
+    score = Math.min(1, score * 1.25); // Deviation from highly responsive trait is higher risk
+  }
+
   const label = scoreToLabel(score);
 
   const causes: string[] = [];
@@ -242,9 +262,16 @@ export function assessOverload(
   eventsNext90: number,
   overlapScore: number,
   notifRate: number,
-  nodeId?: string
+  nodeId?: string,
+  personality?: PersonalityAnalysis
 ): RiskScore {
-  const score = overloadRisk(eventsNext90, overlapScore, notifRate);
+  let score = overloadRisk(eventsNext90, overlapScore, notifRate);
+
+  // Apply Sentiment
+  if (personality?.sentiment === "Stressed" || personality?.sentiment === "Overwhelmed") {
+    score = Math.min(1, score + 0.2); // Significant boost to overload if already stressed
+  }
+
   const label = scoreToLabel(score);
 
   const causes: string[] = [

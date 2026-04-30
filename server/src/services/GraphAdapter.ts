@@ -1,5 +1,6 @@
 import { ContextSnapshot } from '../../../shared/context_snapshot';
 import { neo4jService } from './Neo4jService';
+import { PersonalityAnalysis } from './PersonalityAnalyzer';
 
 export class GraphAdapter {
   /**
@@ -171,6 +172,41 @@ export class GraphAdapter {
   }
 
   /**
+   * Fetches the derived personality traits, interests, and current sentiment for a user.
+   */
+  static async getUserPersonality(userId: string): Promise<PersonalityAnalysis> {
+    const session = await neo4jService.getSession();
+    try {
+      const result = await session.run(
+        `MATCH (p:Person {id: $userId})
+         OPTIONAL MATCH (p)-[:HAS_TRAIT]->(t:Trait)
+         OPTIONAL MATCH (p)-[:INTERESTED_IN]->(i:Interest)
+         OPTIONAL MATCH (p)-[:FEELS]->(s:Sentiment)
+         RETURN collect(distinct t.name) as traits, 
+                collect(distinct i.name) as interests, 
+                s.value as sentiment`,
+        { userId }
+      );
+      
+      if (result.records.length === 0) {
+        return { traits: [], interests: [], sentiment: "Neutral" };
+      }
+      
+      const record = result.records[0];
+      return {
+        traits: record.get('traits') || [],
+        interests: record.get('interests') || [],
+        sentiment: record.get('sentiment') || "Neutral"
+      };
+    } catch (error) {
+      console.error('[Neo4j Adapter] Error fetching user personality:', error);
+      return { traits: [], interests: [], sentiment: "Neutral" };
+    } finally {
+      await session.close();
+    }
+  }
+
+  /**
    * Upserts structured preferences and patterns for a user.
    */
   static async applyPreferencesToNeo4j(userId: string, data: { preferences: any[], patterns: any[] }): Promise<void> {
@@ -215,6 +251,57 @@ export class GraphAdapter {
   }
 
   /**
+   * Upserts personality traits, interests, and sentiment for a user.
+   */
+  static async applyPersonalityToNeo4j(userId: string, analysis: PersonalityAnalysis): Promise<void> {
+    const session = await neo4jService.getSession();
+    try {
+      await session.executeWrite(async (tx) => {
+        // 1. Upsert Traits
+        if (analysis.traits.length > 0) {
+          await tx.run(
+            `MERGE (p:Person {id: $userId})
+             WITH p
+             UNWIND $traits AS trait
+             MERGE (t:Trait {id: apoc.util.md5([$userId, trait])})
+             SET t.name = trait, t.lastUpdated = datetime()
+             MERGE (p)-[:HAS_TRAIT]->(t)`,
+            { userId, traits: analysis.traits }
+          );
+        }
+
+        // 2. Upsert Interests
+        if (analysis.interests.length > 0) {
+          await tx.run(
+            `MERGE (p:Person {id: $userId})
+             WITH p
+             UNWIND $interests AS interest
+             MERGE (i:Interest {id: apoc.util.md5([$userId, interest])})
+             SET i.name = interest, i.lastUpdated = datetime()
+             MERGE (p)-[:INTERESTED_IN]->(i)`,
+            { userId, interests: analysis.interests }
+          );
+        }
+
+        // 3. Upsert Sentiment
+        if (analysis.sentiment) {
+          await tx.run(
+            `MERGE (p:Person {id: $userId})
+             MERGE (s:Sentiment {id: $userId + "_sentiment"})
+             SET s.value = $sentiment, s.lastUpdated = datetime()
+             MERGE (p)-[:FEELS]->(s)`,
+            { userId, sentiment: analysis.sentiment }
+          );
+        }
+      });
+    } catch (error) {
+      console.error('[Neo4j Adapter] Error applying personality:', error);
+    } finally {
+      await session.close();
+    }
+  }
+
+  /**
    * Fetches a subgraph for the Digital Twin visualization.
    */
   static async getTwinSubgraph(userId: string, horizonMinutes: number = 240): Promise<any> {
@@ -235,9 +322,15 @@ export class GraphAdapter {
          WITH p, e, loc, b, n ORDER BY n.postedAt DESC
          WITH p, e, loc, b, collect(distinct n)[0..10] as notifications
          OPTIONAL MATCH (p)-[:HAS_PREFERENCE]->(pr:Preference)
+         OPTIONAL MATCH (p)-[:HAS_TRAIT]->(t:Trait)
+         OPTIONAL MATCH (p)-[:INTERESTED_IN]->(i:Interest)
+         OPTIONAL MATCH (p)-[:FEELS]->(s:Sentiment)
          RETURN p, collect(distinct e) as events, collect(distinct loc) as locations,
                 collect(distinct b) as batteries, notifications,
-                collect(distinct pr) as preferences`,
+                collect(distinct pr) as preferences,
+                collect(distinct t) as traits,
+                collect(distinct i) as interests,
+                s as sentiment`,
         { 
           userId, 
           now, 
@@ -341,6 +434,48 @@ export class GraphAdapter {
         });
         edges.push({ from: 'PERSON_' + userId, to: prId, type: 'HAS_PREFERENCE' });
     });
+
+    // 6. Personality Traits
+    const traits = record.get('traits');
+    traits.forEach((t: any, idx: number) => {
+        const tId = 'TRAIT_' + t.properties.id;
+        nodes.push({
+            id: tId,
+            label: t.properties.name,
+            type: 'trait',
+            x: 100, y: 150 + (idx * 60),
+            risk: 0
+        });
+        edges.push({ from: 'PERSON_' + userId, to: tId, type: 'HAS_TRAIT' });
+    });
+
+    // 7. Interests
+    const interests = record.get('interests');
+    interests.forEach((i: any, idx: number) => {
+        const iId = 'INTEREST_' + i.properties.id;
+        nodes.push({
+            id: iId,
+            label: i.properties.name,
+            type: 'interest',
+            x: 900, y: 500 + (idx * 60),
+            risk: 0
+        });
+        edges.push({ from: 'PERSON_' + userId, to: iId, type: 'INTERESTED_IN' });
+    });
+
+    // 8. Sentiment
+    const sentiment = record.get('sentiment');
+    if (sentiment) {
+        const sId = 'SENTIMENT_' + sentiment.properties.id;
+        nodes.push({
+            id: sId,
+            label: `Mood: ${sentiment.properties.value}`,
+            type: 'sentiment',
+            x: 500, y: -50,
+            risk: 0
+        });
+        edges.push({ from: 'PERSON_' + userId, to: sId, type: 'FEELS' });
+    }
 
     return { nodes, edges };
   }

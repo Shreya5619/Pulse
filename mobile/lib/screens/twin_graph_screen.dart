@@ -143,6 +143,18 @@ class TwinNodeWidget extends StatelessWidget {
         icon = LucideIcons.mapPin;
         color = Colors.teal;
         break;
+      case 'trait':
+        icon = LucideIcons.fingerprint;
+        color = Colors.purpleAccent;
+        break;
+      case 'interest':
+        icon = LucideIcons.heart;
+        color = Colors.pinkAccent;
+        break;
+      case 'sentiment':
+        icon = LucideIcons.smile;
+        color = Colors.cyanAccent;
+        break;
       default:
         icon = LucideIcons.helpCircle;
         color = Colors.grey;

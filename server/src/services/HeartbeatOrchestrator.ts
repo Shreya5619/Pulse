@@ -11,6 +11,7 @@ import { computeNextHeartbeatDelay } from "./HeartbeatPolicy";
 import { workspaceService } from "./WorkspaceService";
 import { memoryAgent } from "./MemoryAgent";
 import { GraphAdapter } from "./GraphAdapter";
+import { personalityAnalyzer } from "./PersonalityAnalyzer";
 import { broadcast } from "../index";
 
 export class HeartbeatOrchestrator {
@@ -33,8 +34,23 @@ export class HeartbeatOrchestrator {
     });
 
     if (context) {
-      // Sync to Neo4j Digital Twin
+      // Sync basic snapshot to Neo4j Digital Twin
       await GraphAdapter.applySnapshotToNeo4j(userId, context);
+
+      // Deep analyze notifications to understand personality/traits
+      if (context.notifications.length > 0) {
+        const analysis = await personalityAnalyzer.analyze(userId, context.notifications);
+        if (analysis) {
+          await GraphAdapter.applyPersonalityToNeo4j(userId, analysis);
+          logEvent({
+            ts: new Date().toISOString(),
+            userId,
+            phase: "PERSONALITY",
+            summary: `Personality analyzed: ${analysis.traits.length} traits, ${analysis.interests.length} interests extracted`,
+            details: analysis
+          });
+        }
+      }
     }
 
     // 2. Build graph

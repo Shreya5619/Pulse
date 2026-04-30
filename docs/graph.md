@@ -14,6 +14,9 @@ The graph is a directed, weighted graph that models the relationships between th
 | `APPOINTMENT` | A scheduled event with a start/end time. |
 | `BATTERY_STATE` | The current energy status of the device. |
 | `MESSAGE_OBLIGATION` | A pending notification or communication debt. |
+| `TRAIT` | A derived behavioral characteristic (e.g., "Work-focused"). |
+| `INTEREST` | A topic of interest identified from activity (e.g., "AI"). |
+| `SENTIMENT` | The current emotional state or mood of the person. |
 
 ### Edge Types
 | Type | From → To | Weight | Description |
