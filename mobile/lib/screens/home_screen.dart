@@ -10,6 +10,8 @@ import '../screens/replay_screen.dart';
 import '../screens/scenario_player_screen.dart';
 import '../screens/gantt_screen.dart';
 import '../widgets/risk_hero_card.dart';
+import '../widgets/route_eta_strip.dart';
+
 import '../models/risk_snapshot.dart';
 import '../models/risk_state.dart' as legacy;
 import '../screens/graph_explanation_screen.dart';
@@ -37,11 +39,11 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   _buildHeaderStrip(context, state),
                   const SizedBox(height: 16),
-                  const RouteEtaStrip(),
+                  RouteEtaStrip(),
                   const SizedBox(height: 16),
                   _buildFuturesPathLabel(state),
                   const SizedBox(height: 24),
-                  const RiskHeroCard(),
+                  RiskHeroCard(),
                   const SizedBox(height: 24),
                   _buildRiskStack(context, state),
                   const SizedBox(height: 24),

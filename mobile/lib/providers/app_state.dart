@@ -841,7 +841,43 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<void> fetchFutures() async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/futures?userId=$_userId');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _currentFutures = data['data'];
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error fetching futures: $e');
+    }
+  }
+
+  Future<void> fetchAppointmentEta() async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse(
+        'http://$host:8080/api/routing/next-appointment-eta?userId=$_userId',
+      );
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _etaInfo = AppointmentEtaInfo.fromJson(data['data']);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error fetching appointment ETA: $e');
+    }
+  }
+
   Future<void> fetchTwinGraph() async {
+
+
     try {
       final host = _getBackendHost();
       final url = Uri.parse('http://$host:8080/api/twin/graph?userId=$_userId');
