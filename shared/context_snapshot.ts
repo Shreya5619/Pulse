@@ -72,7 +72,15 @@ export const ContextSnapshotSchema = z.object({
     last_full_charge_at: z.string().datetime().optional().nullable(),
   }),
 
-  notifications: z.array(NotificationItemSchema),
+  notification_digest: z.object({
+    summary_window_minutes: z.number(),
+    total_count: z.number(),
+    by_category: z.record(z.string(), z.number()),
+    top_threads: z.array(z.object({
+      sender: z.string(),
+      count: z.number(),
+    })),
+  }).optional(),
 
   device_state: z.object({
     network_type: z.enum(["wifi", "4g", "5g", "none"]),

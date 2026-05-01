@@ -112,28 +112,27 @@ export class GraphBuilder {
       weight: context.battery.is_charging ? 0 : 5 // Stub weight: higher if discharging
     });
 
-    // 5. MESSAGE_OBLIGATION Nodes
-    const importantNotifications = context.notifications.filter(n =>
-      n.category === "message" || n.category === "call"
-    );
+    // 5. MESSAGE_OBLIGATION Nodes derived from digest
+    if (context.notification_digest) {
+      const topThreads = context.notification_digest.top_threads || [];
+      topThreads.forEach((thread, idx) => {
+        const msgNodeId = `THREAD_${idx}`;
+        nodes.push({
+          id: msgNodeId,
+          type: "MESSAGE_OBLIGATION",
+          label: `Messages from ${thread.sender}`,
+          scores: { responseDebt: 0 }
+        });
 
-    importantNotifications.forEach(n => {
-      const msgNodeId = `MSG_${n.id}`;
-      nodes.push({
-        id: msgNodeId,
-        type: "MESSAGE_OBLIGATION",
-        label: `Message from ${n.sender || "Unknown"}`,
-        scores: { responseDebt: 0 }
+        edges.push({
+          id: `INTERRUPTION_THREAD_${idx}`,
+          from: "NOW",
+          to: msgNodeId,
+          type: "INTERRUPTION",
+          weight: thread.count * 2 // Weight based on volume
+        });
       });
-
-      edges.push({
-        id: `INTERRUPTION_${n.id}`,
-        from: "NOW",
-        to: msgNodeId,
-        type: "INTERRUPTION",
-        weight: 10 // Fixed weight for now
-      });
-    });
+    }
 
     // --- HEURISTIC SCORE CALCULATION ---
     this.calculateScores(nodes, edges, context, memory);
@@ -217,10 +216,12 @@ export class GraphBuilder {
 
       // Response Debt — delegate to RiskEngine.responseDebtRisk
       if (node.type === "MESSAGE_OBLIGATION") {
-        const importantPending = importantMessages.length;
+        const digest = context.notification_digest;
+        const importantPending = digest?.by_category["IMPORTANT_SENDER"] || 0;
+        const urgentOtp = digest?.by_category["URGENT_OTP"] || 0;
         // Estimate oldest message age from notification timestamps (fallback 30min)
-        const oldestMinutes = 30; // TODO: derive from notification timestamp once available
-        node.scores.responseDebt = responseDebtRisk(importantPending, oldestMinutes);
+        const oldestMinutes = 30; 
+        node.scores.responseDebt = responseDebtRisk(importantPending + urgentOtp, oldestMinutes);
       }
 
       // Overload — delegate to RiskEngine.overloadRisk
@@ -237,8 +238,8 @@ export class GraphBuilder {
         ).length;
         const overlapScore = overlappingPairs / totalPairs;
 
-        // Notifications per 15 min (approximate from snapshot count)
-        const notifRate = context.notifications.length;
+        // Notifications per hour (approximate from digest)
+        const notifRate = context.notification_digest?.total_count ?? 0;
 
         node.scores.overload = overloadRisk(eventsIn90, overlapScore, notifRate);
       }

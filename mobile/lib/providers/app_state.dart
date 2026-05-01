@@ -384,14 +384,22 @@ class AppState extends ChangeNotifier {
 
     // Notifications
     await _contextServices.initNotifications((data) {
-      debugPrint(
-        '[Pulse Context] Notification Received: ${data['packageName']}',
-      );
+      final packageName = data['packageName'] ?? "unknown";
+      final title = data['title'] ?? "No Title";
+      final text = data['text'] ?? "";
+
+      debugPrint('[Pulse Context] Notification Received: $packageName');
+
+      final category = _classifyNotification(title, text, packageName);
+
       final newNotif = NotificationInfo(
-        packageName: data['packageName'] ?? "unknown",
-        title: data['title'] ?? "No Title",
+        packageName: packageName,
+        title: title,
+        text: text,
+        category: category,
         timestamp: DateTime.now(),
       );
+
       final newList = [newNotif, ..._deviceContext.notifications];
       if (newList.length > 50) newList.removeLast();
 
@@ -405,6 +413,119 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       _sendContextSnapshot("notification_received");
     });
+  }
+
+  String _classifyNotification(String? title, String? text, String packageName) {
+    final t = (title ?? "").toLowerCase();
+    final txt = (text ?? "").toLowerCase();
+    final pkg = packageName.toLowerCase();
+
+    // OTP detection
+    if (txt.contains("otp") ||
+        txt.contains("verification code") ||
+        txt.contains("is your code") ||
+        t.contains("otp")) {
+      return "URGENT_OTP";
+    }
+
+    // Important Senders (Heuristic based on app type)
+    if (pkg.contains("slack") ||
+        pkg.contains("teams") ||
+        pkg.contains("whatsapp") ||
+        pkg.contains("messenger")) {
+      return "IMPORTANT_SENDER";
+    }
+
+    // Noisy Groups / Social
+    if (t.contains("group") ||
+        pkg.contains("instagram") ||
+        pkg.contains("facebook") ||
+        pkg.contains("tiktok") ||
+        pkg.contains("youtube")) {
+      return "NOISY_GROUP";
+    }
+
+    return "IGNORABLE";
+  }
+
+  Map<String, dynamic> _generateNotificationDigest() {
+    final windowMinutes = 60;
+    final now = DateTime.now();
+    final recent = _deviceContext.notifications.where(
+      (n) => now.difference(n.timestamp).inMinutes <= windowMinutes,
+    ).toList();
+
+    final counts = {
+      "URGENT_OTP": 0,
+      "IMPORTANT_SENDER": 0,
+      "NOISY_GROUP": 0,
+      "IGNORABLE": 0,
+    };
+
+    final Map<String, Map<String, dynamic>> threads = {};
+
+    for (var n in recent) {
+      counts[n.category] = (counts[n.category] ?? 0) + 1;
+      final sender = n.title ?? "Unknown";
+      if (!threads.containsKey(sender)) {
+        threads[sender] = {"sender": sender, "count": 0, "category": n.category};
+      }
+      threads[sender]!["count"]++;
+    }
+
+    final topThreads = threads.values.toList()
+      ..sort((a, b) => (b["count"] as int).compareTo(a["count"] as int));
+
+    return {
+      "summary_window_minutes": windowMinutes,
+      "total_count": recent.length,
+      "by_category": counts,
+      "top_threads": topThreads.take(8).toList(),
+    };
+  }
+
+  void _syncPulseSnapshot() {
+    final digestData = _generateNotificationDigest();
+    final topThreads = digestData['top_threads'] as List<dynamic>;
+    
+    final urgent = <String>[];
+    final important = <String>[];
+    
+    for (var t in topThreads) {
+      final label = "${t['sender']} (${t['count']})";
+      if (t['category'] == 'URGENT_OTP') {
+        urgent.add(label);
+      } else if (t['category'] == 'IMPORTANT_SENDER') {
+        important.add(label);
+      }
+    }
+
+    final counts = digestData['by_category'] as Map<String, int>;
+    final noiseCount = (counts['NOISY_GROUP'] ?? 0) + (counts['IGNORABLE'] ?? 0);
+
+    String highlight = "Pulse monitoring active";
+    if (digestData['total_count'] > 0) {
+      highlight = "${digestData['total_count']} notifications summarized";
+    }
+
+    _pulseSnapshot = {
+      'state': _currentRisk.score >= 0.7 ? 'CRITICAL' : (_currentRisk.score >= 0.4 ? 'RISK_FORMING' : 'NOMINAL'),
+      'topRiskScore': _currentRisk.score,
+      'notificationContent': {
+        'title': _currentRisk.score >= 0.7 ? 'Urgent Risk' : 'Pulse Active',
+        'subtitle': _currentRisk.reasons.isNotEmpty ? _currentRisk.reasons.first : 'Monitoring your context…',
+        'urgency': _currentRisk.score >= 0.7 ? 'high' : (_currentRisk.score >= 0.4 ? 'medium' : 'low'),
+      },
+      'notificationDigest': {
+        'highlight': highlight,
+        'urgent': urgent,
+        'important': important,
+        'noiseCount': noiseCount,
+      },
+      'nextAction': _proposedCommAction,
+    };
+    
+    notifyListeners();
   }
 
   void _connectWebSocket() {
@@ -623,11 +744,15 @@ class AppState extends ChangeNotifier {
         if (incoming is Map<String, dynamic>) {
           _lastPulseSnapshotVersion = incomingVersion;
           _pulseSnapshot = incoming;
-          debugPrint('[Pulse] pulse.snapshot v$incomingVersion → state=${_pulseSnapshot["state"]}');
+          debugPrint(
+            '[Pulse] pulse.snapshot v$incomingVersion → state=${_pulseSnapshot["state"]}',
+          );
           _updateNativeNotification();
         }
       } else {
-        debugPrint('[Pulse] pulse.snapshot v$incomingVersion ignored (stale, current v$_lastPulseSnapshotVersion)');
+        debugPrint(
+          '[Pulse] pulse.snapshot v$incomingVersion ignored (stale, current v$_lastPulseSnapshotVersion)',
+        );
       }
     } else if (type == 'futures.updated') {
       debugPrint('[Pulse AppState] Futures update received');
@@ -662,6 +787,7 @@ class AppState extends ChangeNotifier {
     }
 
     notifyListeners();
+    _syncPulseSnapshot();
   }
 
   void _generateMockData() {
@@ -774,15 +900,7 @@ class AppState extends ChangeNotifier {
           "is_charging": _deviceContext.battery.isCharging,
           "power_saver_on": false,
         },
-        "notifications": _deviceContext.notifications
-            .map(
-              (n) => {
-                "app_package": n.packageName,
-                "title": n.title,
-                "posted_at": n.timestamp.toUtc().toIso8601String(),
-              },
-            )
-            .toList(),
+        "notification_digest": _generateNotificationDigest(),
         "device_state": {
           "network_type": "wifi",
           "is_roaming": false,
@@ -830,6 +948,8 @@ class AppState extends ChangeNotifier {
           _mapReason(reason),
           payload,
         );
+
+        _syncPulseSnapshot();
       } else {
         debugPrint(
           '[Pulse API] Error: Backend returned ${response.statusCode}',
@@ -876,8 +996,6 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> fetchTwinGraph() async {
-
-
     try {
       final host = _getBackendHost();
       final url = Uri.parse('http://$host:8080/api/twin/graph?userId=$_userId');
@@ -903,7 +1021,9 @@ class AppState extends ChangeNotifier {
     try {
       final host = _getBackendHost();
       final url = Uri.parse('http://$host:8080/api/pulse/action');
-      debugPrint('[Pulse] Dispatching action: ${action['type']} id=${action['id']}');
+      debugPrint(
+        '[Pulse] Dispatching action: ${action['type']} id=${action['id']}',
+      );
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -942,14 +1062,21 @@ class AppState extends ChangeNotifier {
     return path;
   }
 
-  Future<Map<String, dynamic>?> prepareCommAction(String actionId, {String? role}) async {
+  Future<Map<String, dynamic>?> prepareCommAction(
+    String actionId, {
+    String? role,
+  }) async {
     try {
       final host = _getBackendHost();
       final url = Uri.parse('http://$host:8080/api/comm/prepare');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'userId': _userId, 'actionId': actionId, 'role': role}),
+        body: jsonEncode({
+          'userId': _userId,
+          'actionId': actionId,
+          'role': role,
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -1217,11 +1344,9 @@ class AppState extends ChangeNotifier {
     );
   }
 
-
-
   String _getBackendHost() {
     // ADB Reverse Tunnel active - always route through USB loopback
-    return 'localhost';
+    return '192.168.0.102';
   }
 
   @override

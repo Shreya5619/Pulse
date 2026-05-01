@@ -64,11 +64,15 @@ class CalendarEvent {
 class NotificationInfo {
   final String packageName;
   final String? title;
+  final String? text;
+  final String category; // e.g., URGENT_OTP, IMPORTANT_SENDER, etc.
   final DateTime timestamp;
 
   NotificationInfo({
     required this.packageName,
     this.title,
+    this.text,
+    this.category = "IGNORABLE",
     required this.timestamp,
   });
 }

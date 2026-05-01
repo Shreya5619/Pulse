@@ -86,20 +86,25 @@ export class GraphAdapter {
           }
         );
 
-        // 5. Upsert Notifications
-        if (snapshot.notifications.length > 0) {
+        // 5. Update Notification Digest summary on Person node
+        if (snapshot.notification_digest) {
           await tx.run(
             `MATCH (p:Person {id: $userId})
-             UNWIND $notifications AS n
-             MERGE (notif:Notification {id: n.id})
-             SET notif.app = n.app_package,
-                 notif.sender = n.sender,
-                 notif.title = n.title,
-                 notif.body = n.body,
-                 notif.category = n.category,
-                 notif.postedAt = n.posted_at
-             MERGE (p)-[:HAS_NOTIFICATION]->(notif)`,
-            { userId, notifications: snapshot.notifications }
+             SET p.totalNotifications = $total,
+                 p.urgentOtpCount = $otp,
+                 p.importantSenderCount = $important,
+                 p.noisyGroupCount = $noisy,
+                 p.ignorableCount = $ignorable,
+                 p.lastNotificationAt = $timestamp`,
+            { 
+              userId, 
+              total: snapshot.notification_digest.total_count,
+              otp: snapshot.notification_digest.by_category["URGENT_OTP"] || 0,
+              important: snapshot.notification_digest.by_category["IMPORTANT_SENDER"] || 0,
+              noisy: snapshot.notification_digest.by_category["NOISY_GROUP"] || 0,
+              ignorable: snapshot.notification_digest.by_category["IGNORABLE"] || 0,
+              timestamp: snapshot.timestamp
+            }
           );
         }
       });
@@ -316,20 +321,19 @@ export class GraphAdapter {
          WHERE e.startTime >= $now AND e.startTime <= $horizon
          OPTIONAL MATCH (e)-[r2:AT_LOCATION]->(loc:Location)
          OPTIONAL MATCH (p)-[:HAS_BATTERY]->(b:BatteryState)
-         WITH p, e, loc, b ORDER BY b.timestamp DESC LIMIT 5
-         OPTIONAL MATCH (p)-[:HAS_NOTIFICATION]->(n:Notification)
-         WHERE n.postedAt >= $now_minus_60
-         WITH p, e, loc, b, n ORDER BY n.postedAt DESC
-         WITH p, e, loc, b, collect(distinct n)[0..10] as notifications
+         WITH p, e, loc, b ORDER BY b.timestamp DESC LIMIT 1
          OPTIONAL MATCH (p)-[:HAS_PREFERENCE]->(pr:Preference)
          OPTIONAL MATCH (p)-[:HAS_TRAIT]->(t:Trait)
          OPTIONAL MATCH (p)-[:INTERESTED_IN]->(i:Interest)
          OPTIONAL MATCH (p)-[:FEELS]->(s:Sentiment)
          RETURN p, collect(distinct e) as events, collect(distinct loc) as locations,
-                collect(distinct b) as batteries, notifications,
-                collect(distinct pr) as preferences,
-                collect(distinct t) as traits,
-                collect(distinct i) as interests,
+                collect(distinct b) as batteries,
+                p.totalNotifications as totalNotifications,
+                p.urgentOtpCount as urgentOtpCount,
+                p.importantSenderCount as importantSenderCount,
+                collect(distinct pr)[0..5] as preferences,
+                collect(distinct t)[0..6] as traits,
+                collect(distinct i)[0..6] as interests,
                 s as sentiment`,
         { 
           userId, 
@@ -403,25 +407,24 @@ export class GraphAdapter {
         edges.push({ from: 'PERSON_' + userId, to: bId, type: 'HAS_BATTERY' });
     }
 
-    // 4. Notifications
-    const notifs = record.get('notifications');
-    notifs.forEach((n: any, idx: number) => {
-        const nId = 'NOTIF_' + n.properties.id;
-        const sender = n.properties.sender || 'System';
-        const title = n.properties.title ? `: ${n.properties.title}` : '';
-        const body = n.properties.body ? `\n${n.properties.body}` : '';
+    // 4. Notification Summary
+    const total = record.get('totalNotifications');
+    if (total != null && total > 0) {
+        const nId = 'NOTIF_SUMMARY';
+        const otp = record.get('urgentOtpCount') || 0;
+        const important = record.get('importantSenderCount') || 0;
 
         nodes.push({
             id: nId,
-            label: `${sender}${title}${body}`,
+            label: `Notifications: ${total}\n(OTP: ${otp}, Important: ${important})`,
             type: 'notification',
-            x: 800, y: 250 + (idx * 80),
+            x: 800, y: 250,
             risk: 0
         });
-        edges.push({ from: 'PERSON_' + userId, to: nId, type: 'HAS_NOTIFICATION' });
-    });
+        edges.push({ from: 'PERSON_' + userId, to: nId, type: 'HAS_NOTIFICATION_SUMMARY' });
+    }
 
-    // 5. Preferences
+    // 5. Preferences (Distributed layout)
     const prefs = record.get('preferences');
     prefs.forEach((pr: any, idx: number) => {
         const prId = 'PREF_' + pr.properties.id;
@@ -429,13 +432,14 @@ export class GraphAdapter {
             id: prId,
             label: `${pr.properties.category}: ${pr.properties.value}`,
             type: 'preference',
-            x: 100, y: 600 + (idx * 80),
+            x: 300 + (idx * 100), // Spread horizontally
+            y: 750,               // Move to bottom area
             risk: 0
         });
         edges.push({ from: 'PERSON_' + userId, to: prId, type: 'HAS_PREFERENCE' });
     });
 
-    // 6. Personality Traits
+    // 6. Personality Traits (Staggered layout)
     const traits = record.get('traits');
     traits.forEach((t: any, idx: number) => {
         const tId = 'TRAIT_' + t.properties.id;
@@ -443,13 +447,14 @@ export class GraphAdapter {
             id: tId,
             label: t.properties.name,
             type: 'trait',
-            x: 100, y: 150 + (idx * 60),
+            x: 100 + (idx % 2 * 60), // Stagger X
+            y: 350 + (idx * 90),     // Spread Y more
             risk: 0
         });
         edges.push({ from: 'PERSON_' + userId, to: tId, type: 'HAS_TRAIT' });
     });
 
-    // 7. Interests
+    // 7. Interests (Staggered layout)
     const interests = record.get('interests');
     interests.forEach((i: any, idx: number) => {
         const iId = 'INTEREST_' + i.properties.id;
@@ -457,7 +462,8 @@ export class GraphAdapter {
             id: iId,
             label: i.properties.name,
             type: 'interest',
-            x: 900, y: 500 + (idx * 60),
+            x: 850 - (idx % 2 * 60), // Stagger X inwards
+            y: 400 + (idx * 90),     // Spread Y more
             risk: 0
         });
         edges.push({ from: 'PERSON_' + userId, to: iId, type: 'INTERESTED_IN' });

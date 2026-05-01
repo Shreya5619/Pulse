@@ -57,27 +57,16 @@ export function normalizeContext(raw: any): ContextSnapshot {
     last_full_charge_at: raw.battery?.last_full_charge_at ? new Date(raw.battery.last_full_charge_at).toISOString() : null,
   };
 
-  // 4. Normalize Notifications
-  const notifications = (raw.notifications || []).map((n: any) => {
-    const postedAt = new Date(n.posted_at || Date.now()).toISOString();
-    // Generate a stable ID based on content to prevent duplicates if the app doesn't provide one
-    const stableId = n.id || crypto.createHash('md5')
-      .update(`${n.app_package || ''}-${n.sender || ''}-${n.title || ''}-${n.body || ''}-${postedAt}`)
-      .digest('hex');
-
-    return {
-      id: stableId,
-      app_package: n.app_package || "unknown",
-      sender: n.sender || null,
-      title: n.title || null,
-      body: n.body || null,
-      category: mapNotificationCategory(n),
-      is_ongoing: !!n.is_ongoing,
-      posted_at: postedAt,
-      is_ongoing_call: !!n.is_ongoing_call,
-      is_otp_hint: !!n.is_otp_hint,
-    };
-  });
+  // 4. Normalize Notification Digest
+  const notification_digest = raw.notification_digest ? {
+    summary_window_minutes: Number(raw.notification_digest.summary_window_minutes) || 60,
+    total_count: Number(raw.notification_digest.total_count) || 0,
+    by_category: raw.notification_digest.by_category || {},
+    top_threads: (raw.notification_digest.top_threads || []).map((t: any) => ({
+      sender: String(t.sender),
+      count: Number(t.count)
+    }))
+  } : undefined;
 
   // 5. Device State
   const device_state = {
@@ -118,7 +107,7 @@ export function normalizeContext(raw: any): ContextSnapshot {
       upcoming_events: upcoming_events as any,
     },
     battery,
-    notifications,
+    notification_digest,
     device_state: device_state as any,
     meta: meta as any,
     derived,

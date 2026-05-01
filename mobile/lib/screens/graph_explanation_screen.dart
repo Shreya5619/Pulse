@@ -191,7 +191,7 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
                     ),
                     if (edge != null)
                       Text(
-                        "${edge['type']} (weight: ${edge['weight']})",
+                        _formatEdgeExplanation(edge),
                         style: const TextStyle(
                           color: Colors.white30,
                           fontSize: 10,
@@ -320,6 +320,25 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
     return Icon(icon, color: color, size: size);
   }
 
+  String _formatEdgeExplanation(Map<String, dynamic> edge) {
+    final type = edge['type'] as String?;
+    final weight = edge['weight'] as num?;
+    final roundedWeight = weight?.toStringAsFixed(1) ?? "0.0";
+
+    switch (type) {
+      case 'TRAVEL':
+        return "Requires $roundedWeight min travel";
+      case 'URGENCY':
+        return "Starts in $roundedWeight min";
+      case 'ENERGY_COST':
+        return "Power drain impact: $roundedWeight";
+      case 'INTERRUPTION':
+        return "Response urgency: $roundedWeight";
+      default:
+        return "${type ?? 'Related'} (influence: $roundedWeight)";
+    }
+  }
+
   Widget _buildScoreBar(num score) {
     final s = score.toDouble();
     return Column(
@@ -333,7 +352,7 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
               style: TextStyle(color: Colors.white54, fontSize: 11),
             ),
             Text(
-              "${(s * 100).toStringAsFixed(0)}%",
+              "${(s * 100).toStringAsFixed(1)}%",
               style: TextStyle(
                 color: s > 0.7
                     ? Colors.redAccent

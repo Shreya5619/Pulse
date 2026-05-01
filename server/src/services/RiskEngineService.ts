@@ -161,8 +161,8 @@ export class RiskEngineService {
         }
       }
       const overlapScore = overlappingCount / totalPairs;
-      const notifRate = graph.context.notifications
-        ? graph.context.notifications.length
+      const notifRate = graph.context.notification_digest
+        ? graph.context.notification_digest.total_count
         : 0;
 
       risks.push(assessOverload(eventsIn90, overlapScore, notifRate, undefined, personality));

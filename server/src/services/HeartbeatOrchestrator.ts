@@ -37,9 +37,9 @@ export class HeartbeatOrchestrator {
       // Sync basic snapshot to Neo4j Digital Twin
       await GraphAdapter.applySnapshotToNeo4j(userId, context);
 
-      // Deep analyze notifications to understand personality/traits
-      if (context.notifications.length > 0) {
-        const analysis = await personalityAnalyzer.analyze(userId, context.notifications);
+      // Deep analyze notifications to understand personality/traits via digest
+      if (context.notification_digest && context.notification_digest.total_count > 0) {
+        const analysis = await personalityAnalyzer.analyze(userId, context.notification_digest);
         if (analysis) {
           await GraphAdapter.applyPersonalityToNeo4j(userId, analysis);
           logEvent({

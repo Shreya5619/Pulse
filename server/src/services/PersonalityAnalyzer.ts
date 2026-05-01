@@ -1,4 +1,4 @@
-import { Notification } from "../../../shared/context_snapshot";
+import { ContextSnapshot } from "../../../shared/context_snapshot";
 import dotenv from "dotenv";
 import path from "path";
 
@@ -14,13 +14,13 @@ export class PersonalityAnalyzer {
   private lastAnalysisHash: string = "";
 
   /**
-   * Analyzes a list of notifications to derive personality traits, interests, and sentiment.
+   * Analyzes a notification digest to derive personality traits, interests, and sentiment.
    */
-  async analyze(userId: string, notifications: Notification[]): Promise<PersonalityAnalysis | null> {
-    if (notifications.length === 0) return null;
+  async analyze(userId: string, digest: ContextSnapshot["notification_digest"]): Promise<PersonalityAnalysis | null> {
+    if (!digest || digest.total_count === 0) return null;
 
     // 1. Simple change detection to avoid redundant LLM calls
-    const currentHash = this.computeHash(notifications);
+    const currentHash = this.computeHash(digest);
     if (currentHash === this.lastAnalysisHash) {
       return null; // No significant change
     }
@@ -28,20 +28,23 @@ export class PersonalityAnalyzer {
     const apiKey = process.env.GROQ_API;
     if (!apiKey) {
       console.warn("[PersonalityAnalyzer] No GROQ_API found, skipping analysis.");
-      return this.getFallbackAnalysis(notifications);
+      return this.getFallbackAnalysis(digest);
     }
 
     try {
-      const notificationSummary = notifications
-        .map(n => `[${n.app_package}] ${n.sender || 'Unknown'}: ${n.title} - ${n.body}`)
-        .join("\n")
-        .slice(0, 3000); // Limit context size
+      const categoriesSummary = Object.entries(digest.by_category)
+        .map(([cat, count]) => `${cat}: ${count}`)
+        .join(", ");
+      
+      const threadsSummary = digest.top_threads
+        .map(t => `Thread from ${t.sender} (${t.count} messages)`)
+        .join("\n");
 
       const prompt = `
-        Analyze these notifications for user ${userId} and return a JSON object representing their current state and personality.
+        Analyze this notification digest for user ${userId} and return a JSON object representing their current state and personality.
         Focus on:
         1. Traits: Long-term behavioral characteristics (e.g., "Highly responsive to work", "Socially active", "Focuses on fitness").
-        2. Interests: Topics derived from content (e.g., "AI", "Finance", "Gaming", "Cooking").
+        2. Interests: Topics derived from senders or frequency (e.g., "AI", "Finance", "Gaming", "Cooking").
         3. Sentiment: Current emotional state or urgency (e.g., "Stressed", "Calm", "Excited", "Overwhelmed").
 
         Format:
@@ -51,8 +54,11 @@ export class PersonalityAnalyzer {
           "sentiment": "Current sentiment"
         }
 
-        Notifications:
-        ${notificationSummary}
+        Digest Summary:
+        Total Count: ${digest.total_count}
+        By Category: ${categoriesSummary}
+        Top Threads:
+        ${threadsSummary}
       `;
 
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -90,24 +96,22 @@ export class PersonalityAnalyzer {
 
     } catch (error) {
       console.error("[PersonalityAnalyzer] Analysis failed:", error);
-      return this.getFallbackAnalysis(notifications);
+      return this.getFallbackAnalysis(digest);
     }
   }
 
-  private computeHash(notifications: Notification[]): string {
-    // Crude hash of notification IDs and titles to detect changes
-    return notifications.map(n => n.id + n.title).sort().join("|");
+  private computeHash(digest: any): string {
+    return JSON.stringify(digest.by_category) + JSON.stringify(digest.top_threads);
   }
 
-  private getFallbackAnalysis(notifications: Notification[]): PersonalityAnalysis {
-    // Basic heuristic fallback if LLM is unavailable
+  private getFallbackAnalysis(digest: any): PersonalityAnalysis {
     const traits = ["Active Digital User"];
-    const interests = [...new Set(notifications.map(n => n.app_package.split('.').pop() || 'Unknown'))];
-    const sentiment = notifications.length > 10 ? "Busy" : "Calm";
+    const interests = digest.top_threads.map((t: any) => t.sender).slice(0, 3);
+    const sentiment = digest.total_count > 20 ? "Busy" : "Calm";
 
     return {
       traits,
-      interests: interests.slice(0, 3),
+      interests,
       sentiment
     };
   }

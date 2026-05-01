@@ -62,7 +62,7 @@ export class DailySummarizer {
     }
 
     // Notification Tolerance
-    const totalNotifications = snapshots.reduce((acc, s) => acc + (s.notifications?.length || 0), 0);
+    const totalNotifications = snapshots.reduce((acc, s) => acc + (s.notification_digest?.total_count || 0), 0);
     if (totalNotifications > 100) {
       preferences.push({
         category: "NOTIFICATION_TOLERANCE",
@@ -191,24 +191,27 @@ export class DailySummarizer {
   }
 
   private analyzeNotifications(snapshots: any[]) {
-    const counts: Record<string, number> = {};
-    const importantPackages = ["com.whatsapp", "com.slack", "com.google.android.calendar", "telecom"];
+    const totalCounts: Record<string, number> = {
+      "URGENT_OTP": 0,
+      "IMPORTANT_SENDER": 0,
+      "NOISY_GROUP": 0,
+      "IGNORABLE": 0,
+    };
 
     snapshots.forEach(s => {
-      (s.notifications || []).forEach((n: any) => {
-        counts[n.app_package] = (counts[n.app_package] || 0) + 1;
-      });
+      const digest = s.notification_digest;
+      if (digest && digest.by_category) {
+        Object.entries(digest.by_category).forEach(([cat, count]) => {
+          totalCounts[cat] = (totalCounts[cat] || 0) + (count as number);
+        });
+      }
     });
 
-    const noisy = Object.entries(counts)
-      .filter(([_, count]) => count > 50)
-      .map(([pkg]) => pkg);
+    const isNoisy = totalCounts["NOISY_GROUP"] > 100;
 
     return {
-      priority_senders: [],
-      noisy_packages: noisy,
-      quiet_hours: [],
-      app_sensitivity: Object.fromEntries(importantPackages.map(p => [p, "high"])),
+      category_aggregates: totalCounts,
+      is_noisy_user: isNoisy,
       last_updated: new Date().toISOString()
     };
   }

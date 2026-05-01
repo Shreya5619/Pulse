@@ -156,19 +156,6 @@ class HomeScreen extends StatelessWidget {
                       size: 14,
                       color: Colors.blueAccent,
                     ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        "Client Review · 18 min",
-                        style: GoogleFonts.outfit(
-                          fontSize: 11,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -341,7 +328,7 @@ class HomeScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  risk.score.toStringAsFixed(2),
+                  risk.score.toStringAsFixed(1),
                   style: GoogleFonts.outfit(
                     color: risk.color,
                     fontWeight: FontWeight.bold,
@@ -395,12 +382,23 @@ class HomeScreen extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _contextChip(LucideIcons.battery, "Battery 17% (draining fast)"),
-              _contextChip(LucideIcons.calendar, "Calendar: 3 events next 2h"),
-              _contextChip(LucideIcons.bell, "Notifications: 46 in last hour"),
+              _contextChip(
+                LucideIcons.battery,
+                "Battery ${state.deviceContext.battery.level}%${state.deviceContext.battery.isCharging ? ' (Charging)' : ''}",
+              ),
+              _contextChip(
+                LucideIcons.calendar,
+                "Calendar: ${state.deviceContext.upcomingEvents.length} events next 2h",
+              ),
+              _contextChip(
+                LucideIcons.bell,
+                "Notifications: ${state.deviceContext.notifications.length} recent",
+              ),
               _contextChip(
                 LucideIcons.mapPin,
-                "Koramangala → Whitefield · 56 min",
+                state.etaInfo.hasRoute
+                    ? "${state.etaInfo.destinationName} · ${state.etaInfo.etaDisplay}"
+                    : "Location: ${state.deviceContext.location.status}",
               ),
             ],
           ),
