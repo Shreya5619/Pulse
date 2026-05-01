@@ -23,16 +23,19 @@ class FuturesEngine {
 
     // Get current context & next event
     const context = await contextSnapshotRepo.findLatestByUser(userId);
+    console.log(`[FuturesEngine] userId: ${userId}, context found: ${!!context}`);
     const nextEvent = await eventsRepo.getNextEvent(userId);
+    console.log(`[FuturesEngine] nextEvent found: ${!!nextEvent}`);
     const memory = await this.memoryStore.loadAll(userId);
 
-    // If no context, return empty
+    // If no context, return empty (or idle for demo user)
     if (!context) {
+      console.log(`[FuturesEngine] No context for ${userId}, returning idle futures.`);
       return {
         userId,
         baseTime,
         horizonMinutes,
-        futures: []
+        futures: this.buildIdleFutures(memory)
       };
     }
 
@@ -108,12 +111,49 @@ class FuturesEngine {
     return [
       {
         id: "DO_NOTHING",
-        title: "Stay the Course",
-        description: "No immediate appointments. You can continue your current routine.",
+        title: "Maintain Routine",
+        description: "Everything is on track. No upcoming travel or critical risks in the next 2 hours.",
         metrics: {
           endTime: new Date(Date.now() + 120 * 60000).toISOString(),
+          etaMinutes: 0,
+          batteryPercent: 88,
+          expectedLatenessMinutes: 0,
           missedCommitments: 0,
+          notificationCount: 12,
+          overlapCount: 0,
+          stressScore: 0.15
+        },
+        risks: []
+      },
+      {
+        id: "RECOMMENDED",
+        title: "Optimization Plan",
+        description: "Proactive battery saving enabled. You'll finish the period with maximum reserve.",
+        metrics: {
+          endTime: new Date(Date.now() + 120 * 60000).toISOString(),
+          etaMinutes: 0,
+          batteryPercent: 92,
+          expectedLatenessMinutes: 0,
+          missedCommitments: 0,
+          notificationCount: 4,
+          overlapCount: 0,
           stressScore: 0.1
+        },
+        risks: []
+      },
+      {
+        id: "ALTERNATE",
+        title: "Focus Path",
+        description: "Aggressive notification filtering to minimize cognitive load during this block.",
+        metrics: {
+          endTime: new Date(Date.now() + 120 * 60000).toISOString(),
+          etaMinutes: 0,
+          batteryPercent: 85,
+          expectedLatenessMinutes: 0,
+          missedCommitments: 0,
+          notificationCount: 2,
+          overlapCount: 0,
+          stressScore: 0.2
         },
         risks: []
       }
@@ -171,6 +211,8 @@ class FuturesEngine {
         batteryPercent: Math.round(batteryAtArrival),
         expectedLatenessMinutes: Math.round(expectedLatenessMinutes),
         missedCommitments: expectedLatenessMinutes > 5 ? 1 : 0,
+        notificationCount: 34,
+        overlapCount: 3,
         stressScore: this.computeStressScore([latenessRisk, batteryRisk])
       },
       risks
@@ -229,6 +271,8 @@ class FuturesEngine {
         batteryPercent: Math.round(batteryAtArrival),
         expectedLatenessMinutes: Math.round(expectedLatenessMinutes),
         missedCommitments: 0,
+        notificationCount: 18,
+        overlapCount: 1,
         stressScore: this.computeStressScore([latenessRisk, batteryRisk])
       },
       risks
@@ -285,6 +329,8 @@ class FuturesEngine {
         batteryPercent: Math.round(batteryAtArrival),
         expectedLatenessMinutes: Math.round(expectedLatenessMinutes),
         missedCommitments: expectedLatenessMinutes > 5 ? 1 : 0,
+        notificationCount: 9,
+        overlapCount: 0,
         stressScore: this.computeStressScore([latenessRisk, batteryRisk])
       },
       risks

@@ -5,6 +5,7 @@ import { memoryStore } from "./MemoryStore";
 import { RiskSnapshot } from "../types/risk";
 import { FuturesResult } from "../types/futures";
 import { MemoryState } from "../../../shared/memory";
+import { contextSnapshotRepo } from "../db/ContextSnapshotRepository";
 
 class PlannerEngine {
   async decideForUser(userId: string): Promise<PlannerDecision> {
@@ -12,8 +13,9 @@ class PlannerEngine {
     const riskSnapshot = await riskEngine.computeForUser(userId);
     const futures = await futuresEngine.computeForUser(userId);
     const memory = await memoryStore.loadAll(userId);
+    const context = await contextSnapshotRepo.findLatestByUser(userId);
 
-    const candidates = this.buildCandidates(riskSnapshot, futures, memory);
+    const candidates = this.buildCandidates(riskSnapshot, futures, memory, context);
     const chosen = this.pickBest(candidates, memory);
 
     return {
@@ -24,12 +26,54 @@ class PlannerEngine {
     };
   }
 
+  async getActionsForRisk(userId: string, riskType: string, nodeId?: string): Promise<PlannerAction[]> {
+    const riskSnapshot = await riskEngine.computeForUser(userId);
+    const futures = await futuresEngine.computeForUser(userId);
+    const memory = await memoryStore.loadAll(userId);
+    const context = await contextSnapshotRepo.findLatestByUser(userId);
+
+    const allCandidates = this.buildCandidates(riskSnapshot, futures, memory, context);
+
+    // Filter candidates relevant to this risk type/node
+    let relevant = allCandidates.filter(c => {
+      if (riskType === 'lateness') return c.id === 'ACTION_LEAVE_NOW' || c.id === 'ACTION_RECOMMEND_CHARGING_STOP';
+      if (riskType === 'battery') return c.id === 'ACTION_ENABLE_BATTERY_SAVER' || c.id === 'ACTION_RECOMMEND_CHARGING_STOP';
+      if (riskType === 'overload') return c.id === 'ACTION_SUPPRESS_NOISY_NOTIFICATIONS';
+      if (riskType === 'response_debt') return c.id === 'ACTION_PREPARE_DELAY_MESSAGE';
+      return false;
+    });
+
+    // If we have a specific nodeId, prioritize actions that apply to it
+    if (nodeId) {
+      relevant = relevant.sort((a, b) => (a.appliesToEventId === nodeId ? -1 : 1));
+    }
+
+    // Ensure we have at least some generic actions if nothing specific found
+    if (relevant.length === 0) {
+      if (riskType === 'lateness') {
+         relevant.push({
+           id: "ACTION_PREPARE_DELAY_MESSAGE",
+           title: "Send 'Running 10 minutes late'",
+           description: "Quick update to the organizer.",
+           approvalMode: "ASK_FIRST",
+           reasons: ["Mitigate lateness impact"],
+           sideEffects: []
+         });
+      }
+    }
+
+    return relevant.slice(0, 3);
+  }
+
   private buildCandidates(
     risk: RiskSnapshot,
     futures: FuturesResult,
-    memory: MemoryState
+    memory: MemoryState,
+    context: any
   ): PlannerAction[] {
     const candidates: PlannerAction[] = [];
+    const suggestedRecipient = context?.calendar?.next_event?.organizer_contact || "123-456-7890"; // Hardcoded fallback as requested
+
 
     const lateness = risk.risks.find(r => r.type === "lateness");
     const battery  = risk.risks.find(r => r.type === "battery");
@@ -40,12 +84,17 @@ class PlannerEngine {
     if (lateness && lateness.score >= 0.6) {
       candidates.push({
         id: "ACTION_LEAVE_NOW",
-        title: "Leave now for your next commitment",
-        description: "Based on traffic and your usual buffer, leaving now reduces your risk of being late.",
+        title: "Leave now and take cab to Office HQ",
+        description: "Switching to a cab now saves 15 mins of walking in traffic.",
         approvalMode: "ASK_FIRST",
         reasons: lateness.causes || [],
         sideEffects: ["May trigger navigation", "May send an optional delay message"],
-        appliesToEventId: lateness.nodeId
+        appliesToEventId: lateness.nodeId,
+        category: "Commute",
+        impact: "Cuts lateness risk from High to Low",
+        templateId: "ON_THE_WAY",
+        channel: "SMS",
+        suggestedRecipient
       });
     }
 
@@ -53,11 +102,16 @@ class PlannerEngine {
     if (battery && battery.score >= 0.6) {
       candidates.push({
         id: "ACTION_ENABLE_BATTERY_SAVER",
-        title: "Enable Battery Saver",
-        description: "Battery is likely to fall below a safe level before your next event.",
+        title: "Enable Battery Saver mode",
+        description: "Optimizes background syncing and brightness to preserve power.",
         approvalMode: "ASK_FIRST",
         reasons: battery.causes || [],
-        sideEffects: ["Reduces background activity", "May delay some notifications"]
+        sideEffects: ["Reduces background activity", "May delay some notifications"],
+        category: "Focus",
+        impact: "Ensures device remains active until destination",
+        templateId: "BATTERY_LOW",
+        channel: "SMS",
+        suggestedRecipient
       });
     }
 
@@ -65,11 +119,13 @@ class PlannerEngine {
     if (overload && overload.score >= 0.6) {
       candidates.push({
         id: "ACTION_SUPPRESS_NOISY_NOTIFICATIONS",
-        title: "Silence noisy apps for 1 hour",
-        description: "You have a dense schedule and many notifications; muting noisy apps lowers overload.",
+        title: "Suppress noisy senders for 60 min",
+        description: "Temporarily filters low-priority notifications to reduce overload.",
         approvalMode: "ASK_FIRST",
         reasons: overload.causes || [],
-        sideEffects: ["Temporarily mutes selected apps"]
+        sideEffects: ["Temporarily mutes selected apps"],
+        category: "Focus",
+        impact: "Reduces cognitive load during peak stress"
       });
     }
 
@@ -77,11 +133,16 @@ class PlannerEngine {
     if (response && response.score >= 0.6) {
       candidates.push({
         id: "ACTION_PREPARE_DELAY_MESSAGE",
-        title: "Draft a quick update",
-        description: "You have pending messages to important contacts; Pulse can draft a short update.",
+        title: "Send 'Running 10 minutes late'",
+        description: "Pulse has drafted a polite update for your next appointment.",
         approvalMode: "ASK_FIRST",
         reasons: response.causes || [],
-        sideEffects: ["Creates a draft, you tap to send"]
+        sideEffects: ["Creates a draft, you tap to send"],
+        category: "Communication",
+        impact: "Proactively manages attendee expectations",
+        templateId: "RUNNING_LATE",
+        channel: "SMS",
+        suggestedRecipient
       });
     }
 
@@ -90,11 +151,13 @@ class PlannerEngine {
     if (alt && alt.metrics.batteryPercent !== undefined && alt.metrics.batteryPercent > 20) {
       candidates.push({
         id: "ACTION_RECOMMEND_CHARGING_STOP",
-        title: "Add a short charging stop",
-        description: "A brief charging stop keeps your battery safe for the rest of the trip.",
+        title: "Plan a charging stop",
+        description: "A brief 15-min charge at a nearby station is recommended.",
         approvalMode: "ASK_FIRST",
         reasons: [`Alternate future keeps battery at ~${Math.round(alt.metrics.batteryPercent)}%`],
-        sideEffects: ["Slightly changes route or departure time"]
+        sideEffects: ["Slightly changes route or departure time"],
+        category: "Commute",
+        impact: "Prevents total battery depletion before arrival"
       });
     }
 

@@ -25,6 +25,8 @@ export const CalendarEventSchema = z.object({
   }).optional().nullable(),
   is_all_day: z.boolean(),
   importance: ImportanceSchema.default("normal"),
+  organizer_name: z.string().optional().nullable(),
+  organizer_contact: z.string().optional().nullable(),
 });
 
 export const NotificationItemSchema = z.object({

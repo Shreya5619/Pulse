@@ -32,6 +32,58 @@ class TimelineEvent {
   });
 }
 
+class AppointmentEtaInfo {
+  final bool hasRoute;
+  final String? reason;
+  final int? durationSeconds;
+  final int? distanceMeters;
+  final String? travelMode;
+  final Map<String, dynamic>? worstSegment;
+  final String? eventId;
+  final String? eventTitle;
+  final String? eventTime;
+  final String? destinationName;
+  final int? leaveInMinutes;
+  final String? latenessRisk;
+  final String? etaDisplay;
+
+  AppointmentEtaInfo({
+    required this.hasRoute,
+    this.reason,
+    this.durationSeconds,
+    this.distanceMeters,
+    this.travelMode,
+    this.worstSegment,
+    this.eventId,
+    this.eventTitle,
+    this.eventTime,
+    this.destinationName,
+    this.leaveInMinutes,
+    this.latenessRisk,
+    this.etaDisplay,
+  });
+
+  factory AppointmentEtaInfo.fromJson(Map<String, dynamic> json) {
+    return AppointmentEtaInfo(
+      hasRoute: json['hasRoute'] ?? false,
+      reason: json['reason'],
+      durationSeconds: json['durationSeconds'],
+      distanceMeters: json['distanceMeters'],
+      travelMode: json['travelMode'],
+      worstSegment: json['worstSegment'],
+      eventId: json['eventId'],
+      eventTitle: json['eventTitle'],
+      eventTime: json['eventTime'],
+      destinationName: json['destinationName'],
+      leaveInMinutes: json['leaveInMinutes'],
+      latenessRisk: json['latenessRisk'],
+      etaDisplay: json['etaDisplay'],
+    );
+  }
+
+  factory AppointmentEtaInfo.empty() => AppointmentEtaInfo(hasRoute: false);
+}
+
 class AppState extends ChangeNotifier {
   final ContextServices _contextServices = ContextServices();
   final LocalRepository _localRepo = LocalRepository();
@@ -53,6 +105,10 @@ class AppState extends ChangeNotifier {
   final List<String> _rawMessages = [];
   bool _isLive = true;
   WebSocketChannel? _channel;
+
+  // ETA State
+  AppointmentEtaInfo _etaInfo = AppointmentEtaInfo.empty();
+  AppointmentEtaInfo get etaInfo => _etaInfo;
 
   // Replay Mode State
   bool _isReplayMode = false;
@@ -86,12 +142,86 @@ class AppState extends ChangeNotifier {
   DateTime? _lastHeartbeatTime;
   RiskSnapshot? _currentRiskSnapshot;
   Map<String, dynamic>? _currentFutures;
+  String _selectedScenarioId = "RECOMMENDED";
+  Map<String, dynamic>? _lastPlannerDecision;
+  Map<String, dynamic>? get proposedCommAction => _proposedCommAction;
+
+  final Set<String> _acceptedActionIds = {};
+  final Set<String> _dismissedActionIds = {};
+  Map<String, dynamic>? _proposedCommAction;
 
   int get risksNext90Min => _risksNext90Min;
   List<String> get activeRiskTypes => _activeRiskTypes;
   DateTime? get lastHeartbeatTime => _lastHeartbeatTime;
   RiskSnapshot? get currentRiskSnapshot => _currentRiskSnapshot;
   Map<String, dynamic>? get currentFutures => _currentFutures;
+  String get selectedScenarioId => _selectedScenarioId;
+  Map<String, dynamic>? get lastPlannerDecision => _lastPlannerDecision;
+
+  bool isActionAccepted(String id) => _acceptedActionIds.contains(id);
+  bool isActionDismissed(String id) => _dismissedActionIds.contains(id);
+
+  void acceptAction(Map<String, dynamic> action) {
+    final id = action['id'];
+    _acceptedActionIds.add(id);
+    _dismissedActionIds.remove(id);
+
+    // Emit timeline event
+    _timelineEvents.insert(
+      0,
+      TimelineEvent(
+        id: const Uuid().v4(),
+        timestamp: DateTime.now(),
+        type: 'Action',
+        agent: 'User',
+        text: 'Accepted: ${action['title']}',
+        data: action,
+      ),
+    );
+
+    debugPrint('[Pulse AppState] Action accepted: $id');
+    notifyListeners();
+
+    // Optional: Call backend to sync
+    _syncActionToBackend(id, 'accepted');
+  }
+
+  void dismissAction(Map<String, dynamic> action) {
+    final id = action['id'];
+    _dismissedActionIds.add(id);
+    _acceptedActionIds.remove(id);
+
+    debugPrint('[Pulse AppState] Action dismissed: $id');
+    notifyListeners();
+
+    _syncActionToBackend(id, 'dismissed');
+  }
+
+  Future<void> _syncActionToBackend(String actionId, String status) async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse(
+        'http://$host:8080/api/planner/interventions/status',
+      );
+      await http.post(
+        url,
+        body: json.encode({
+          'userId': _userId,
+          'actionId': actionId,
+          'status': status,
+          'timestamp': DateTime.now().toUtc().toIso8601String(),
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error syncing action status: $e');
+    }
+  }
+
+  void selectScenario(String id) {
+    _selectedScenarioId = id;
+    notifyListeners();
+  }
 
   // Pulse snapshot (Day 12 — persistent widget source of truth)
   // Seeded with a visible fallback so the bar renders immediately
@@ -135,6 +265,14 @@ class AppState extends ChangeNotifier {
     _initContextIngestion();
     // Keep internal simulation for fallback or UI stability
     _startSimulatedStream();
+
+    // Initial ETA fetch
+    fetchAppointmentEta();
+
+    // Periodic ETA refresh
+    Timer.periodic(const Duration(minutes: 2), (timer) {
+      if (!_isReplayMode) fetchAppointmentEta();
+    });
   }
 
   Future<void> _initNotificationService() async {
@@ -328,56 +466,36 @@ class AppState extends ChangeNotifier {
         ? DateTime.parse(timestampStr)
         : DateTime.now();
 
-    // Persist to Local DB (Only if live)
-    if (!isReplay) {
-      if (type == 'context.updated') {
+    // Event capture for Timeline (for both live and replay)
+    if (type == 'context.updated') {
+      _timelineEvents.insert(
+        0,
+        TimelineEvent(
+          id: data['eventId'] ?? const Uuid().v4(),
+          timestamp: timestamp,
+          type: 'Context',
+          agent: 'Context',
+          text: 'Device state snapshot ingested.',
+          data: data['data'],
+        ),
+      );
+    } else if (type == 'risk.updated') {
+      final risks = data['data']?['risks'] as List<dynamic>? ?? [];
+      if (risks.isNotEmpty) {
         _timelineEvents.insert(
           0,
           TimelineEvent(
             id: data['eventId'] ?? const Uuid().v4(),
             timestamp: timestamp,
-            type: 'Context',
-            agent: 'Context',
-            text: 'Device state snapshot ingested.',
+            type: 'Risk',
+            agent: 'RiskEngine',
+            text:
+                '${risks.length} risks detected: ${risks.map((r) => r['type']).join(", ")}',
             data: data['data'],
           ),
         );
-      } else if (type == 'risk.updated') {
-        final risks = data['data']?['risks'] as List<dynamic>?;
-        if (risks != null && risks.isNotEmpty) {
-          _timelineEvents.insert(
-            0,
-            TimelineEvent(
-              id: data['eventId'] ?? const Uuid().v4(),
-              timestamp: timestamp,
-              type: 'Risk',
-              agent: 'RiskEngine',
-              text:
-                  '${risks.length} risks detected: ${risks.map((r) => r['type']).join(", ")}',
-              data: data['data'],
-            ),
-          );
-        }
-        _localRepo.saveRisk(
-          timestamp.toIso8601String(),
-          data['data']?['level'] ?? 'unknown',
-          data,
-        );
-      } else if (type == 'intervention.created') {
-        _localRepo.saveTimelineEvent(
-          data['eventId'] ?? const Uuid().v4(),
-          timestamp.toIso8601String(),
-          type!,
-          data,
-        );
       }
-    } else if (type == 'futures.updated') {
-      debugPrint('[Pulse AppState] Futures update received');
-      _currentFutures = data['data'];
-    }
 
-    // Update UI State
-    if (type == 'risk.updated') {
       debugPrint(
         '[Pulse AppState] Risk update received for user: ${data['userId']}',
       );
@@ -400,6 +518,57 @@ class AppState extends ChangeNotifier {
           history: [],
         );
       }
+
+      if (!isReplay) {
+        _localRepo.saveRisk(
+          timestamp.toIso8601String(),
+          data['data']?['level'] ?? 'unknown',
+          data,
+        );
+      }
+    } else if (type == 'COMM_ACTION_PROPOSED') {
+      _proposedCommAction = data['data'];
+      _timelineEvents.insert(
+        0,
+        TimelineEvent(
+          id: data['eventId'] ?? const Uuid().v4(),
+          timestamp: timestamp,
+          type: 'Action',
+          agent: 'CommPlanner',
+          text: 'Message proposed: ${data['data']?['previewText']}',
+          data: data['data'],
+        ),
+      );
+    } else if (type == 'planner.suggested') {
+      debugPrint('[Pulse AppState] Planner suggestion received');
+      _lastPlannerDecision = data['data'];
+      final chosen = data['data']?['chosen'];
+      if (chosen != null) {
+        _timelineEvents.insert(
+          0,
+          TimelineEvent(
+            id: data['eventId'] ?? const Uuid().v4(),
+            timestamp: timestamp,
+            type: 'Action',
+            agent: 'Planner',
+            text: 'Suggested: ${chosen['title']}',
+            data: chosen,
+          ),
+        );
+      }
+    } else if (type == 'guardian.decided') {
+      _timelineEvents.insert(
+        0,
+        TimelineEvent(
+          id: data['eventId'] ?? const Uuid().v4(),
+          timestamp: timestamp,
+          type: 'Outcome',
+          agent: 'Guardian',
+          text:
+              'Approved: ${data['data']?['rationale'] ?? 'Security check passed'}',
+          data: data['data'],
+        ),
+      );
     } else if (type == 'intervention.created') {
       final intv = data['data'];
       if (intv != null) {
@@ -410,12 +579,13 @@ class AppState extends ChangeNotifier {
           TimelineEvent(
             id: intvId,
             timestamp: timestamp,
-            type: 'Action',
-            agent: 'Planner',
-            text: '${intv['headline']}: ${intv['body']}',
+            type: 'Outcome',
+            agent: 'System',
+            text: 'Intervention active: ${intv['headline']}',
             data: intv,
           ),
         );
+
         _interventions.insert(
           0,
           Intervention(
@@ -431,6 +601,15 @@ class AppState extends ChangeNotifier {
             createdAt: timestamp,
           ),
         );
+
+        if (!isReplay) {
+          _localRepo.saveTimelineEvent(
+            intvId,
+            timestamp.toIso8601String(),
+            type ?? 'unknown',
+            data,
+          );
+        }
       }
     } else if (type == 'pulse.snapshot') {
       // Dedup by version — ignore older or duplicate snapshots
@@ -447,10 +626,11 @@ class AppState extends ChangeNotifier {
       } else {
         debugPrint('[Pulse] pulse.snapshot v$incomingVersion ignored (stale, current v$_lastPulseSnapshotVersion)');
       }
+    } else if (type == 'futures.updated') {
+      debugPrint('[Pulse AppState] Futures update received');
+      _currentFutures = data['data'];
     } else if (type == 'heartbeat.tick') {
-      // Only process ticks for our current user
       if (data['userId'] != null && data['userId'] != _userId) return;
-
       debugPrint(
         '[Pulse AppState] Heartbeat tick: risksNext90Min=${data['data']?['risksNext90Min']}',
       );
@@ -461,7 +641,6 @@ class AppState extends ChangeNotifier {
       }
     } else if (type == 'graph.updated') {
       if (data['userId'] != null && data['userId'] != _userId) return;
-
       final gData = data['data'];
       debugPrint(
         '[Pulse AppState] Graph update: risksNext90Min=${gData?['totalRisksNext90Min']}',
@@ -633,7 +812,9 @@ class AppState extends ChangeNotifier {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         debugPrint('[Pulse API] Success: Snapshot ingested by backend.');
-        // debugPrint('[Pulse API] Response: ${response.body}');
+
+        // Refresh ETA after successful context ingestion
+        fetchAppointmentEta();
 
         // Save to Local DB
         await _localRepo.saveSnapshot(
@@ -702,6 +883,63 @@ class AppState extends ChangeNotifier {
     return path;
   }
 
+  Future<Map<String, dynamic>?> prepareCommAction(String actionId, {String? role}) async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/comm/prepare');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'userId': _userId, 'actionId': actionId, 'role': role}),
+      );
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        return body['data'];
+      }
+    } catch (e) {
+      debugPrint(
+        '[Pulse AppState] prepareCommAction failed, falling back to local: $e',
+      );
+    }
+
+    // Local fallback
+    return _generateLocalCommAction(actionId);
+  }
+
+  Map<String, dynamic> _generateLocalCommAction(String actionId) {
+    final eventTitle = etaInfo.eventTitle ?? "next event";
+    String text = "Running a bit late to $eventTitle. See you soon!";
+    if (actionId.contains("BATTERY")) {
+      text = "Battery low, might be hard to reach for a bit.";
+    }
+    return {
+      'channel': 'SMS',
+      'text': text,
+      'recipient': '123-456-7890',
+      'actionId': actionId,
+    };
+  }
+
+  Future<void> completeCommAction(String actionId) async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/comm/send');
+      await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'userId': _userId, 'actionId': actionId}),
+      );
+
+      // Mark as completed
+      _proposedCommAction = null;
+      _acceptedActionIds.add(actionId);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[Pulse AppState] completeCommAction failed: $e');
+    }
+  }
+
   Future<void> importData(String json) async {
     await _localRepo.importFromJson(json);
     await _initLocalData();
@@ -734,6 +972,27 @@ class AppState extends ChangeNotifier {
 
     _resumeTimer();
     notifyListeners();
+  }
+
+  Future<List<dynamic>> fetchSuggestedActions(
+    String riskType, {
+    String? nodeId,
+  }) async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse(
+        'http://$host:8080/api/planner/suggested-actions?userId=$_userId&riskType=$riskType&nodeId=${nodeId ?? ""}',
+      );
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['data'] as List<dynamic>;
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error fetching suggested actions: $e');
+    }
+    return [];
   }
 
   Future<Map<String, dynamic>?> fetchGraphExplanation(String nodeId) async {

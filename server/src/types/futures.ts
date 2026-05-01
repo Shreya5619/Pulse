@@ -8,6 +8,8 @@ export interface FutureMetrics {
   batteryPercent?: number;
   expectedLatenessMinutes?: number;
   missedCommitments: number;
+  notificationCount?: number;
+  overlapCount?: number;
   stressScore: number; // 0–1
 }
 

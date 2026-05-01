@@ -60,6 +60,21 @@ export async function runAgentPulseFlow(initialContext: any, broadcast: (message
                 timestamp: new Date().toISOString(),
                 data: result.decision
             });
+
+            if (result.decision.chosen.templateId) {
+                broadcast({
+                    type: "COMM_ACTION_PROPOSED",
+                    userId,
+                    eventId: `comm_${Date.now()}`,
+                    timestamp: new Date().toISOString(),
+                    data: {
+                        actionId: result.decision.chosen.id,
+                        templateId: result.decision.chosen.templateId,
+                        channel: result.decision.chosen.channel,
+                        previewText: result.decision.chosen.title // Simple preview for now
+                    }
+                });
+            }
         }
 
         broadcast({

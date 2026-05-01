@@ -36,6 +36,10 @@ class HomeScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildHeaderStrip(context, state),
+                  const SizedBox(height: 16),
+                  const RouteEtaStrip(),
+                  const SizedBox(height: 16),
+                  _buildFuturesPathLabel(state),
                   const SizedBox(height: 24),
                   const RiskHeroCard(),
                   const SizedBox(height: 24),
@@ -139,6 +143,45 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildFuturesPathLabel(AppState state) {
+    String title = "Recommended";
+    Color color = AppColors.primary;
+    if (state.selectedScenarioId == "DO_NOTHING") {
+      title = "Do Nothing";
+      color = AppColors.danger;
+    } else if (state.selectedScenarioId == "ALTERNATE") {
+      title = "Alternate path";
+      color = Colors.orangeAccent;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(LucideIcons.sparkles, size: 14, color: color),
+          const SizedBox(width: 10),
+          Text(
+            "Futures: Currently on ",
+            style: GoogleFonts.outfit(fontSize: 11, color: Colors.white30),
+          ),
+          Text(
+            "'$title'",
+            style: GoogleFonts.outfit(fontSize: 11, color: color, fontWeight: FontWeight.bold),
+          ),
+          const Text(
+            " path",
+            style: TextStyle(fontSize: 11, color: Colors.white30),
+          ),
+        ],
+      ),
+    );
+  }
+
 
 
   Widget _buildRiskStack(BuildContext context, AppState state) {
@@ -161,6 +204,7 @@ class HomeScreen extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 12),
         child: _riskCard(
           risk: risk,
+          state: state,
           onTap: () => _showExplanation(context, state, risk),
         ),
       )).toList(),
@@ -183,6 +227,7 @@ class HomeScreen extends StatelessWidget {
 
   Widget _riskCard({
     required RiskScore risk,
+    required AppState state,
     required VoidCallback onTap,
   }) {
     IconData icon;
@@ -222,6 +267,14 @@ class HomeScreen extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (risk.type == RiskType.lateness && state.etaInfo.hasRoute)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        "Current route ETA ${state.etaInfo.etaDisplay} · you'll be ${state.etaInfo.leaveInMinutes != null && state.etaInfo.leaveInMinutes! < 0 ? state.etaInfo.leaveInMinutes!.abs() : 0} min late.",
+                        style: GoogleFonts.outfit(fontSize: 10, color: Colors.redAccent.withOpacity(0.8)),
+                      ),
+                    ),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,

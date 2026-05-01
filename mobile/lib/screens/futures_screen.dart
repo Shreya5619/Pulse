@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/colors.dart';
 import '../widgets/glass_card.dart';
+import '../widgets/route_eta_strip.dart';
 
 class FuturesScreen extends StatefulWidget {
   const FuturesScreen({super.key});
@@ -14,7 +15,13 @@ class FuturesScreen extends StatefulWidget {
 }
 
 class _FuturesScreenState extends State<FuturesScreen> {
-  int _selectedScenario = 1; // Recommended
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<AppState>(context, listen: false).fetchFutures();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,27 +32,66 @@ class _FuturesScreenState extends State<FuturesScreen> {
         return Scaffold(
           backgroundColor: AppColors.background,
           body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Next 2 hours",
-                    style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            state.isReplayMode ? "Historical Projections" : "Future Projections",
+                            style: GoogleFonts.outfit(
+                              fontSize: 24, 
+                              fontWeight: FontWeight.bold, 
+                              color: Colors.white
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            state.isReplayMode 
+                              ? "REPLAYING HISTORICAL SNAPSHOT" 
+                              : "Simulating the next 2 hours",
+                            style: GoogleFonts.outfit(
+                              fontSize: 13, 
+                              color: state.isReplayMode ? AppColors.primary : Colors.white30,
+                              fontWeight: state.isReplayMode ? FontWeight.bold : FontWeight.normal
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (!state.isReplayMode)
+                        IconButton(
+                          icon: const Icon(LucideIcons.refreshCw, size: 20, color: AppColors.primary),
+                          onPressed: () => Provider.of<AppState>(context, listen: false).fetchFutures(),
+                        ),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                  _buildSegmentedControl(),
-                  const SizedBox(height: 24),
-                  if (futures.isNotEmpty)
-                    _buildScenarioCard(futures[_selectedScenario.clamp(0, futures.length - 1)])
-                  else
-                    const Center(child: Text("No projections available", style: TextStyle(color: Colors.white30))),
-                  const SizedBox(height: 32),
-                  if (futures.isNotEmpty)
-                    _buildComparativeGraph(futures),
-                ],
-              ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  child: RouteEtaStrip(isMini: true),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: futures.isEmpty 
+                    ? const Center(child: Text("No projections available", style: TextStyle(color: Colors.white30)))
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
+                        itemCount: futures.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 20),
+                        itemBuilder: (context, index) {
+                          final data = futures[index];
+                          final isSelected = state.selectedScenarioId == data['id'];
+                          return _buildScenarioCard(context, state, data, isSelected);
+                        },
+                      ),
+                ),
+              ],
             ),
           ),
         );
@@ -53,194 +99,230 @@ class _FuturesScreenState extends State<FuturesScreen> {
     );
   }
 
-  Widget _buildSegmentedControl() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
-      child: Row(
-        children: [
-          _segment(0, "Do nothing"),
-          _segment(1, "Recommended"),
-          _segment(2, "Alternate"),
-        ],
-      ),
-    );
-  }
+  Widget _buildScenarioCard(BuildContext context, AppState state, dynamic data, bool isSelected) {
+    final metrics = data['metrics'];
+    final stressScore = (metrics['stressScore'] as num?)?.toDouble() ?? 0.0;
+    final color = stressScore > 0.7 
+        ? AppColors.danger 
+        : stressScore > 0.4 
+            ? Colors.orangeAccent 
+            : AppColors.success;
 
-  Widget _segment(int index, String label) {
-    final isSelected = _selectedScenario == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _selectedScenario = index),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary.withOpacity(0.2) : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isSelected ? AppColors.primary.withOpacity(0.5) : Colors.transparent),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: isSelected ? Colors.white : Colors.white30, fontSize: 11, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal),
-          ),
+    return GestureDetector(
+      onTap: () {
+        state.selectScenario(data['id']);
+        _showScenarioDetails(context, state, data);
+      },
+      child: GlassCard(
+        padding: const EdgeInsets.all(20),
+        borderColor: isSelected ? color.withOpacity(0.8) : Colors.white10,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data['title'] ?? "Scenario",
+                      style: GoogleFonts.outfit(
+                        fontSize: 18, 
+                        fontWeight: FontWeight.bold, 
+                        color: isSelected ? color : Colors.white
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    _getStatusBadge(data['id']),
+                  ],
+                ),
+                if (isSelected)
+                  Icon(LucideIcons.checkCircle2, color: color, size: 20),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _metricRow(
+              LucideIcons.clock, 
+              _formatLateness(metrics['expectedLatenessMinutes'] ?? 0),
+              color
+            ),
+            _metricRow(
+              LucideIcons.battery, 
+              "Battery: ~${metrics['batteryPercent'] ?? '?'}% at end",
+              color
+            ),
+            _metricRow(
+              LucideIcons.bell, 
+              "+${metrics['notificationCount'] ?? 0} new notifications",
+              color
+            ),
+            _metricRow(
+              LucideIcons.layers, 
+              "${metrics['overlapCount'] ?? 0} overlapping blocks",
+              color
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "RISK TREND",
+                  style: GoogleFonts.outfit(
+                    fontSize: 9, 
+                    fontWeight: FontWeight.bold, 
+                    color: Colors.white24,
+                    letterSpacing: 1.2
+                  ),
+                ),
+                _buildMiniRiskChart(stressScore, color),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildScenarioCard(dynamic data) {
-    final metrics = data['metrics'];
-    final risks = data['risks'] as List<dynamic>? ?? [];
-    final stressScore = (metrics['stressScore'] as num?)?.toDouble() ?? 0.0;
-    final color = stressScore > 0.7 ? Colors.redAccent : stressScore > 0.4 ? Colors.orangeAccent : Colors.greenAccent;
-
-    return GlassCard(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  data['title'] ?? "Scenario",
-                  style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: color),
-                ),
-              ),
-              _riskIconCount(risks.length),
-            ],
-          ),
-          const SizedBox(height: 24),
-          _metricRow(LucideIcons.clock, "ETA: ${metrics['etaMinutes'] ?? '?'} min", color),
-          const SizedBox(height: 16),
-          _metricRow(LucideIcons.battery, "Battery: ${metrics['batteryPercent'] ?? '?'}% at end", color),
-          const SizedBox(height: 16),
-          _metricRow(LucideIcons.alertCircle, "Expected late: ${metrics['expectedLatenessMinutes'] ?? 0} min", color),
-          const SizedBox(height: 24),
-          const Divider(color: Colors.white10),
-          const SizedBox(height: 20),
-          Text(
-            data['description'] ?? "",
-            style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
-          ),
-        ],
+  Widget _getStatusBadge(String id) {
+    String text = "FEASIBLE";
+    Color color = Colors.white24;
+    if (id == "RECOMMENDED") {
+      text = "OPTIMAL";
+      color = AppColors.primary.withOpacity(0.3);
+    } else if (id == "DO_NOTHING") {
+      text = "HIGH RISK";
+      color = AppColors.danger.withOpacity(0.2);
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
       ),
     );
   }
 
-  Widget _riskIconCount(int count) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: count > 0 ? Colors.redAccent.withOpacity(0.1) : Colors.greenAccent.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(LucideIcons.activity, size: 12, color: count > 0 ? Colors.redAccent : Colors.greenAccent),
-          const SizedBox(width: 4),
-          Text(
-            "$count risks",
-            style: TextStyle(
-              color: count > 0 ? Colors.redAccent : Colors.greenAccent,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
+  String _formatLateness(int mins) {
+    if (mins <= 0) return "Arrive on time";
+    if (mins < 10) return "Arrive slightly late ($mins min)";
+    return "Arrive $mins–${mins+5} min late";
   }
 
   Widget _metricRow(IconData icon, String text, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: Colors.white38),
+          const SizedBox(width: 12),
+          Text(
+            text,
+            style: GoogleFonts.outfit(fontSize: 12, color: Colors.white70),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniRiskChart(double score, Color color) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 12),
-        Text(text, style: const TextStyle(color: Colors.white, fontSize: 14)),
+        _bar(score * 0.4, color.withOpacity(0.3)),
+        const SizedBox(width: 2),
+        _bar(score * 0.7, color.withOpacity(0.6)),
+        const SizedBox(width: 2),
+        _bar(score, color),
       ],
     );
   }
 
-  Widget _buildComparativeGraph(List<dynamic> futures) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text("RISK PROJECTION", style: TextStyle(color: Colors.white30, fontSize: 10, letterSpacing: 1.2, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: futures.map((f) {
-            final stress = (f['metrics']['stressScore'] as num?)?.toDouble() ?? 0.0;
-            final color = stress > 0.7 ? Colors.redAccent : stress > 0.4 ? Colors.orangeAccent : Colors.greenAccent;
-            return _bar(f['title'] ?? "Scenario", stress, color);
-          }).toList(),
-        ),
-      ],
+  Widget _bar(double heightFactor, Color color) {
+    return Container(
+      width: 6,
+      height: 16 * heightFactor.clamp(0.1, 1.0),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(1),
+      ),
     );
   }
 
-  Widget _bar(String label, double score, Color color) {
-    return Column(
-      children: [
-        Text("${(score * 100).toInt()}", style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Container(
-          width: 40,
-          height: 100 * score,
-          decoration: BoxDecoration(color: color.withOpacity(0.3), borderRadius: const BorderRadius.vertical(top: Radius.circular(4)), border: Border.all(color: color.withOpacity(0.5))),
-        ),
-        const SizedBox(height: 8),
-        Text(label.split(" ")[0], style: const TextStyle(color: Colors.white24, fontSize: 8)),
-      ],
-    );
-  }
-
-  _ScenarioData _getScenarioData(int index) {
-    switch (index) {
-      case 0:
-        return _ScenarioData(
-          "Do nothing",
-          "12–18 min late",
-          "6%",
-          "+24",
-          "High chance you’ll both be late and unreachable mid-meeting.",
-          Colors.redAccent,
-        );
-      case 1:
-        return _ScenarioData(
-          "Recommended plan",
-          "on time (9:57)",
-          "14%",
-          "+4",
-          "Optimal balance. Switching to cab now saves 15 mins of walking in traffic.",
-          Colors.greenAccent,
-        );
-      case 2:
-        return _ScenarioData(
-          "Alternate path",
-          "5 min late",
-          "18%",
-          "+12",
-          "Safest for battery, but involves a longer walk and slight delay.",
-          Colors.orangeAccent,
-        );
-      default:
-        return _getScenarioData(1);
+  void _showScenarioDetails(BuildContext context, AppState state, dynamic data) {
+    final metrics = data['metrics'];
+    final id = data['id'];
+    
+    List<String> interventions = [];
+    if (id == "RECOMMENDED") {
+      interventions = ["Leave 15 min earlier", "Enable commute mode", "Send 'running late' message", "Plan a charging stop"];
+    } else if (id == "ALTERNATE") {
+      interventions = ["Plan 15 min charging stop", "Arrive 10 min late", "Full battery visibility"];
+    } else {
+      interventions = ["Maintain current routine", "Accept potential delays", "No battery saving"];
     }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => GlassCard(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Strategy: ${data['title']}",
+              style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              data['description'] ?? "",
+              style: const TextStyle(color: Colors.white60, fontSize: 13, height: 1.5),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              "REQUIRED ACTIONS",
+              style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary, letterSpacing: 1.2),
+            ),
+            const SizedBox(height: 12),
+            ...interventions.map((i) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  const Icon(LucideIcons.check, size: 14, color: AppColors.primary),
+                  const SizedBox(width: 12),
+                  Text(i, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                ],
+              ),
+            )).toList(),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  // Deep link would go here - for now just feedback
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Plan applied and synced to Dashboard")),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text("APPLY THIS PLAN", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
-}
-
-class _ScenarioData {
-  final String title;
-  final String eta;
-  final String battery;
-  final String notifs;
-  final String summary;
-  final Color color;
-
-  _ScenarioData(this.title, this.eta, this.battery, this.notifs, this.summary, this.color);
 }

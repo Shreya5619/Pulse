@@ -39,6 +39,8 @@ app.use("/api/graph", graphRouter);
 app.use("/api/routing", routingRouter);
 app.use("/api/planner", plannerRouter);
 app.use("/api", futuresRouter);
+import commRouter from "./routes/comm";
+app.use("/api/comm", commRouter);
 
 
 const httpServer = createServer(app);
