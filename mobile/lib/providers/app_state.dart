@@ -11,6 +11,7 @@ import '../models/snapshot.dart';
 import '../models/device_context.dart';
 import '../services/context_services.dart';
 import '../services/local_repository.dart';
+import '../services/notification_service.dart';
 import '../models/risk_snapshot.dart';
 import '../models/twin_graph.dart';
 
@@ -225,6 +226,28 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Pulse snapshot (Day 12 — persistent widget source of truth)
+  // Seeded with a visible fallback so the bar renders immediately
+  Map<String, dynamic> _pulseSnapshot = {
+    'state': 'NOMINAL',
+    'topRiskScore': 0.0,
+    'notificationContent': {
+      'title': 'Pulse active',
+      'subtitle': 'Monitoring your context…',
+      'urgency': 'low',
+    },
+    'notificationDigest': {
+      'highlight': 'Connecting to server…',
+      'urgent': [],
+      'important': [],
+      'noiseCount': 0,
+    },
+    'nextAction': null,
+  };
+  int _lastPulseSnapshotVersion = -1;
+
+  Map<String, dynamic> get pulseSnapshot => _pulseSnapshot;
+
   int get replayProgress {
     if (_scenarioStart == null ||
         _scenarioEnd == null ||
@@ -240,6 +263,7 @@ class AppState extends ChangeNotifier {
   AppState() {
     _initLocalData();
     _generateMockData();
+    _initNotificationService();
     _connectWebSocket();
     _initContextIngestion();
     // Keep internal simulation for fallback or UI stability
@@ -252,6 +276,13 @@ class AppState extends ChangeNotifier {
     Timer.periodic(const Duration(minutes: 2), (timer) {
       if (!_isReplayMode) fetchAppointmentEta();
     });
+  }
+
+  Future<void> _initNotificationService() async {
+    final ns = NotificationService();
+    await ns.init();
+    await ns.requestPermissions();
+    _updateNativeNotification(); // show initial seeded state
   }
 
   Future<void> _initLocalData() async {
@@ -583,6 +614,21 @@ class AppState extends ChangeNotifier {
           );
         }
       }
+    } else if (type == 'pulse.snapshot') {
+      // Dedup by version — ignore older or duplicate snapshots
+      if (data['userId'] != null && data['userId'] != _userId) return;
+      final incomingVersion = (data['version'] as num?)?.toInt() ?? 0;
+      if (incomingVersion > _lastPulseSnapshotVersion) {
+        final incoming = data['data'];
+        if (incoming is Map<String, dynamic>) {
+          _lastPulseSnapshotVersion = incomingVersion;
+          _pulseSnapshot = incoming;
+          debugPrint('[Pulse] pulse.snapshot v$incomingVersion → state=${_pulseSnapshot["state"]}');
+          _updateNativeNotification();
+        }
+      } else {
+        debugPrint('[Pulse] pulse.snapshot v$incomingVersion ignored (stale, current v$_lastPulseSnapshotVersion)');
+      }
     } else if (type == 'futures.updated') {
       debugPrint('[Pulse AppState] Futures update received');
       _currentFutures = data['data'];
@@ -813,6 +859,28 @@ class AppState extends ChangeNotifier {
 
   void triggerManualSnapshot() {
     _sendContextSnapshot("manual_trigger");
+  }
+
+  /// Sends a one-tap action to the backend (POST /api/pulse/action).
+  /// Also broadcasts `action.dispatched` back via WebSocket if connected.
+  Future<void> dispatchPulseAction(Map<String, dynamic> action) async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/pulse/action');
+      debugPrint('[Pulse] Dispatching action: ${action['type']} id=${action['id']}');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'userId': _userId, 'action': action}),
+      );
+      if (response.statusCode == 200) {
+        debugPrint('[Pulse] Action acknowledged by backend.');
+      } else {
+        debugPrint('[Pulse] Action dispatch error: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('[Pulse] Action dispatch exception: $e');
+    }
   }
 
   String _mapReason(String reason) {
@@ -1090,68 +1158,34 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchFutures() async {
-    if (_isReplayMode) return;
-    final host = _getBackendHost();
-    final url = Uri.parse('http://$host:8080/api/futures?userId=$_userId');
-    debugPrint('[Pulse AppState] Fetching futures from: $url');
+  void _updateNativeNotification() {
+    final snap = _pulseSnapshot;
+    final pulseState = snap['state'] as String? ?? 'NOMINAL';
+    final content = snap['notificationContent'] as Map<String, dynamic>?;
+    final digest = snap['notificationDigest'] as Map<String, dynamic>?;
 
-    try {
-      final response = await http.get(url).timeout(const Duration(seconds: 10));
-      debugPrint(
-        '[Pulse AppState] Futures response status: ${response.statusCode}',
-      );
+    final title = content?['title'] as String? ?? 'Pulse active';
+    final subtitle = content?['subtitle'] as String? ?? 'Monitoring…';
+    final highlight = (content?['highlight'] as String?)?.isNotEmpty == true
+        ? content!['highlight'] as String
+        : digest?['highlight'] as String?;
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['ok'] == true) {
-          _currentFutures = data['data'];
-          final count = (_currentFutures?['futures'] as List?)?.length ?? 0;
-          debugPrint('[Pulse AppState] Futures loaded: $count scenarios');
-          notifyListeners();
-        } else {
-          debugPrint('[Pulse AppState] Futures API error: ${data['error']}');
-        }
-      } else {
-        debugPrint(
-          '[Pulse AppState] Futures API failed: ${response.statusCode}',
-        );
-      }
-    } catch (e) {
-      debugPrint('[Pulse AppState] Error fetching futures: $e');
-    }
+    final body = highlight != null && highlight.isNotEmpty
+        ? '$subtitle\n$highlight'
+        : subtitle;
+
+    NotificationService().showPulseNotification(
+      title: title,
+      body: body,
+      state: pulseState,
+    );
   }
 
-  Future<void> fetchAppointmentEta() async {
-    try {
-      final host = _getBackendHost();
-      final url = Uri.parse(
-        'http://$host:8080/api/routing/next-appointment-eta?userId=$_userId',
-      );
 
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['ok'] == true) {
-          _etaInfo = AppointmentEtaInfo.fromJson(data['data']);
-          notifyListeners();
-        }
-      }
-    } catch (e) {
-      debugPrint('[Pulse AppState] Error fetching appointment ETA: $e');
-    }
-  }
 
   String _getBackendHost() {
-    String host = 'localhost';
-    if (!kIsWeb) {
-      if (defaultTargetPlatform == TargetPlatform.android) {
-        // For physical devices or emulators on local network
-        // Use your computer's local IP address
-        host = '192.168.0.102';
-      }
-    }
-    return host;
+    // ADB Reverse Tunnel active - always route through USB loopback
+    return 'localhost';
   }
 
   @override

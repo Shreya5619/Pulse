@@ -81,6 +81,42 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
         },
       },
     ],
+    "Ola Multi-Mode ETA Test": [
+      {
+        "type": "heartbeat.tick",
+        "timestamp": "2026-04-28T09:00:00Z",
+        "data": {"status": "nominal"},
+      },
+      {
+        "type": "risk.updated",
+        "timestamp": "2026-04-28T09:02:00Z",
+        "data": {
+          "level": "low",
+          "score": 15.0,
+          "reasons": ["Evaluating Transit APIs"],
+          "history": [5, 10, 15],
+        },
+      },
+      {
+        "type": "intervention.created",
+        "timestamp": "2026-04-28T09:05:00Z",
+        "eventId": "int_002",
+        "data": {
+          "headline": "Check Alternate Routes",
+          "body": "Verify live traffic data via the Map Pin icon.",
+        },
+      },
+      {
+        "type": "risk.updated",
+        "timestamp": "2026-04-28T09:10:00Z",
+        "data": {
+          "level": "med",
+          "score": 48.0,
+          "reasons": ["High traffic along route"],
+          "history": [15, 25, 35, 48],
+        },
+      },
+    ],
   };
 
   @override

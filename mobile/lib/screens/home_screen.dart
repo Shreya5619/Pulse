@@ -13,7 +13,7 @@ import '../widgets/risk_hero_card.dart';
 import '../models/risk_snapshot.dart';
 import '../models/risk_state.dart' as legacy;
 import '../screens/graph_explanation_screen.dart';
-import '../widgets/route_eta_strip.dart';
+import '../screens/multi_mode_eta_screen.dart';
 import '../screens/twin_graph_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -43,11 +43,9 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 24),
                   const RiskHeroCard(),
                   const SizedBox(height: 24),
-
                   _buildRiskStack(context, state),
                   const SizedBox(height: 24),
                   _buildContextChipsRow(context, state),
-                  const SizedBox(height: 80), // Space for bottom banner
                 ],
               ),
             ),
@@ -101,6 +99,19 @@ class HomeScreen extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              IconButton(
+                icon: const Icon(
+                  LucideIcons.mapPin,
+                  size: 18,
+                  color: Colors.white30,
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MultiModeEtaScreen(),
+                  ),
+                ),
+              ),
               IconButton(
                 icon: const Icon(
                   LucideIcons.calendar,
