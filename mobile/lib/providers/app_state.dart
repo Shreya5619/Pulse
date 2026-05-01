@@ -85,6 +85,53 @@ class AppointmentEtaInfo {
   factory AppointmentEtaInfo.empty() => AppointmentEtaInfo(hasRoute: false);
 }
 
+class DayPulseRisk {
+  final String type;
+  final String level;
+  final String label;
+  final double score;
+
+  DayPulseRisk({required this.type, required this.level, required this.label, required this.score});
+
+  factory DayPulseRisk.fromJson(Map<String, dynamic> json) {
+    return DayPulseRisk(
+      type: json['type'],
+      level: json['level'],
+      label: json['type'].toString().toUpperCase(),
+      score: (json['score'] as num).toDouble(),
+    );
+  }
+}
+
+class DayPulseBlock {
+  final String eventId;
+  final String title;
+  final DateTime startTime;
+  final DateTime endTime;
+  final List<DayPulseRisk> risks;
+  final Map<String, dynamic>? suggestion;
+
+  DayPulseBlock({
+    required this.eventId,
+    required this.title,
+    required this.startTime,
+    required this.endTime,
+    required this.risks,
+    this.suggestion,
+  });
+
+  factory DayPulseBlock.fromJson(Map<String, dynamic> json) {
+    return DayPulseBlock(
+      eventId: json['eventId'],
+      title: json['title'],
+      startTime: DateTime.parse(json['startTime']),
+      endTime: DateTime.parse(json['endTime']),
+      risks: (json['risks'] as List).map((r) => DayPulseRisk.fromJson(r)).toList(),
+      suggestion: json['suggestion'],
+    );
+  }
+}
+
 class AppState extends ChangeNotifier {
   final ContextServices _contextServices = ContextServices();
   final LocalRepository _localRepo = LocalRepository();
@@ -156,10 +203,12 @@ class AppState extends ChangeNotifier {
   Map<String, dynamic>? get lastPlannerDecision => _lastPlannerDecision;
   TwinGraph? get twinGraph => _twinGraph;
   Map<String, dynamic>? get proposedCommAction => _proposedCommAction;
+  List<DayPulseBlock> get dayPulseBlocks => _dayPulseBlocks;
 
   final Set<String> _acceptedActionIds = {};
   final Set<String> _dismissedActionIds = {};
   Map<String, dynamic>? _proposedCommAction;
+  List<DayPulseBlock> _dayPulseBlocks = [];
 
   bool isActionAccepted(String id) => _acceptedActionIds.contains(id);
   bool isActionDismissed(String id) => _dismissedActionIds.contains(id);
@@ -224,6 +273,51 @@ class AppState extends ChangeNotifier {
   void selectScenario(String id) {
     _selectedScenarioId = id;
     notifyListeners();
+  }
+
+  Future<void> fetchDayPulse() async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/day-pulse?userId=$_userId');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List blocks = data['data']['blocks'];
+        _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error fetching Day Pulse: $e');
+    }
+  }
+
+  Future<void> modifyDayPulse(String eventId, Map<String, dynamic> updates) async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/day-pulse/modify');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'userId': _userId,
+          'eventId': eventId,
+          'updates': updates,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List blocks = data['data']['blocks'];
+        _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        notifyListeners();
+        
+        // Also refresh graph as schedule change affects digital twin
+        fetchTwinGraph();
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error modifying Day Pulse: $e');
+    }
   }
 
   // Pulse snapshot (Day 12 — persistent widget source of truth)
@@ -888,6 +982,7 @@ class AppState extends ChangeNotifier {
           "upcoming_events": _deviceContext.upcomingEvents
               .map(
                 (e) => {
+                  "id": "event_${e.title.hashCode}_${e.start.millisecondsSinceEpoch}",
                   "title": e.title,
                   "start_time": e.start.toUtc().toIso8601String(),
                   "end_time": e.end.toUtc().toIso8601String(),

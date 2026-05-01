@@ -43,6 +43,8 @@ app.use("/api", futuresRouter);
 import commRouter from "./routes/comm";
 app.use("/api/comm", commRouter);
 app.use("/api/twin", twinRouter);
+import dayPulseRouter from "./routes/dayPulse";
+app.use("/api", dayPulseRouter);
 
 
 const httpServer = createServer(app);

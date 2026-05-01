@@ -15,12 +15,29 @@ class DeviceContext {
   });
 
   factory DeviceContext.initial() {
+    final now = DateTime.now();
     return DeviceContext(
-      battery: BatteryInfo(level: 0, isCharging: false),
-      location: LocationInfo(latitude: 0, longitude: 0, status: "Unknown"),
-      upcomingEvents: [],
+      battery: BatteryInfo(level: 85, isCharging: false),
+      location: LocationInfo(latitude: 37.7749, longitude: -122.4194, status: "Home"),
+      upcomingEvents: [
+        CalendarEvent(
+          title: "Strategy Sync",
+          start: now.add(const Duration(minutes: 30)),
+          end: now.add(const Duration(minutes: 60)),
+        ),
+        CalendarEvent(
+          title: "Product Design Review",
+          start: now.add(const Duration(hours: 3)),
+          end: now.add(const Duration(hours: 4)),
+        ),
+        CalendarEvent(
+          title: "Grocery & Errands",
+          start: now.add(const Duration(hours: 6)),
+          end: now.add(const Duration(hours: 7)),
+        ),
+      ],
       notifications: [],
-      timestamp: DateTime.now(),
+      timestamp: now,
     );
   }
 }

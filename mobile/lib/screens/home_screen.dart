@@ -17,6 +17,7 @@ import '../models/risk_state.dart' as legacy;
 import '../screens/graph_explanation_screen.dart';
 import '../screens/multi_mode_eta_screen.dart';
 import '../screens/twin_graph_screen.dart';
+import '../screens/day_pulse_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -44,6 +45,8 @@ class HomeScreen extends StatelessWidget {
                   _buildFuturesPathLabel(state),
                   const SizedBox(height: 24),
                   RiskHeroCard(),
+                  const SizedBox(height: 24),
+                  _buildDayPulsePreview(context, state),
                   const SizedBox(height: 24),
                   _buildRiskStack(context, state),
                   const SizedBox(height: 24),
@@ -127,6 +130,19 @@ class HomeScreen extends StatelessWidget {
               ),
               IconButton(
                 icon: const Icon(
+                  LucideIcons.activity,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const DayPulseScreen(),
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(
                   LucideIcons.gitBranch,
                   size: 18,
                   color: Colors.white30,
@@ -203,6 +219,78 @@ class HomeScreen extends StatelessWidget {
           const Text(
             " path",
             style: TextStyle(fontSize: 11, color: Colors.white30),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDayPulsePreview(BuildContext context, AppState state) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const DayPulseScreen()),
+      ),
+      child: GlassCard(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(LucideIcons.activity, color: AppColors.primary, size: 20),
+                      const SizedBox(width: 10),
+                      Text(
+                        "Daily Pulse",
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Icon(LucideIcons.chevronRight, color: Colors.white24, size: 16),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "Your schedule is being simulated for the entire day. ${state.dayPulseBlocks.length} activities tracked.",
+                style: GoogleFonts.outfit(fontSize: 13, color: Colors.white60),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _miniRiskBadge(LucideIcons.clock, "No delay"),
+                  const SizedBox(width: 8),
+                  _miniRiskBadge(LucideIcons.battery, "Power ok"),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _miniRiskBadge(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 10, color: Colors.white30),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: GoogleFonts.outfit(fontSize: 10, color: Colors.white30),
           ),
         ],
       ),
