@@ -6,6 +6,8 @@ import { RiskSnapshot } from "../types/risk";
 import { FuturesResult } from "../types/futures";
 import { MemoryState } from "../../../shared/memory";
 import { contextSnapshotRepo } from "../db/ContextSnapshotRepository";
+import { GraphAdapter } from "./GraphAdapter";
+import { PersonalityAnalysis } from "./PersonalityAnalyzer";
 
 class PlannerEngine {
   async decideForUser(userId: string): Promise<PlannerDecision> {
@@ -14,9 +16,10 @@ class PlannerEngine {
     const futures = await futuresEngine.computeForUser(userId);
     const memory = await memoryStore.loadAll(userId);
     const context = await contextSnapshotRepo.findLatestByUser(userId);
+    const personality = await GraphAdapter.getUserPersonality(userId);
 
-    const candidates = this.buildCandidates(riskSnapshot, futures, memory, context);
-    const chosen = this.pickBest(candidates, memory);
+    const candidates = this.buildCandidates(riskSnapshot, futures, memory, context, personality);
+    const chosen = this.pickBest(candidates, memory, personality);
 
     return {
       userId,
@@ -31,8 +34,9 @@ class PlannerEngine {
     const futures = await futuresEngine.computeForUser(userId);
     const memory = await memoryStore.loadAll(userId);
     const context = await contextSnapshotRepo.findLatestByUser(userId);
+    const personality = await GraphAdapter.getUserPersonality(userId);
 
-    const allCandidates = this.buildCandidates(riskSnapshot, futures, memory, context);
+    const allCandidates = this.buildCandidates(riskSnapshot, futures, memory, context, personality);
 
     // Filter candidates relevant to this risk type/node
     let relevant = allCandidates.filter(c => {
@@ -69,7 +73,8 @@ class PlannerEngine {
     risk: RiskSnapshot,
     futures: FuturesResult,
     memory: MemoryState,
-    context: any
+    context: any,
+    personality?: PersonalityAnalysis
   ): PlannerAction[] {
     const candidates: PlannerAction[] = [];
     const suggestedRecipient = context?.calendar?.next_event?.organizer_contact || "123-456-7890"; // Hardcoded fallback as requested
@@ -164,17 +169,26 @@ class PlannerEngine {
     return candidates;
   }
 
-  private pickBest(candidates: PlannerAction[], memory: MemoryState): PlannerAction | null {
+  private pickBest(candidates: PlannerAction[], memory: MemoryState, personality?: PersonalityAnalysis): PlannerAction | null {
     if (candidates.length === 0) return null;
 
-    // priority order: lateness > battery > overload/response
-    const priorities: ActionId[] = [
+    // Default priority order: lateness > battery > overload/response
+    let priorities: ActionId[] = [
       "ACTION_LEAVE_NOW",
       "ACTION_ENABLE_BATTERY_SAVER",
       "ACTION_RECOMMEND_CHARGING_STOP",
       "ACTION_SUPPRESS_NOISY_NOTIFICATIONS",
       "ACTION_PREPARE_DELAY_MESSAGE"
     ];
+
+    // Adjust priorities based on personality traits
+    if (personality?.traits.includes("Goal-oriented")) {
+      priorities = ["ACTION_LEAVE_NOW", ...priorities.filter(p => p !== "ACTION_LEAVE_NOW")];
+    } else if (personality?.traits.includes("Highly responsive")) {
+      priorities = ["ACTION_PREPARE_DELAY_MESSAGE", ...priorities.filter(p => p !== "ACTION_PREPARE_DELAY_MESSAGE")];
+    } else if (personality?.sentiment === "Stressed" || personality?.sentiment === "Overwhelmed") {
+      priorities = ["ACTION_SUPPRESS_NOISY_NOTIFICATIONS", ...priorities.filter(p => p !== "ACTION_SUPPRESS_NOISY_NOTIFICATIONS")];
+    }
 
     const preferred = [...candidates].sort((a, b) =>
       priorities.indexOf(a.id) - priorities.indexOf(b.id)
