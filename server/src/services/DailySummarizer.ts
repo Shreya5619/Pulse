@@ -1,6 +1,6 @@
 import { contextSnapshotRepo } from "../db/ContextSnapshotRepository";
 import { memoryStore } from "./MemoryStore";
-import { ContextSnapshot } from "../../../shared/memory"; // Assuming it's re-exported or similar
+import { ContextSnapshot } from "../../../shared/context_snapshot";
 
 export class DailySummarizer {
    /**

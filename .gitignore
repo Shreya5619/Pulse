@@ -80,3 +80,10 @@ data/generated/
 # ---- Pulse Memory Layer (User Data) ----
 memory/osrm-data/
 server/memory
+
+# ---- External Project Modules ----
+lifecanvas_app/
+lifecanvas_mobile/
+lifecanvas_web/
+# ---- Experimental / Testing ----
+testing/

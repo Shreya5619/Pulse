@@ -17,9 +17,11 @@ router.get("/eta", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Missing coordinates" });
     }
 
+    const force = req.query.force === "true";
     const result = await routingService.getRoute(
       { lat: Number(fromLat), lon: Number(fromLon) },
-      { lat: Number(toLat), lon: Number(toLon) }
+      { lat: Number(toLat), lon: Number(toLon) },
+      force
     );
 
     res.json({
@@ -59,10 +61,11 @@ router.get("/next-appointment-eta", async (req, res) => {
       });
     }
 
+    const force = req.query.force === "true";
     const from = { lat: context.location.lat, lon: context.location.lon };
     const to = { lat: nextEvent.location.lat, lon: nextEvent.location.lon };
 
-    const result = await routingService.getRoute(from, to);
+    const result = await routingService.getRoute(from, to, force);
 
     const now = new Date(context.timestamp);
     const eventTime = new Date(nextEvent.start_time);
@@ -107,9 +110,11 @@ router.get("/multi-mode-eta", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Missing coordinates" });
     }
 
+    const force = req.query.force === "true";
     const result = await routingService.getMultiModeRoutes(
       { lat: Number(fromLat), lon: Number(fromLon) },
-      { lat: Number(toLat), lon: Number(toLon) }
+      { lat: Number(toLat), lon: Number(toLon) },
+      force
     );
 
     res.json({

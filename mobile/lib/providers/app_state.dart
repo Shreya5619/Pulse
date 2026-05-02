@@ -200,6 +200,7 @@ class AppState extends ChangeNotifier {
 
   RiskState get currentRisk => _currentRisk;
   List<ContextSnapshot> get snapshots => _snapshots;
+
   List<Intervention> get interventions => _interventions;
   List<TimelineEvent> get timelineEvents => _timelineEvents;
   List<String> get rawMessages => _rawMessages;
@@ -832,17 +833,39 @@ class AppState extends ChangeNotifier {
 
     // Event capture for Timeline (for both live and replay)
     if (type == 'context.updated') {
-      _timelineEvents.insert(
-        0,
-        TimelineEvent(
-          id: data['eventId'] ?? const Uuid().v4(),
-          timestamp: timestamp,
-          type: 'Context',
-          agent: 'Context',
-          text: 'Device state snapshot ingested.',
-          data: data['data'],
-        ),
-      );
+      final cData = data['data'];
+      if (cData != null) {
+        // Update local state for UI immediately
+        if (isReplay) {
+          final loc = cData['location'];
+          _deviceContext = DeviceContext(
+            battery: BatteryInfo(
+              level: cData['batteryPercent'] ?? _deviceContext.battery.level,
+              isCharging: cData['isCharging'] ?? _deviceContext.battery.isCharging,
+              trend: _deviceContext.battery.trend,
+            ),
+            location: loc != null ? LocationInfo(latitude: loc['lat'], longitude: loc['lon'], status: cData['locationLabel'] ?? "Replay") : _deviceContext.location,
+            upcomingEvents: _deviceContext.upcomingEvents,
+            notifications: _deviceContext.notifications,
+            timestamp: timestamp,
+          );
+          
+          // CRITICAL: Push simulated context to server so server-side routing works
+          _sendContextSnapshot("replay_sync");
+        }
+
+        _timelineEvents.insert(
+          0,
+          TimelineEvent(
+            id: data['eventId'] ?? const Uuid().v4(),
+            timestamp: timestamp,
+            type: 'Context',
+            agent: 'Context',
+            text: 'Device state snapshot ingested.',
+            data: cData,
+          ),
+        );
+      }
     } else if (type == 'risk.updated') {
       final risks = data['data']?['risks'] as List<dynamic>? ?? [];
       if (risks.isNotEmpty) {
@@ -1005,7 +1028,7 @@ class AppState extends ChangeNotifier {
       _lastHeartbeatTime = timestamp;
       final hData = data['data'];
       if (hData != null && hData['risksNext90Min'] != null) {
-        _risksNext90Min = hData['risksNext90Min'];
+        _risksNext90Min = (hData['risksNext90Min'] as num).toInt();
       }
     } else if (type == 'graph.updated') {
       if (data['userId'] != null && data['userId'] != _userId) return;
@@ -1251,6 +1274,18 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       debugPrint('[Pulse AppState] Error fetching twin graph: $e');
     }
+  }
+
+  void setSimulatedLocation(double lat, double lon, String label) {
+    _deviceContext = DeviceContext(
+      battery: _deviceContext.battery,
+      location: LocationInfo(latitude: lat, longitude: lon, status: label),
+      upcomingEvents: _deviceContext.upcomingEvents,
+      notifications: _deviceContext.notifications,
+      timestamp: DateTime.now(),
+    );
+    notifyListeners();
+    _sendContextSnapshot("manual_location_update");
   }
 
   void triggerManualSnapshot() {
