@@ -35,6 +35,18 @@ export class UserEventsRepository {
         events.push(event);
         this.manualEvents.set(userId, events);
     }
+
+    async deleteManualEvent(userId: string, eventId: string): Promise<void> {
+        const events = this.manualEvents.get(userId) || [];
+        const filtered = events.filter(e => e.id !== eventId);
+        this.manualEvents.set(userId, filtered);
+    }
+
+    async deleteOverride(userId: string, eventId: string): Promise<void> {
+        const userOverrides = this.overrides.get(userId) || [];
+        const filtered = userOverrides.filter(o => o.eventId !== eventId);
+        this.overrides.set(userId, filtered);
+    }
 }
 
 export const userEventsRepo = new UserEventsRepository();

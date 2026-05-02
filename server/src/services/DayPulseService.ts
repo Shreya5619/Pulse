@@ -16,10 +16,14 @@ export interface DayPulseBlock {
     endTime: string;
     type: 'event' | 'routine';
     category?: 'sleep' | 'study' | 'commute' | 'buffer';
+    locationText?: string;
+    etaMinutes?: number;
+    days?: number[];
     risks: {
-        type: 'lateness' | 'battery' | 'overload';
+        type: 'lateness' | 'battery' | 'overload' | 'overlap' | 'personality';
         level: 'low' | 'medium' | 'high';
         score: number;
+        explanation?: string;
     }[];
     suggestion?: {
         title: string;
@@ -95,12 +99,25 @@ export class DayPulseService {
 
         // 5. Simulate risk for each event block
         for (const event of events) {
-            const risks = await this.simulateRisksForEvent(userId, event, context, personality);
+            let etaMinutes: number | undefined;
+            if (event.location?.lat && event.location?.lon && context) {
+                try {
+                    const route = await routingService.getRoute(
+                        { lat: context.location.lat, lon: context.location.lon },
+                        { lat: event.location.lat, lon: event.location.lon }
+                    );
+                    etaMinutes = Math.ceil(route.durationSeconds / 60);
+                } catch (e) {
+                    console.error(`[DayPulseService] Failed to fetch ETA for ${event.title}:`, e);
+                }
+            }
+
+            const risks = await this.simulateRisksForEvent(userId, event, context, personality, etaMinutes);
             
             let suggestion;
             if (risks.length > 0) {
                 const topRisk = risks.sort((a, b) => b.score - a.score)[0];
-                const actions = await plannerEngine.getActionsForRisk(userId, topRisk.type, event.id);
+                const actions = await plannerEngine.getActionsForRisk(userId, topRisk.type as any, event.id);
                 if (actions.length > 0) {
                     suggestion = {
                         title: actions[0].title,
@@ -115,6 +132,9 @@ export class DayPulseService {
                 startTime: event.start_time,
                 endTime: event.end_time,
                 type: 'event',
+                locationText: event.location_text,
+                etaMinutes,
+                category: (event as any).category,
                 risks,
                 suggestion
             });
@@ -172,7 +192,7 @@ export class DayPulseService {
         };
     }
 
-    private async simulateRisksForEvent(userId: string, event: CalendarEvent, context: any, personality: any): Promise<DayPulseBlock['risks']> {
+    private async simulateRisksForEvent(userId: string, event: CalendarEvent, context: any, personality: any, etaMinutes?: number): Promise<DayPulseBlock['risks']> {
         const risks: DayPulseBlock['risks'] = [];
         if (!context) return [];
 
@@ -180,19 +200,27 @@ export class DayPulseService {
         const eventStart = new Date(event.start_time);
         const minutesToStart = (eventStart.getTime() - now.getTime()) / 60000;
         
-        // 1. Lateness Risk (Heuristic)
-        // Only calculate if event has a location
-        if (event.location?.lat && event.location?.lon) {
-            if (minutesToStart > 0 && minutesToStart < 120) {
-                let etaMinutes = 20;
-                try {
-                    const route = await routingService.getRoute(
-                        { lat: context.location.lat, lon: context.location.lon },
-                        { lat: event.location.lat, lon: event.location.lon }
-                    );
-                    etaMinutes = Math.ceil(route.durationSeconds / 60);
-                } catch (e) {}
+        const isTier1 = minutesToStart > 0 && minutesToStart < 120; // Within 2 hours
 
+        // 1. Battery Risk (All tiers)
+        const drainRate = 8; // 8% per hour active
+        const hoursUntilStart = Math.max(0, minutesToStart / 60);
+        const predictedLevel = (context.battery.level * 100) - (drainRate * hoursUntilStart);
+        
+        if (predictedLevel < 25) {
+            risks.push({
+                type: 'battery',
+                level: predictedLevel < 10 ? 'high' : (predictedLevel < 20 ? 'medium' : 'low'),
+                score: Math.min(1, (25 - predictedLevel) / 25),
+                explanation: `Predicted battery level: ${Math.round(predictedLevel)}% at start.`
+            });
+        }
+
+        if (isTier1) {
+            // TIER 1: Detailed Risks
+            
+            // Lateness Risk
+            if (etaMinutes !== undefined) {
                 const lateness = assessLateness(
                     minutesToStart,
                     etaMinutes,
@@ -206,24 +234,37 @@ export class DayPulseService {
                     risks.push({
                         type: 'lateness',
                         level: lateness.score > 0.7 ? 'high' : (lateness.score > 0.4 ? 'medium' : 'low'),
-                        score: lateness.score
+                        score: lateness.score,
+                        explanation: `ETA: ${etaMinutes} mins. Start in: ${Math.round(minutesToStart)} mins. Graph trace shows tight window.`
                     });
                 }
             }
-        }
 
-        // 2. Battery Risk
-        // Projected drain until event start
-        const drainRate = 8; // 8% per hour active
-        const hoursUntilStart = Math.max(0, minutesToStart / 60);
-        const predictedLevel = (context.battery.level * 100) - (drainRate * hoursUntilStart);
-        
-        if (predictedLevel < 20) {
-            risks.push({
-                type: 'battery',
-                level: predictedLevel < 10 ? 'high' : 'medium',
-                score: (20 - predictedLevel) / 20
-            });
+            // Overload Risk (Stub for now)
+            if (event.importance === 'high') {
+                risks.push({
+                    type: 'overload',
+                    level: 'low',
+                    score: 0.2,
+                    explanation: "High importance event. Monitor cognitive load."
+                });
+            }
+        } else if (minutesToStart > 0) {
+            // TIER 2: Basic Risks
+            
+            // Overlap Risk (Simplified)
+            // We could check other events here, but for now just personality alignment
+            if (personality && personality.traits) {
+                const isIntrovert = personality.traits.extraversion < 0.4;
+                if (isIntrovert && event.title.toLowerCase().includes('party')) {
+                    risks.push({
+                        type: 'personality',
+                        level: 'medium',
+                        score: 0.5,
+                        explanation: "Social event detected. Potential energy drain for introvert profile."
+                    });
+                }
+            }
         }
 
         return risks;

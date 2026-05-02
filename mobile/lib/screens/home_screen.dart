@@ -154,27 +154,6 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white10),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      LucideIcons.clock,
-                      size: 14,
-                      color: Colors.blueAccent,
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         ),
@@ -242,7 +221,11 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(LucideIcons.activity, color: AppColors.primary, size: 20),
+                      const Icon(
+                        LucideIcons.activity,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
                       const SizedBox(width: 10),
                       Text(
                         "Daily Pulse",
@@ -254,7 +237,11 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const Icon(LucideIcons.chevronRight, color: Colors.white24, size: 16),
+                  const Icon(
+                    LucideIcons.chevronRight,
+                    color: Colors.white24,
+                    size: 16,
+                  ),
                 ],
               ),
               const SizedBox(height: 16),

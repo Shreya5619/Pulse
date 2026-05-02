@@ -58,6 +58,27 @@ export class RoutineRepository {
         const day = date.getDay();
         return (await this.getForUser(userId)).filter(r => r.days.includes(day));
     }
+
+    async addRoutine(userId: string, routine: Omit<RoutineBlock, 'id' | 'userId'>): Promise<RoutineBlock> {
+        const newRoutine: RoutineBlock = {
+            ...routine,
+            id: `routine_${Date.now()}`,
+            userId
+        };
+        this.routines.push(newRoutine);
+        return newRoutine;
+    }
+
+    async updateRoutine(userId: string, routineId: string, updates: Partial<RoutineBlock>): Promise<void> {
+        const index = this.routines.findIndex(r => r.id === routineId && (r.userId === userId || r.userId === 'demo-user'));
+        if (index !== -1) {
+            this.routines[index] = { ...this.routines[index], ...updates };
+        }
+    }
+
+    async deleteRoutine(userId: string, routineId: string): Promise<void> {
+        this.routines = this.routines.filter(r => !(r.id === routineId && (r.userId === userId || r.userId === 'demo-user')));
+    }
 }
 
 export const routineRepo = new RoutineRepository();

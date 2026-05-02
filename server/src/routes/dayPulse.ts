@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { dayPulseService } from "../services/DayPulseService";
 import { userEventsRepo } from "../db/UserEventsRepository";
+import { routineRepo } from "../db/RoutineRepository";
 
 const router = Router();
 
@@ -25,10 +26,15 @@ router.get("/day-pulse", async (req: Request, res: Response) => {
 
 router.post("/day-pulse/modify", async (req: Request, res: Response) => {
     try {
-        const { userId, eventId, updates } = req.body;
+        const { userId, eventId, updates, isRecurring, days } = req.body;
         console.log(`[DayPulseRoute] Modifying event ${eventId} for user ${userId}:`, updates);
         
-        await userEventsRepo.addOverride(userId, { userId, eventId, updates });
+        if (isRecurring && days) {
+            // Sync to RoutineRepository if it was a routine or we want to make it recurring
+            await routineRepo.updateRoutine(userId, eventId, { ...updates, days });
+        } else {
+            await userEventsRepo.addOverride(userId, { userId, eventId, updates });
+        }
         
         const date = new Date().toISOString().split('T')[0];
         const timeline = await dayPulseService.getDailyTimeline(userId, date);
@@ -48,10 +54,23 @@ router.post("/day-pulse/modify", async (req: Request, res: Response) => {
 
 router.post("/day-pulse/add", async (req: Request, res: Response) => {
     try {
-        const { userId, event } = req.body;
+        const { userId, event, isRecurring, days, category } = req.body;
         console.log(`[DayPulseRoute] Adding manual event for user ${userId}:`, event.title);
-        
-        await userEventsRepo.addManualEvent(userId, event);
+        if (isRecurring && days) {
+            // Extract HH:mm from ISO strings
+            const startStr = new Date(event.start_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+            const endStr = new Date(event.end_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+            
+            await routineRepo.addRoutine(userId, {
+                title: event.title,
+                startTime: startStr,
+                endTime: endStr,
+                category: category || 'buffer',
+                days: days
+            });
+        } else {
+            await userEventsRepo.addManualEvent(userId, { ...event, category });
+        }
         
         const date = new Date().toISOString().split('T')[0];
         const timeline = await dayPulseService.getDailyTimeline(userId, date);
@@ -85,6 +104,35 @@ router.post("/day-pulse/optimize", async (req: Request, res: Response) => {
         res.status(500).json({
             ok: false,
             error: "Could not optimize pulse"
+        });
+    }
+});
+
+router.post("/day-pulse/delete", async (req: Request, res: Response) => {
+    try {
+        const { userId, eventId, isRoutine } = req.body;
+        console.log(`[DayPulseRoute] Deleting ${isRoutine ? 'routine' : 'event'} ${eventId} for user ${userId}`);
+        
+        if (isRoutine) {
+            await routineRepo.deleteRoutine(userId, eventId);
+        } else {
+            // It could be a manual event or an override
+            await userEventsRepo.deleteManualEvent(userId, eventId);
+            await userEventsRepo.addOverride(userId, { userId, eventId, updates: {}, isDeleted: true });
+        }
+        
+        const date = new Date().toISOString().split('T')[0];
+        const timeline = await dayPulseService.getDailyTimeline(userId, date);
+        
+        res.json({
+            ok: true,
+            data: timeline,
+            message: "Item removed from your pulse."
+        });
+    } catch (error) {
+        res.status(500).json({
+            ok: false,
+            error: "Could not delete item"
         });
     }
 });

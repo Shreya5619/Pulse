@@ -90,12 +90,14 @@ class DayPulseRisk {
   final String level;
   final String label;
   final double score;
+  final String? explanation;
 
   DayPulseRisk({
     required this.type,
     required this.level,
     required this.label,
     required this.score,
+    this.explanation,
   });
 
   factory DayPulseRisk.fromJson(Map<String, dynamic> json) {
@@ -104,6 +106,7 @@ class DayPulseRisk {
       level: json['level'],
       label: json['type'].toString().toUpperCase(),
       score: (json['score'] as num).toDouble(),
+      explanation: json['explanation'],
     );
   }
 }
@@ -115,6 +118,9 @@ class DayPulseBlock {
   final DateTime endTime;
   final String type; // 'event' | 'routine'
   final String? category; // 'sleep' | 'study' | 'commute' | 'buffer'
+  final String? locationText;
+  final int? etaMinutes;
+  final List<int>? days;
   final List<DayPulseRisk> risks;
   final Map<String, dynamic>? suggestion;
 
@@ -125,6 +131,9 @@ class DayPulseBlock {
     required this.endTime,
     required this.type,
     this.category,
+    this.locationText,
+    this.etaMinutes,
+    this.days,
     required this.risks,
     this.suggestion,
   });
@@ -137,6 +146,9 @@ class DayPulseBlock {
       endTime: DateTime.parse(json['endTime']).toLocal(),
       type: json['type'] ?? 'event',
       category: json['category'],
+      locationText: json['locationText'],
+      etaMinutes: json['etaMinutes'],
+      days: json['days'] != null ? List<int>.from(json['days']) : null,
       risks: (json['risks'] as List)
           .map((r) => DayPulseRisk.fromJson(r))
           .toList(),
@@ -319,6 +331,8 @@ class AppState extends ChangeNotifier {
           'userId': _userId,
           'eventId': eventId,
           'updates': updates,
+          'isRecurring': updates['isRecurring'],
+          'days': updates['days'],
         }),
       );
 
@@ -340,6 +354,9 @@ class AppState extends ChangeNotifier {
     DateTime start,
     DateTime end, {
     String? location,
+    String? category,
+    bool isRecurring = false,
+    List<int>? days,
   }) async {
     try {
       final host = _getBackendHost();
@@ -360,6 +377,9 @@ class AppState extends ChangeNotifier {
                 }
               : null,
         },
+        'isRecurring': isRecurring,
+        'days': days,
+        'category': category,
       };
 
       final response = await http.post(
@@ -377,6 +397,32 @@ class AppState extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('[Pulse AppState] Error adding event: $e');
+    }
+  }
+
+  Future<void> deleteDayPulseItem(String eventId, bool isRoutine) async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/day-pulse/delete');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'userId': _userId,
+          'eventId': eventId,
+          'isRoutine': isRoutine,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List blocks = data['data']['blocks'];
+        _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        notifyListeners();
+        fetchTwinGraph();
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error deleting item: $e');
     }
   }
 

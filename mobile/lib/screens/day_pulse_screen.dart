@@ -6,6 +6,182 @@ import 'package:intl/intl.dart';
 import '../providers/app_state.dart';
 import '../theme/colors.dart';
 
+void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
+    final titleController = TextEditingController(text: existingBlock?.title);
+    final locationController = TextEditingController(text: existingBlock?.locationText);
+    DateTime startTime = existingBlock?.startTime ?? DateTime.now().add(const Duration(hours: 1));
+    DateTime endTime = existingBlock?.endTime ?? DateTime.now().add(const Duration(hours: 2));
+    String selectedCategory = existingBlock?.category ?? 'buffer';
+    bool isRecurring = existingBlock?.days != null;
+    List<int> selectedDays = existingBlock?.days ?? [1, 2, 3, 4, 5]; // Default M-F
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: AppColors.background,
+          title: Text(existingBlock == null ? "Add Activity" : "Edit Activity", style: GoogleFonts.outfit(color: Colors.white)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: titleController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: "Name",
+                    labelStyle: TextStyle(color: Colors.white54),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: locationController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: "Location (Optional)",
+                    labelStyle: TextStyle(color: Colors.white54),
+                    hintText: "e.g. Office HQ",
+                    hintStyle: TextStyle(color: Colors.white24, fontSize: 12),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text("Category", style: GoogleFonts.outfit(color: Colors.white70)),
+                    DropdownButton<String>(
+                      dropdownColor: AppColors.background,
+                      value: selectedCategory,
+                      items: ['sleep', 'study', 'commute', 'buffer'].map((c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(c.toUpperCase(), style: GoogleFonts.outfit(color: Colors.white, fontSize: 12)),
+                      )).toList(),
+                      onChanged: (val) => setDialogState(() => selectedCategory = val!),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text("Remember choice", style: GoogleFonts.outfit(color: Colors.white70, fontSize: 14)),
+                  subtitle: Text("Make this a recurring routine", style: GoogleFonts.outfit(color: Colors.white24, fontSize: 11)),
+                  value: isRecurring,
+                  activeColor: AppColors.primary,
+                  onChanged: (val) => setDialogState(() => isRecurring = val),
+                ),
+                if (isRecurring) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 4,
+                    children: List.generate(7, (index) {
+                      final days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+                      final isSelected = selectedDays.contains(index);
+                      return GestureDetector(
+                        onTap: () => setDialogState(() {
+                          if (isSelected) selectedDays.remove(index);
+                          else selectedDays.add(index);
+                        }),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppColors.primary : Colors.white.withOpacity(0.05),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(days[index], style: GoogleFonts.outfit(color: isSelected ? Colors.white : Colors.white38, fontSize: 10)),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                _TimePickerRow(
+                  label: "Start",
+                  time: startTime,
+                  onTap: () async {
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(startTime),
+                    );
+                    if (time != null) {
+                      setDialogState(() {
+                        startTime = DateTime(startTime.year, startTime.month, startTime.day, time.hour, time.minute);
+                        if (endTime.isBefore(startTime)) {
+                          endTime = startTime.add(const Duration(hours: 1));
+                        }
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                _TimePickerRow(
+                  label: "End",
+                  time: endTime,
+                  onTap: () async {
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(endTime),
+                    );
+                    if (time != null) {
+                      setDialogState(() {
+                        endTime = DateTime(endTime.year, endTime.month, endTime.day, time.hour, time.minute);
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            if (existingBlock != null)
+              TextButton(
+                onPressed: () {
+                  context.read<AppState>().deleteDayPulseItem(existingBlock.eventId, existingBlock.type == 'routine');
+                  Navigator.pop(context);
+                },
+                child: const Text("Delete", style: TextStyle(color: Colors.red)),
+              ),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            ElevatedButton(
+              onPressed: () {
+                if (titleController.text.isNotEmpty) {
+                  if (existingBlock == null) {
+                    context.read<AppState>().addDayPulseEvent(
+                      titleController.text, 
+                      startTime, 
+                      endTime, 
+                      location: locationController.text.isNotEmpty ? locationController.text : null,
+                      category: selectedCategory,
+                      isRecurring: isRecurring,
+                      days: isRecurring ? selectedDays : null,
+                    );
+                  } else {
+                    context.read<AppState>().modifyDayPulse(
+                      existingBlock.eventId, 
+                      {
+                        'title': titleController.text,
+                        'startTime': startTime.toIso8601String(),
+                        'endTime': endTime.toIso8601String(),
+                        'location_text': locationController.text,
+                        'category': selectedCategory,
+                        'isRecurring': isRecurring,
+                        'days': isRecurring ? selectedDays : null,
+                      }
+                    );
+                  }
+                  Navigator.pop(context);
+                }
+              },
+              child: Text(existingBlock == null ? "Add" : "Save"),
+            ),
+          ],
+        ),
+      ),
+    );
+}
+
 class DayPulseScreen extends StatefulWidget {
   const DayPulseScreen({super.key});
 
@@ -80,101 +256,6 @@ class _DayPulseScreenState extends State<DayPulseScreen> {
       ),
     );
   }
-
-  void _showAddEventDialog(BuildContext context) {
-    final titleController = TextEditingController();
-    final locationController = TextEditingController();
-    DateTime startTime = DateTime.now().add(const Duration(hours: 1));
-    DateTime endTime = DateTime.now().add(const Duration(hours: 2));
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: AppColors.background,
-          title: Text("Add Activity", style: GoogleFonts.outfit(color: Colors.white)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: titleController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: "Name",
-                    labelStyle: TextStyle(color: Colors.white54),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: locationController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: "Location (Optional)",
-                    labelStyle: TextStyle(color: Colors.white54),
-                    hintText: "e.g. Office HQ",
-                    hintStyle: TextStyle(color: Colors.white24, fontSize: 12),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                _TimePickerRow(
-                  label: "Start",
-                  time: startTime,
-                  onTap: () async {
-                    final time = await showTimePicker(
-                      context: context,
-                      initialTime: TimeOfDay.fromDateTime(startTime),
-                    );
-                    if (time != null) {
-                      setDialogState(() {
-                        startTime = DateTime(startTime.year, startTime.month, startTime.day, time.hour, time.minute);
-                        if (endTime.isBefore(startTime)) {
-                          endTime = startTime.add(const Duration(hours: 1));
-                        }
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
-                _TimePickerRow(
-                  label: "End",
-                  time: endTime,
-                  onTap: () async {
-                    final time = await showTimePicker(
-                      context: context,
-                      initialTime: TimeOfDay.fromDateTime(endTime),
-                    );
-                    if (time != null) {
-                      setDialogState(() {
-                        endTime = DateTime(endTime.year, endTime.month, endTime.day, time.hour, time.minute);
-                      });
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-            ElevatedButton(
-              onPressed: () {
-                if (titleController.text.isNotEmpty) {
-                  context.read<AppState>().addDayPulseEvent(
-                    titleController.text, 
-                    startTime, 
-                    endTime, 
-                    location: locationController.text.isNotEmpty ? locationController.text : null
-                  );
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text("Add"),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _TimePickerRow extends StatelessWidget {
@@ -225,11 +306,14 @@ class _TimelineBlock extends StatelessWidget {
     final hasHighRisk = block.risks.any((r) => r.level == 'high');
     final isRoutine = block.type == 'routine';
 
-    Color blockColor = isRoutine ? Colors.white10 : Colors.white.withOpacity(0.05);
-    if (block.category == 'sleep') blockColor = Colors.grey.withOpacity(0.1);
-    if (block.category == 'study') blockColor = Colors.indigo.withOpacity(0.15);
-    if (block.category == 'commute') blockColor = Colors.blueGrey.withOpacity(0.15);
-    if (block.category == 'buffer') blockColor = Colors.green.withOpacity(0.1);
+    Color blockColor = isRoutine ? Colors.white.withOpacity(0.02) : Colors.white.withOpacity(0.05);
+    
+    // Specified palette
+    if (block.category == 'sleep') blockColor = const Color(0xFF3F51B5).withOpacity(0.15); // Deep Indigo
+    if (block.category == 'study') blockColor = const Color(0xFF2ECC71).withOpacity(0.15); // Emerald
+    if (block.category == 'commute') blockColor = const Color(0xFFF1C40F).withOpacity(0.15); // Amber
+    if (block.category == 'buffer') blockColor = const Color(0xFF1ABC9C).withOpacity(0.15); // Teal
+    if (block.locationText != null && block.locationText!.isNotEmpty) blockColor = const Color(0xFF673AB7).withOpacity(0.15); // Royal Purple
 
     return IntrinsicHeight(
       child: Row(
@@ -298,7 +382,7 @@ class _TimelineBlock extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(bottom: 30),
               child: GestureDetector(
-                onLongPress: isRoutine ? null : () => _showEditDialog(context),
+                onLongPress: () => _showAddEventDialog(context, existingBlock: block),
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -317,13 +401,45 @@ class _TimelineBlock extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
-                            child: Text(
-                              block.title,
-                              style: GoogleFonts.outfit(
-                                fontSize: 16,
-                                fontWeight: isRoutine ? FontWeight.normal : FontWeight.bold,
-                                color: isRoutine ? Colors.white38 : Colors.white,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  block.title,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 16,
+                                    fontWeight: isRoutine ? FontWeight.normal : FontWeight.bold,
+                                    color: isRoutine ? Colors.white70 : Colors.white,
+                                  ),
+                                ),
+                                if (block.locationText != null && block.locationText!.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(LucideIcons.mapPin, size: 10, color: Colors.white38),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        block.locationText!,
+                                        style: GoogleFonts.outfit(fontSize: 10, color: Colors.white38),
+                                      ),
+                                      if (block.etaMinutes != null) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber.withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            "ETA: ${block.etaMinutes}m",
+                                            style: GoogleFonts.outfit(fontSize: 9, color: Colors.amber, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                           if (!isRoutine) _RiskBadges(risks: block.risks),
@@ -371,37 +487,7 @@ class _TimelineBlock extends StatelessWidget {
     );
   }
 
-  void _showEditDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.background,
-        title: Text("Modify Schedule", style: GoogleFonts.outfit(color: Colors.white)),
-        content: Text(
-          "Do you want to simulate moving '${block.title}' 30 minutes later to resolve potential conflicts?",
-          style: GoogleFonts.outfit(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              context.read<AppState>().modifyDayPulse(block.eventId, {
-                'start_offset_minutes': 30
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Simulating ripple effect...")),
-              );
-            },
-            child: const Text("Modify"),
-          ),
-        ],
-      ),
-    );
-  }
+
 }
 
 class _RiskBadges extends StatelessWidget {
@@ -443,7 +529,7 @@ class _RiskBadges extends StatelessWidget {
         return Padding(
           padding: const EdgeInsets.only(left: 4),
           child: Tooltip(
-            message: risk.label,
+            message: risk.explanation ?? risk.label,
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
