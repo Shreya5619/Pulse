@@ -85,6 +85,66 @@ class AppointmentEtaInfo {
   factory AppointmentEtaInfo.empty() => AppointmentEtaInfo(hasRoute: false);
 }
 
+class DayPulseRisk {
+  final String type;
+  final String level;
+  final String label;
+  final double score;
+
+  DayPulseRisk({
+    required this.type,
+    required this.level,
+    required this.label,
+    required this.score,
+  });
+
+  factory DayPulseRisk.fromJson(Map<String, dynamic> json) {
+    return DayPulseRisk(
+      type: json['type'],
+      level: json['level'],
+      label: json['type'].toString().toUpperCase(),
+      score: (json['score'] as num).toDouble(),
+    );
+  }
+}
+
+class DayPulseBlock {
+  final String eventId;
+  final String title;
+  final DateTime startTime;
+  final DateTime endTime;
+  final String type; // 'event' | 'routine'
+  final String? category; // 'sleep' | 'study' | 'commute' | 'buffer'
+  final List<DayPulseRisk> risks;
+  final Map<String, dynamic>? suggestion;
+
+  DayPulseBlock({
+    required this.eventId,
+    required this.title,
+    required this.startTime,
+    required this.endTime,
+    required this.type,
+    this.category,
+    required this.risks,
+    this.suggestion,
+  });
+
+  factory DayPulseBlock.fromJson(Map<String, dynamic> json) {
+    return DayPulseBlock(
+      eventId: json['eventId'],
+      title: json['title'],
+      startTime: DateTime.parse(json['startTime']).toLocal(),
+      endTime: DateTime.parse(json['endTime']).toLocal(),
+      type: json['type'] ?? 'event',
+      category: json['category'],
+      risks: (json['risks'] as List)
+          .map((r) => DayPulseRisk.fromJson(r))
+          .toList(),
+      suggestion: json['suggestion'],
+    );
+  }
+}
+
 class AppState extends ChangeNotifier {
   final ContextServices _contextServices = ContextServices();
   final LocalRepository _localRepo = LocalRepository();
@@ -157,10 +217,12 @@ class AppState extends ChangeNotifier {
   Map<String, dynamic>? get lastPlannerDecision => _lastPlannerDecision;
   TwinGraph? get twinGraph => _twinGraph;
   Map<String, dynamic>? get proposedCommAction => _proposedCommAction;
+  List<DayPulseBlock> get dayPulseBlocks => _dayPulseBlocks;
 
   final Set<String> _acceptedActionIds = {};
   final Set<String> _dismissedActionIds = {};
   Map<String, dynamic>? _proposedCommAction;
+  List<DayPulseBlock> _dayPulseBlocks = [];
 
   bool isActionAccepted(String id) => _acceptedActionIds.contains(id);
   bool isActionDismissed(String id) => _dismissedActionIds.contains(id);
@@ -225,6 +287,123 @@ class AppState extends ChangeNotifier {
   void selectScenario(String id) {
     _selectedScenarioId = id;
     notifyListeners();
+  }
+
+  Future<void> fetchDayPulse() async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/day-pulse?userId=$_userId');
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List blocks = data['data']['blocks'];
+        _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error fetching Day Pulse: $e');
+    }
+  }
+
+  Future<void> modifyDayPulse(
+    String eventId,
+    Map<String, dynamic> updates,
+  ) async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/day-pulse/modify');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'userId': _userId,
+          'eventId': eventId,
+          'updates': updates,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List blocks = data['data']['blocks'];
+        _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        notifyListeners();
+
+        fetchTwinGraph();
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error modifying Day Pulse: $e');
+    }
+  }
+
+  Future<void> addDayPulseEvent(
+    String title,
+    DateTime start,
+    DateTime end, {
+    String? location,
+  }) async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/day-pulse/add');
+
+      final payload = {
+        'userId': _userId,
+        'event': {
+          'id': 'manual_${DateTime.now().millisecondsSinceEpoch}',
+          'title': title,
+          'start_time': start.toUtc().toIso8601String(),
+          'end_time': end.toUtc().toIso8601String(),
+          'location_text': location,
+          'location': location != null && location.isNotEmpty
+              ? {
+                  'lat': 12.9716, // Simulated lat/lon for manual entries
+                  'lon': 77.5946,
+                }
+              : null,
+        },
+      };
+
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(payload),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List blocks = data['data']['blocks'];
+        _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        notifyListeners();
+        fetchTwinGraph();
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error adding event: $e');
+    }
+  }
+
+  Future<void> optimizeDayPulse() async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/day-pulse/optimize');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'userId': _userId,
+          'date': DateTime.now().toIso8601String().split('T')[0],
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List blocks = data['data']['blocks'];
+        _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        notifyListeners();
+        fetchTwinGraph();
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error optimizing Day Pulse: $e');
+    }
   }
 
   // Pulse snapshot (Day 12 — persistent widget source of truth)
@@ -416,7 +595,11 @@ class AppState extends ChangeNotifier {
     });
   }
 
-  String _classifyNotification(String? title, String? text, String packageName) {
+  String _classifyNotification(
+    String? title,
+    String? text,
+    String packageName,
+  ) {
     final t = (title ?? "").toLowerCase();
     final txt = (text ?? "").toLowerCase();
     final pkg = packageName.toLowerCase();
@@ -452,9 +635,9 @@ class AppState extends ChangeNotifier {
   Map<String, dynamic> _generateNotificationDigest() {
     final windowMinutes = 60;
     final now = DateTime.now();
-    final recent = _deviceContext.notifications.where(
-      (n) => now.difference(n.timestamp).inMinutes <= windowMinutes,
-    ).toList();
+    final recent = _deviceContext.notifications
+        .where((n) => now.difference(n.timestamp).inMinutes <= windowMinutes)
+        .toList();
 
     final counts = {
       "URGENT_OTP": 0,
@@ -469,7 +652,11 @@ class AppState extends ChangeNotifier {
       counts[n.category] = (counts[n.category] ?? 0) + 1;
       final sender = n.title ?? "Unknown";
       if (!threads.containsKey(sender)) {
-        threads[sender] = {"sender": sender, "count": 0, "category": n.category};
+        threads[sender] = {
+          "sender": sender,
+          "count": 0,
+          "category": n.category,
+        };
       }
       threads[sender]!["count"]++;
     }
@@ -488,10 +675,10 @@ class AppState extends ChangeNotifier {
   void _syncPulseSnapshot() {
     final digestData = _generateNotificationDigest();
     final topThreads = digestData['top_threads'] as List<dynamic>;
-    
+
     final urgent = <String>[];
     final important = <String>[];
-    
+
     for (var t in topThreads) {
       final label = "${t['sender']} (${t['count']})";
       if (t['category'] == 'URGENT_OTP') {
@@ -502,7 +689,8 @@ class AppState extends ChangeNotifier {
     }
 
     final counts = digestData['by_category'] as Map<String, int>;
-    final noiseCount = (counts['NOISY_GROUP'] ?? 0) + (counts['IGNORABLE'] ?? 0);
+    final noiseCount =
+        (counts['NOISY_GROUP'] ?? 0) + (counts['IGNORABLE'] ?? 0);
 
     String highlight = "Pulse monitoring active";
     if (digestData['total_count'] > 0) {
@@ -510,12 +698,18 @@ class AppState extends ChangeNotifier {
     }
 
     _pulseSnapshot = {
-      'state': _currentRisk.score >= 0.7 ? 'CRITICAL' : (_currentRisk.score >= 0.4 ? 'RISK_FORMING' : 'NOMINAL'),
+      'state': _currentRisk.score >= 0.7
+          ? 'CRITICAL'
+          : (_currentRisk.score >= 0.4 ? 'RISK_FORMING' : 'NOMINAL'),
       'topRiskScore': _currentRisk.score,
       'notificationContent': {
         'title': _currentRisk.score >= 0.7 ? 'Urgent Risk' : 'Pulse Active',
-        'subtitle': _currentRisk.reasons.isNotEmpty ? _currentRisk.reasons.first : 'Monitoring your context…',
-        'urgency': _currentRisk.score >= 0.7 ? 'high' : (_currentRisk.score >= 0.4 ? 'medium' : 'low'),
+        'subtitle': _currentRisk.reasons.isNotEmpty
+            ? _currentRisk.reasons.first
+            : 'Monitoring your context…',
+        'urgency': _currentRisk.score >= 0.7
+            ? 'high'
+            : (_currentRisk.score >= 0.4 ? 'medium' : 'low'),
       },
       'notificationDigest': {
         'highlight': highlight,
@@ -525,7 +719,7 @@ class AppState extends ChangeNotifier {
       },
       'nextAction': _proposedCommAction,
     };
-    
+
     notifyListeners();
   }
 
@@ -911,6 +1105,8 @@ class AppState extends ChangeNotifier {
           "upcoming_events": _deviceContext.upcomingEvents
               .map(
                 (e) => {
+                  "id":
+                      "event_${e.title.hashCode}_${e.start.millisecondsSinceEpoch}",
                   "title": e.title,
                   "start_time": e.start.toUtc().toIso8601String(),
                   "end_time": e.end.toUtc().toIso8601String(),
@@ -1380,8 +1576,8 @@ class AppState extends ChangeNotifier {
   }
 
   String _getBackendHost() {
-    // Using host machine's local IP for reliable device/emulator connectivity
-    return '10.44.187.156';
+    // ADB Reverse Tunnel active - always route through USB loopback
+    return '10.123.31.141';
   }
 
   @override

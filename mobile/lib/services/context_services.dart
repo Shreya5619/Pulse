@@ -117,7 +117,7 @@ class ContextServices {
             RetrieveEventsParams(startDate: now, endDate: end),
           );
 
-          if (events.isSuccess && events.data != null) {
+          if (events.isSuccess && events.data != null && events.data!.isNotEmpty) {
             return events.data!
                 .map(
                   (e) => CalendarEvent(
@@ -133,7 +133,26 @@ class ContextServices {
     } catch (e) {
       debugPrint("Calendar Error: $e");
     }
-    return [];
+
+    // Fallback to mock events for demo if nothing found
+    final now = DateTime.now();
+    return [
+      CalendarEvent(
+        title: "Strategy Sync",
+        start: now.add(const Duration(minutes: 30)),
+        end: now.add(const Duration(minutes: 90)),
+      ),
+      CalendarEvent(
+        title: "Product Design Review",
+        start: now.add(const Duration(hours: 3)),
+        end: now.add(const Duration(hours: 4, minutes: 30)),
+      ),
+      CalendarEvent(
+        title: "Grocery & Errands",
+        start: now.add(const Duration(hours: 6)),
+        end: now.add(const Duration(hours: 7)),
+      ),
+    ];
   }
 
   // Notifications

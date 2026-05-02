@@ -86,7 +86,16 @@ class RoutingService {
       return result;
     } catch (error) {
       console.error(`[Routing] Fetch failed for ${key}:`, error instanceof Error ? error.message : "Unknown error");
-      return cached?.result || this.getFallbackRoute();
+      if (cached?.result) return cached.result;
+      const distance = this.getHaversineDistance(from, to);
+      const durationSeconds = Math.round((distance / 10) * 1.5); // Assume 10m/s (~36km/h) average with 1.5x traffic multiplier
+      console.warn(`[Routing] Using heuristic fallback: ${Math.round(durationSeconds/60)} mins, ${Math.round(distance)}m`);
+      return {
+        durationSeconds,
+        distanceMeters: Math.round(distance),
+        travelMode: "car",
+        worstSegment: { name: "Local Road", delayMinutes: 5 }
+      };
     } finally {
       this.isRoutingInProgress = false;
       console.log(`[Routing] END: Route fetch finished for ${key} @ ${Date.now()}`);
@@ -145,6 +154,21 @@ class RoutingService {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private getHaversineDistance(p1: LatLng, p2: LatLng): number {
+    const R = 6371e3; // Earth radius in meters
+    const φ1 = p1.lat * Math.PI / 180;
+    const φ2 = p2.lat * Math.PI / 180;
+    const Δφ = (p2.lat - p1.lat) * Math.PI / 180;
+    const Δλ = (p2.lon - p1.lon) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
   }
 
   private getFallbackRoute(): RouteResult {

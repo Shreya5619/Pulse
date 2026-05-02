@@ -46,10 +46,19 @@ router.post("/snapshots", async (req: Request, res: Response) => {
 
     } catch (error: any) {
         console.error("[Pulse] Snapshot ingest error:", error);
-        res.status(400).json({
+        
+        if (error.name === "ZodError") {
+            return res.status(400).json({
+                ok: false,
+                error: "Normalization/Validation failed",
+                details: error.errors,
+            });
+        }
+
+        res.status(500).json({
             ok: false,
-            error: "Normalization failed",
-            details: error.errors || error.message,
+            error: "Internal server error during ingestion",
+            details: error.message || "Unknown error",
         });
     }
 });

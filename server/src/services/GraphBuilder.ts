@@ -58,7 +58,7 @@ export class GraphBuilder {
       });
 
       // TRAVEL Edge from current location
-      let travelWeight = 15; // default 15 mins
+      let travelWeight = 20; // Default fallback if no coordinates at all
       if (context.location.lat && context.location.lon && event.location?.lat && event.location?.lon) {
         try {
           const route = await routingService.getRoute(
@@ -68,8 +68,11 @@ export class GraphBuilder {
           travelWeight = Math.ceil(route.durationSeconds / 60);
           console.log(`[Graph] TRAVEL edge ${currentPlaceId} → ${event.title}, etaMinutes=${travelWeight}`);
         } catch (err) {
-          console.warn(`[Graph] OSRM routing failed for ${event.title}, using fallback.`);
+          console.warn(`[Graph] Routing failed for ${event.title}, using fallback.`);
         }
+      } else {
+          // If we have history of this event, we could use that. For now, 20m.
+          travelWeight = 20; 
       }
 
       edges.push({
