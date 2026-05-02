@@ -70,31 +70,54 @@ export class DayPulseService {
         // 4. Add Routine Blocks
         const routines = await routineRepo.getForDay(userId, date);
         for (const routine of routines) {
-            // Assume routine times are in IST (UTC+5:30)
-            const [sH, sM] = routine.startTime.split(':').map(Number);
-            const start = new Date(date);
-            // Convert IST to UTC for the ISO string
-            // 8:00 IST = 2:30 UTC
-            start.setUTCHours(sH - 5, sM - 30, 0, 0);
+            try {
+                // Handle various formats (HH:mm or ISO)
+                let sH, sM, eH, eM;
 
-            const [eH, eM] = routine.endTime.split(':').map(Number);
-            const end = new Date(date);
-            end.setUTCHours(eH - 5, eM - 30, 0, 0);
-            
-            // Handle overnight sleep (simplified)
-            if (end < start && routine.category === 'sleep') {
-                end.setUTCDate(end.getUTCDate() + 1);
+                if (routine.startTime.includes(':')) {
+                    [sH, sM] = routine.startTime.split(':').map(Number);
+                } else {
+                    const d = new Date(routine.startTime);
+                    sH = d.getHours();
+                    sM = d.getMinutes();
+                }
+
+                if (routine.endTime.includes(':')) {
+                    [eH, eM] = routine.endTime.split(':').map(Number);
+                } else {
+                    const d = new Date(routine.endTime);
+                    eH = d.getHours();
+                    eM = d.getMinutes();
+                }
+
+                if (isNaN(sH) || isNaN(sM) || isNaN(eH) || isNaN(eM)) {
+                    console.warn(`[DayPulseService] Skipping routine ${routine.id} due to invalid time: ${routine.startTime} - ${routine.endTime}`);
+                    continue;
+                }
+
+                const start = new Date(date);
+                start.setUTCHours(sH - 5, sM - 30, 0, 0);
+
+                const end = new Date(date);
+                end.setUTCHours(eH - 5, eM - 30, 0, 0);
+                
+                // Handle overnight sleep (simplified)
+                if (end < start && routine.category === 'sleep') {
+                    end.setUTCDate(end.getUTCDate() + 1);
+                }
+
+                blocks.push({
+                    eventId: routine.id,
+                    title: routine.title,
+                    startTime: start.toISOString(),
+                    endTime: end.toISOString(),
+                    type: 'routine',
+                    category: routine.category,
+                    risks: []
+                });
+            } catch (e) {
+                console.error(`[DayPulseService] Error processing routine ${routine.id}:`, e);
             }
-
-            blocks.push({
-                eventId: routine.id,
-                title: routine.title,
-                startTime: start.toISOString(),
-                endTime: end.toISOString(),
-                type: 'routine',
-                category: routine.category,
-                risks: [] // Routine blocks don't have risks themselves usually
-            });
         }
 
         // 5. Simulate risk for each event block

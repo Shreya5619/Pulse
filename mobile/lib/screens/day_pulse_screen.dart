@@ -17,8 +17,8 @@ void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
           backgroundColor: AppColors.background,
           title: Text(existingBlock == null ? "Add Activity" : "Edit Activity", style: GoogleFonts.outfit(color: Colors.white)),
           content: SingleChildScrollView(
@@ -102,7 +102,7 @@ void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
                   time: startTime,
                   onTap: () async {
                     final time = await showTimePicker(
-                      context: context,
+                      context: dialogContext,
                       initialTime: TimeOfDay.fromDateTime(startTime),
                     );
                     if (time != null) {
@@ -121,7 +121,7 @@ void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
                   time: endTime,
                   onTap: () async {
                     final time = await showTimePicker(
-                      context: context,
+                      context: dialogContext,
                       initialTime: TimeOfDay.fromDateTime(endTime),
                     );
                     if (time != null) {
@@ -139,11 +139,11 @@ void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
               TextButton(
                 onPressed: () {
                   context.read<AppState>().deleteDayPulseItem(existingBlock.eventId, existingBlock.type == 'routine');
-                  Navigator.pop(context);
+                  Navigator.pop(dialogContext);
                 },
                 child: const Text("Delete", style: TextStyle(color: Colors.red)),
               ),
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("Cancel")),
             ElevatedButton(
               onPressed: () {
                 if (titleController.text.isNotEmpty) {
@@ -171,7 +171,7 @@ void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
                       }
                     );
                   }
-                  Navigator.pop(context);
+                  Navigator.pop(dialogContext);
                 }
               },
               child: Text(existingBlock == null ? "Add" : "Save"),
@@ -219,6 +219,10 @@ class _DayPulseScreenState extends State<DayPulseScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(LucideIcons.plus, size: 20),
+            onPressed: () => _showAddEventDialog(context),
+          ),
           TextButton.icon(
             onPressed: () => context.read<AppState>().optimizeDayPulse(),
             icon: const Icon(LucideIcons.sparkles, size: 16, color: Colors.amber),
@@ -230,10 +234,12 @@ class _DayPulseScreenState extends State<DayPulseScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.primary,
-        onPressed: () => _showAddEventDialog(context),
-        child: const Icon(LucideIcons.plus, color: Colors.white),
+      floatingActionButton: Builder(
+        builder: (context) => FloatingActionButton(
+          backgroundColor: AppColors.primary,
+          onPressed: () => _showAddEventDialog(context),
+          child: const Icon(LucideIcons.plus, color: Colors.white),
+        ),
       ),
       body: Consumer<AppState>(
         builder: (context, state, child) {

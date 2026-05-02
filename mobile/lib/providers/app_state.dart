@@ -102,10 +102,10 @@ class DayPulseRisk {
 
   factory DayPulseRisk.fromJson(Map<String, dynamic> json) {
     return DayPulseRisk(
-      type: json['type'],
-      level: json['level'],
-      label: json['type'].toString().toUpperCase(),
-      score: (json['score'] as num).toDouble(),
+      type: json['type'] ?? 'unknown',
+      level: json['level'] ?? 'low',
+      label: (json['type'] ?? 'INFO').toString().toUpperCase(),
+      score: (json['score'] as num? ?? 0.0).toDouble(),
       explanation: json['explanation'],
     );
   }
@@ -149,7 +149,7 @@ class DayPulseBlock {
       locationText: json['locationText'],
       etaMinutes: json['etaMinutes'],
       days: json['days'] != null ? List<int>.from(json['days']) : null,
-      risks: (json['risks'] as List)
+      risks: (json['risks'] as List? ?? [])
           .map((r) => DayPulseRisk.fromJson(r))
           .toList(),
       suggestion: json['suggestion'],

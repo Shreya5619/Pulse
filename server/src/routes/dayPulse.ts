@@ -30,8 +30,15 @@ router.post("/day-pulse/modify", async (req: Request, res: Response) => {
         console.log(`[DayPulseRoute] Modifying event ${eventId} for user ${userId}:`, updates);
         
         if (isRecurring && days) {
-            // Sync to RoutineRepository if it was a routine or we want to make it recurring
-            await routineRepo.updateRoutine(userId, eventId, { ...updates, days });
+            // Ensure times are in HH:mm for the routine repository
+            const routineUpdates: any = { ...updates, days };
+            if (updates.startTime) {
+                routineUpdates.startTime = new Date(updates.startTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+            }
+            if (updates.endTime) {
+                routineUpdates.endTime = new Date(updates.endTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+            }
+            await routineRepo.updateRoutine(userId, eventId, routineUpdates);
         } else {
             await userEventsRepo.addOverride(userId, { userId, eventId, updates });
         }
@@ -58,8 +65,16 @@ router.post("/day-pulse/add", async (req: Request, res: Response) => {
         console.log(`[DayPulseRoute] Adding manual event for user ${userId}:`, event.title);
         if (isRecurring && days) {
             // Extract HH:mm from ISO strings
-            const startStr = new Date(event.start_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
-            const endStr = new Date(event.end_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+            // Extract HH:mm from ISO strings if they are ISO strings
+            let startStr = event.start_time;
+            let endStr = event.end_time;
+            
+            if (startStr.includes('T')) {
+                startStr = new Date(startStr).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+            }
+            if (endStr.includes('T')) {
+                endStr = new Date(endStr).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+            }
             
             await routineRepo.addRoutine(userId, {
                 title: event.title,
