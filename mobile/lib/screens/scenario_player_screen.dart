@@ -25,6 +25,17 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
         "data": {"status": "nominal"},
       },
       {
+        "type": "context.updated",
+        "timestamp": "2026-04-28T08:01:00Z",
+        "data": {
+          "userId": "user1",
+          "locationLabel": "Home",
+          "location": {"lat": 12.9345, "lon": 77.6101},
+          "batteryPercent": 17,
+          "trafficStatus": "JAMMED"
+        }
+      },
+      {
         "type": "risk.updated",
         "timestamp": "2026-04-28T08:05:00Z",
         "data": {
@@ -88,6 +99,17 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
         "data": {"status": "nominal"},
       },
       {
+        "type": "context.updated",
+        "timestamp": "2026-04-28T09:01:00Z",
+        "data": {
+          "userId": "user1",
+          "locationLabel": "Koramangala",
+          "location": {"lat": 12.9345, "lon": 77.6101},
+          "batteryPercent": 85,
+          "trafficStatus": "HEAVY"
+        }
+      },
+      {
         "type": "risk.updated",
         "timestamp": "2026-04-28T09:02:00Z",
         "data": {
@@ -114,6 +136,64 @@ class _ScenarioPlayerScreenState extends State<ScenarioPlayerScreen> {
           "score": 48.0,
           "reasons": ["High traffic along route"],
           "history": [15, 25, 35, 48],
+        },
+      },
+    ],
+    "Home-College Commute": [
+      {
+        "type": "heartbeat.tick",
+        "timestamp": "2026-04-29T07:30:00Z",
+        "data": {"status": "nominal"},
+      },
+      {
+        "type": "context.updated",
+        "timestamp": "2026-04-29T07:31:00Z",
+        "data": {
+          "userId": "user1",
+          "locationLabel": "Home",
+          "location": {"lat": 12.9345, "lon": 77.6101},
+          "batteryPercent": 14,
+          "trafficStatus": "NOMINAL"
+        }
+      },
+      {
+        "type": "risk.updated",
+        "timestamp": "2026-04-29T07:32:00Z",
+        "data": {
+          "level": "med",
+          "score": 45.0,
+          "reasons": ["Low Battery (14%)", "Commute starts soon"],
+          "history": [10, 25, 45],
+        },
+      },
+      {
+        "type": "context.updated",
+        "timestamp": "2026-04-29T07:45:00Z",
+        "data": {
+          "userId": "user1",
+          "locationLabel": "Mid-way to College",
+          "location": {"lat": 12.9530, "lon": 77.6250},
+          "batteryPercent": 9,
+          "trafficStatus": "HEAVY"
+        }
+      },
+      {
+        "type": "risk.updated",
+        "timestamp": "2026-04-29T07:46:00Z",
+        "data": {
+          "level": "high",
+          "score": 82.0,
+          "reasons": ["Critical Battery (9%)", "Heavy Traffic mid-way"],
+          "history": [45, 60, 75, 82],
+        },
+      },
+      {
+        "type": "intervention.created",
+        "timestamp": "2026-04-29T07:47:00Z",
+        "eventId": "int_college_1",
+        "data": {
+          "headline": "Battery Critical - Optimize Route",
+          "body": "Your battery is at 9% and traffic is heavy. Pulse suggests switching to a ride-share to save power and arrive on time.",
         },
       },
     ],

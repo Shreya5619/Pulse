@@ -4,6 +4,7 @@ import { ContextSnapshot } from "../../../shared/context_snapshot";
 export interface IContextSnapshotRepository {
     save(snapshot: ContextSnapshot): Promise<void>;
     findLatestByUser(userId: string): Promise<ContextSnapshot | null>;
+    findRecent(userId: string, limit: number): Promise<ContextSnapshot[]>;
     findRange(userId: string, from: Date, to: Date): Promise<ContextSnapshot[]>;
 }
 
@@ -38,6 +39,18 @@ export class PostgresContextSnapshotRepository implements IContextSnapshotReposi
         
         if (res.rows.length === 0) return null;
         return res.rows[0].payload as ContextSnapshot;
+    }
+
+    async findRecent(userId: string, limit: number): Promise<ContextSnapshot[]> {
+        const sql = `
+            SELECT payload 
+            FROM context_snapshots 
+            WHERE user_id = $1 
+            ORDER BY timestamp DESC 
+            LIMIT $2
+        `;
+        const res = await query(sql, [userId, limit]);
+        return res.rows.map(row => row.payload as ContextSnapshot);
     }
 
     async findRange(userId: string, from: Date, to: Date): Promise<ContextSnapshot[]> {
