@@ -1,0 +1,63 @@
+import { query } from "./db";
+
+export interface RoutineBlock {
+    id: string;
+    userId: string;
+    title: string;
+    startTime: string; // HH:mm
+    endTime: string;   // HH:mm
+    category: 'sleep' | 'study' | 'commute' | 'buffer';
+    days: number[]; // 0-6 (Sun-Sat)
+}
+
+export class RoutineRepository {
+    private routines: RoutineBlock[] = [
+        {
+            id: 'routine_sleep',
+            userId: 'demo-user',
+            title: 'Sleep',
+            startTime: '23:00',
+            endTime: '07:00',
+            category: 'sleep',
+            days: [0, 1, 2, 3, 4, 5, 6]
+        },
+        {
+            id: 'routine_study',
+            userId: 'demo-user',
+            title: 'Study block',
+            startTime: '09:00',
+            endTime: '11:00',
+            category: 'study',
+            days: [1, 2, 3, 4, 5]
+        },
+        {
+            id: 'routine_commute',
+            userId: 'demo-user',
+            title: 'Usual commute',
+            startTime: '08:30',
+            endTime: '09:00',
+            category: 'commute',
+            days: [1, 2, 3, 4, 5]
+        },
+        {
+            id: 'routine_buffer',
+            userId: 'demo-user',
+            title: 'Free buffer',
+            startTime: '12:00',
+            endTime: '13:00',
+            category: 'buffer',
+            days: [0, 1, 2, 3, 4, 5, 6]
+        }
+    ];
+
+    async getForUser(userId: string): Promise<RoutineBlock[]> {
+        return this.routines.filter(r => r.userId === userId || r.userId === 'demo-user');
+    }
+
+    async getForDay(userId: string, date: Date): Promise<RoutineBlock[]> {
+        const day = date.getDay();
+        return (await this.getForUser(userId)).filter(r => r.days.includes(day));
+    }
+}
+
+export const routineRepo = new RoutineRepository();

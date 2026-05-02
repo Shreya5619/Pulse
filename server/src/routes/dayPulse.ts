@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { dayPulseService } from "../services/DayPulseService";
+import { userEventsRepo } from "../db/UserEventsRepository";
 
 const router = Router();
 
@@ -27,9 +28,7 @@ router.post("/day-pulse/modify", async (req: Request, res: Response) => {
         const { userId, eventId, updates } = req.body;
         console.log(`[DayPulseRoute] Modifying event ${eventId} for user ${userId}:`, updates);
         
-        // In a real app, this would update the database/calendar
-        // For the hackathon, we can simulate the "ripple effect" by returning 
-        // the re-calculated timeline for the modified day.
+        await userEventsRepo.addOverride(userId, { userId, eventId, updates });
         
         const date = new Date().toISOString().split('T')[0];
         const timeline = await dayPulseService.getDailyTimeline(userId, date);
@@ -43,6 +42,49 @@ router.post("/day-pulse/modify", async (req: Request, res: Response) => {
         res.status(500).json({
             ok: false,
             error: "Could not modify schedule"
+        });
+    }
+});
+
+router.post("/day-pulse/add", async (req: Request, res: Response) => {
+    try {
+        const { userId, event } = req.body;
+        console.log(`[DayPulseRoute] Adding manual event for user ${userId}:`, event.title);
+        
+        await userEventsRepo.addManualEvent(userId, event);
+        
+        const date = new Date().toISOString().split('T')[0];
+        const timeline = await dayPulseService.getDailyTimeline(userId, date);
+        
+        res.json({
+            ok: true,
+            data: timeline,
+            message: "Event added to your pulse."
+        });
+    } catch (error) {
+        res.status(500).json({
+            ok: false,
+            error: "Could not add event"
+        });
+    }
+});
+
+router.post("/day-pulse/optimize", async (req: Request, res: Response) => {
+    try {
+        const { userId, date } = req.body;
+        const targetDate = date || new Date().toISOString().split('T')[0];
+        
+        const timeline = await dayPulseService.optimizeTimeline(userId, targetDate);
+        
+        res.json({
+            ok: true,
+            data: timeline,
+            message: "Pulse optimized to minimize risks."
+        });
+    } catch (error) {
+        res.status(500).json({
+            ok: false,
+            error: "Could not optimize pulse"
         });
     }
 });

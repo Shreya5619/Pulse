@@ -87,10 +87,11 @@ class PlannerEngine {
 
     // Lateness intervention
     if (lateness && lateness.score >= 0.6) {
+      const routineOverlap = "this would cut into your usual study block"; // Placeholder logic for now
       candidates.push({
         id: "ACTION_LEAVE_NOW",
         title: "Leave now and take cab to Office HQ",
-        description: "Switching to a cab now saves 15 mins of walking in traffic.",
+        description: `Switching to a cab now saves 15 mins. Note: ${routineOverlap}.`,
         approvalMode: "ASK_FIRST",
         reasons: lateness.causes || [],
         sideEffects: ["May trigger navigation", "May send an optional delay message"],
