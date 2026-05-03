@@ -49,6 +49,7 @@ export class GraphAdapter {
                  e.importance = ev.importance,
                  e.locationText = ev.location_text
              MERGE (p)-[:HAS_EVENT]->(e)
+             FOREACH (ignore IN CASE WHEN ev.location IS NULL AND (ev.location_text IS NULL OR ev.location_text = '') THEN [1] ELSE [] END | SET e:Act)
              
              WITH e, ev
              WHERE ev.location IS NOT NULL
@@ -384,7 +385,7 @@ export class GraphAdapter {
         nodes.push({
             id: eId,
             label: e.properties.title,
-            type: 'event',
+            type: e.labels?.includes('Act') ? 'act' : 'event',
             x: 200 + (idx * 300),
             y: 500,
             risk: e.properties.riskScore || 0

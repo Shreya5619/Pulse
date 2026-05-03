@@ -6,7 +6,7 @@ import { riskSnapshotRepo } from "../db/RiskSnapshotRepository";
 import { 
   assessLateness, 
   assessBattery, 
-  assessResponseDebt, 
+  assessActBattery,
   assessResponseDebt, 
   assessOverload 
 } from "./RiskEngine";
@@ -26,7 +26,7 @@ interface NextAppointment {
  * Walk the graph to find the next upcoming appointment node
  * and its associated TRAVEL edge weight.
  */
-function findNextAppointmentNode(
+function findNextPhysicalAppointment(
   nodes: GraphNode[],
   edges: GraphEdge[],
   nowMs: number
@@ -38,7 +38,7 @@ function findNextAppointmentNode(
       const minutesToEvent = (startMs - nowMs) / 60000;
       return { node: n, minutesToEvent };
     })
-    .filter((a) => a.minutesToEvent > 0) // future only
+    .filter((a) => a.minutesToEvent > 0)
     .sort((a, b) => a.minutesToEvent - b.minutesToEvent);
 
   if (appts.length === 0) return null;
@@ -47,9 +47,26 @@ function findNextAppointmentNode(
   const travelEdge = edges.find(
     (e) => e.to === closest.node.id && e.type === "TRAVEL"
   );
-  const etaMinutes = travelEdge ? travelEdge.weight : 20; // fallback 20 min
+  const etaMinutes = travelEdge ? travelEdge.weight : 20;
 
   return { ...closest, etaMinutes };
+}
+
+function findNextActNode(
+  nodes: GraphNode[],
+  nowMs: number
+): { node: GraphNode; minutesToEvent: number } | null {
+  const acts = nodes
+    .filter((n) => n.type === "ACT" && n.timeWindow?.start)
+    .map((n) => {
+      const startMs = new Date(n.timeWindow!.start).getTime();
+      const minutesToEvent = (startMs - nowMs) / 60000;
+      return { node: n, minutesToEvent };
+    })
+    .filter((a) => a.minutesToEvent > 0)
+    .sort((a, b) => a.minutesToEvent - b.minutesToEvent);
+
+  return acts.length > 0 ? acts[0] : null;
 }
 
 /**
@@ -90,13 +107,26 @@ export class RiskEngineService {
 
     const risks: RiskScore[] = [];
 
-    // ── Lateness ────────────────────────────────────────────────
-    const nextAppt = findNextAppointmentNode(graph.nodes, graph.edges, nowMs);
+    // ── Lateness (Physical) ────────────────────────────────────
+    const nextAppt = findNextPhysicalAppointment(graph.nodes, graph.edges, nowMs);
     if (nextAppt) {
       const { node, minutesToEvent, etaMinutes } = nextAppt;
       const buffer = memory.habits?.patterns?.typical_lateness ?? 5;
       risks.push(
         assessLateness(minutesToEvent, etaMinutes, buffer, node.label, node.id, preferences, personality)
+      );
+    }
+
+    // ── Act Battery (Virtual/Location-less) ──────────────────────
+    const nextAct = findNextActNode(graph.nodes, nowMs);
+    if (nextAct) {
+      const { node, minutesToEvent } = nextAct;
+      const currentPct = graph.context.battery ? Math.round(graph.context.battery.level * 100) : 50;
+      const drainRate = memory.battery?.profile?.discharge_rates?.active ?? 8;
+      const isCharging = graph.context.battery?.is_charging ?? false;
+      
+      risks.push(
+        assessActBattery(currentPct, minutesToEvent, drainRate, isCharging, node.label, node.id)
       );
     }
 
@@ -108,10 +138,11 @@ export class RiskEngineService {
         : 50;
       const drainRate =
         memory.battery?.profile?.discharge_rates?.active ?? 8;
+      const isCharging = graph.context.battery?.is_charging ?? false;
 
       // Horizon = minutes to next event or default 120
       const appointmentNodes = graph.nodes.filter(
-        (n) => n.type === "APPOINTMENT"
+        (n) => n.type === "APPOINTMENT" || n.type === "ACT"
       );
       const nextEventMs = appointmentNodes
         .map((n) =>
@@ -124,7 +155,7 @@ export class RiskEngineService {
           : 120;
 
       risks.push(
-        assessBattery(currentPct, horizonMinutes, drainRate, battNode.id, preferences, personality)
+        assessBattery(currentPct, horizonMinutes, drainRate, isCharging, battNode.id, preferences, personality)
       );
     }
 
@@ -141,7 +172,7 @@ export class RiskEngineService {
 
     // ── Overload ────────────────────────────────────────────────
     const appointmentNodes = graph.nodes.filter(
-      (n) => n.type === "APPOINTMENT"
+      (n) => n.type === "APPOINTMENT" || n.type === "ACT"
     );
     const eventsIn90 = appointmentNodes.filter((n) => {
       if (!n.timeWindow) return false;

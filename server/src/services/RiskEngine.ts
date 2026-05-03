@@ -114,9 +114,15 @@ export function assessLateness(
 export function batteryRisk(
   currentPct: number,
   horizonMinutes: number,
-  dischargePerHour: number
+  dischargePerHour: number,
+  isCharging: boolean = false
 ): number {
-  const predictedPct = currentPct - (dischargePerHour * horizonMinutes) / 60;
+  const chargePerHour = 20; // 20% per hour charging
+  const delta = isCharging 
+    ? (chargePerHour * horizonMinutes) / 60 
+    : -(dischargePerHour * horizonMinutes) / 60;
+    
+  const predictedPct = currentPct + delta;
   if (predictedPct >= 30) return 0.1;
   if (predictedPct >= 20) return 0.4;
   if (predictedPct >= 10) return 0.7;
@@ -130,11 +136,12 @@ export function assessBattery(
   currentPct: number,
   horizonMinutes: number,
   dischargePerHour: number,
+  isCharging: boolean = false,
   nodeId?: string,
   preferences: any[] = [],
   personality?: PersonalityAnalysis
 ): RiskScore {
-  let score = batteryRisk(currentPct, horizonMinutes, dischargePerHour);
+  let score = batteryRisk(currentPct, horizonMinutes, dischargePerHour, isCharging);
 
   // Apply preferences
   const tolerance = preferences.find(p => p.category === 'BATTERY_TOLERANCE');
@@ -148,22 +155,25 @@ export function assessBattery(
   }
 
   const label = scoreToLabel(score);
-  const predictedPct = currentPct - (dischargePerHour * horizonMinutes) / 60;
+  const chargePerHour = 20;
+  const delta = isCharging ? (chargePerHour * horizonMinutes) / 60 : -(dischargePerHour * horizonMinutes) / 60;
+  const predictedPct = currentPct + delta;
 
   const causes: string[] = [
     `Current battery: ${currentPct}%`,
-    `Discharge rate: ${dischargePerHour}%/hr`,
-    `Horizon: ${horizonMinutes} min`,
-    `Predicted level at horizon: ${Math.max(0, predictedPct).toFixed(1)}%`,
+    `Status: ${isCharging ? 'Charging (+20%/hr)' : 'Discharging'}`,
+    `Typical drain: ${dischargePerHour}%/hr`,
+    `Horizon: ${horizonMinutes.toFixed(1)} min`,
+    `Predicted level at horizon: ${Math.max(0, Math.min(100, predictedPct)).toFixed(1)}%`,
   ];
 
-  if (predictedPct < 10) {
+  if (predictedPct < 10 && !isCharging) {
     causes.push("Device may shut down before horizon");
   }
 
   const summary =
-    `Battery ${currentPct}%, typical drain ${dischargePerHour}%/hr, ` +
-    `${horizonMinutes}min window; predicted ${Math.max(0, predictedPct).toFixed(0)}% → ${label} battery risk.`;
+    `Battery ${currentPct}%, ${isCharging ? 'charging' : 'typical drain ' + dischargePerHour + '%/hr'}, ` +
+    `${horizonMinutes.toFixed(0)}min window; predicted ${Math.max(0, Math.min(100, predictedPct)).toFixed(0)}% → ${label} battery risk.`;
 
   return { type: "battery", score, label, nodeId, summary, causes };
 }
@@ -309,4 +319,42 @@ export function buildSnapshot(
   };
 }
 
+/**
+ * Specialized assessment for Acts (location-less events) where connectivity/power is the primary risk.
+ */
+export function assessActBattery(
+  currentPct: number,
+  minutesToStart: number,
+  dischargePerHour: number,
+  isCharging: boolean,
+  eventLabel: string,
+  nodeId?: string
+): RiskScore {
+  const chargeRate = 20; // 20% per hour charging
+  const delta = isCharging ? (chargeRate * minutesToStart) / 60 : -(dischargePerHour * minutesToStart) / 60;
+  const predictedPct = currentPct + delta;
+  
+  // Stricter thresholds for Acts because they usually require the device active
+  let score = 0.1;
+  if (predictedPct < 15) score = 0.9;
+  else if (predictedPct < 25) score = 0.7;
+  else if (predictedPct < 40) score = 0.4;
 
+  const label = scoreToLabel(score);
+  const causes = [
+    `Target: "${eventLabel}" (ACT)`,
+    `Current battery: ${currentPct}%`,
+    `Status: ${isCharging ? 'Charging (+20%/hr)' : 'Discharging'}`,
+    `Time to start: ${minutesToStart.toFixed(1)} min`,
+    `Predicted level: ${Math.max(0, predictedPct).toFixed(1)}%`
+  ];
+
+  return {
+    type: "battery",
+    score,
+    label,
+    nodeId,
+    summary: `Act "${eventLabel}" starts in ${minutesToStart.toFixed(0)}min; predicted ${Math.max(0, predictedPct).toFixed(0)}% battery → ${label} risk.`,
+    causes
+  };
+}

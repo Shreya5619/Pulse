@@ -117,7 +117,7 @@ class DayPulseBlock {
   final String title;
   final DateTime startTime;
   final DateTime endTime;
-  final String type; // 'event' | 'routine'
+  final String type; // 'event' | 'routine' | 'act'
   final String? category; // 'sleep' | 'study' | 'commute' | 'buffer'
   final String? locationText;
   final int? etaMinutes;
@@ -917,6 +917,12 @@ class AppState extends ChangeNotifier {
       final rData = data['data'];
       if (rData != null) {
         _currentRiskSnapshot = RiskSnapshot.fromJson(rData);
+        _risksNext90Min = _currentRiskSnapshot!.risks.length;
+        _activeRiskTypes = _currentRiskSnapshot!.risks
+            .map((r) => r.type == RiskType.responseDebt ? "response_debt" : r.type.name)
+            .toSet()
+            .toList();
+
         _currentRisk = RiskState(
           score: _currentRiskSnapshot!.risks.isEmpty
               ? 0.0

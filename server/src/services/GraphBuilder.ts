@@ -9,6 +9,7 @@ import { geocodingService } from "./GeocodingService";
 import {
   latenessRisk,
   batteryRisk,
+  assessActBattery,
   responseDebtRisk,
   overloadRisk
 } from "./RiskEngine";
@@ -49,16 +50,31 @@ export class GraphBuilder {
 
     // 3. APPOINTMENT Nodes & TRAVEL Edges
     for (const event of upcomingEvents) {
+      const hasLocation = !!(event.location?.lat || event.location_text);
       const eventNodeId = `APP_${event.id}`;
       nodes.push({
         id: eventNodeId,
-        type: "APPOINTMENT",
+        type: hasLocation ? "APPOINTMENT" : "ACT",
         label: event.title,
         timeWindow: { start: event.start_time, end: event.end_time },
-        scores: { lateness: 0 } // Will calculate below
+        scores: { lateness: 0, overload: 0 }
       });
 
-      // TRAVEL Edge
+      if (!hasLocation) {
+        // Still add URGENCY edge for acts so they are grounded in time
+        const startTime = new Date(event.start_time).getTime();
+        const nowTime = new Date(context.timestamp).getTime();
+        const diffMins = Math.max(0, (startTime - nowTime) / 60000);
+
+        edges.push({
+          id: `URGENCY_NOW_${event.id}`,
+          from: "NOW",
+          to: eventNodeId,
+          type: "URGENCY",
+          weight: diffMins
+        });
+        continue;
+      }
       let travelWeight = 20; // Default fallback
       if (context.location.lat && context.location.lon) {
         // Determine Start Coordinates
@@ -212,7 +228,7 @@ export class GraphBuilder {
 
     // Pre-compute aggregate inputs for response-debt and overload
     const importantMessages = nodes.filter(n => n.type === "MESSAGE_OBLIGATION");
-    const appointmentNodes = nodes.filter(n => n.type === "APPOINTMENT");
+    const appointmentNodes = nodes.filter(n => n.type === "APPOINTMENT" || n.type === "ACT");
 
     nodes.forEach(node => {
       if (!node.scores) return;
@@ -223,10 +239,21 @@ export class GraphBuilder {
         const etaMinutes = edge ? edge.weight : 20;
         const startTime = new Date(node.timeWindow.start).getTime();
         const minutesToEvent = (startTime - nowTime) / 60000;
-        // typical_lateness = avg minutes late; treat as the buffer the user "normally cuts it close" by
         const buffer = memory.habits?.patterns?.typical_lateness ?? 5;
 
         node.scores.lateness = latenessRisk(minutesToEvent, etaMinutes, buffer);
+      }
+
+      // ACT Battery — Specialized risk for location-less events
+      if (node.type === "ACT" && node.timeWindow) {
+        const startTime = new Date(node.timeWindow.start).getTime();
+        const minutesToStart = (startTime - nowTime) / 60000;
+        const currentPct = Math.round(context.battery.level * 100);
+        const drainRate = memory.battery?.profile?.discharge_rates?.active ?? 8;
+        const isCharging = context.battery.is_charging;
+        
+        // Populate battery score for this node specifically
+        node.scores.battery = assessActBattery(currentPct, minutesToStart, drainRate, isCharging, node.label).score;
       }
 
       // Battery — delegate to RiskEngine.batteryRisk
@@ -243,7 +270,7 @@ export class GraphBuilder {
             ? Math.max(0, (nextEventStart - nowTime) / 60000)
             : 120;
 
-        node.scores.battery = batteryRisk(currentPct, horizonMinutes, drainRate);
+        node.scores.battery = batteryRisk(currentPct, horizonMinutes, drainRate, context.battery.is_charging);
       }
 
       // Response Debt — delegate to RiskEngine.responseDebtRisk
@@ -305,7 +332,7 @@ export class GraphBuilder {
       if (!node.scores) return;
 
       const checkRisk = (type: RiskSummaryItem["type"], score: number | undefined, template: string) => {
-        if (score && score >= 0.4) { // Non-LOW risks only (MEDIUM + HIGH)
+        if (score && score >= 0.1) { // Show all non-negligible risks
           if (!bestByRisk[type] || score > bestByRisk[type].score) {
             bestByRisk[type] = {
               type,

@@ -15,7 +15,7 @@ export interface DayPulseBlock {
     title: string;
     startTime: string;
     endTime: string;
-    type: 'event' | 'routine';
+    type: 'event' | 'routine' | 'act';
     category?: 'sleep' | 'study' | 'commute' | 'buffer';
     locationText?: string;
     etaMinutes?: number;
@@ -195,12 +195,14 @@ export class DayPulseService {
             const batteryRisk = risks.find(r => r.type === 'battery');
             const batteryAtStart = batteryRisk ? parseFloat(batteryRisk.explanation?.match(/\d+/)?.[0] || "") : undefined;
 
+            const hasLocation = !!(event.location?.lat || event.location_text);
+
             blocks.push({
                 eventId: event.id || `event_${(event.title as any).hashCode}`,
                 title: event.title,
                 startTime: event.start_time,
                 endTime: event.end_time,
-                type: 'event',
+                type: hasLocation ? 'event' : 'act',
                 locationText: event.location_text ?? undefined,
                 etaMinutes,
                 batteryAtStart,
@@ -308,16 +310,23 @@ export class DayPulseService {
         const isTier1 = minutesToStart > 0 && minutesToStart < 120; // Within 2 hours
 
         // 1. Battery Risk (All tiers)
-        const drainRate = 8; // 8% per hour active
-        const hoursUntilStart = Math.max(0, minutesToStart / 60);
-        const predictedLevel = (context.battery.level * 100) - (drainRate * hoursUntilStart);
+        const drainRate = 8; // 8% per hour discharging
+        const chargeRate = 20; // 20% per hour charging
+        const isCharging = context.battery.is_charging;
         
-        if (predictedLevel < 25) {
+        const hoursUntilStart = Math.max(0, minutesToStart / 60);
+        const delta = isCharging ? (chargeRate * hoursUntilStart) : -(drainRate * hoursUntilStart);
+        const predictedLevel = (context.battery.level * 100) + delta;
+        
+        const hasLocation = !!(event.location?.lat || event.location_text);
+
+        if (predictedLevel < 25 || (!hasLocation && predictedLevel < 40)) {
+            const riskLevel = predictedLevel < 15 ? 'high' : (predictedLevel < 25 ? 'medium' : 'low');
             risks.push({
                 type: 'battery',
-                level: predictedLevel < 10 ? 'high' : (predictedLevel < 20 ? 'medium' : 'low'),
-                score: Math.min(1, (25 - predictedLevel) / 25),
-                explanation: `Predicted battery level: ${Math.round(predictedLevel)}% at start.`
+                level: riskLevel,
+                score: Math.min(1, (40 - predictedLevel) / 40),
+                explanation: `${!hasLocation ? '[ACT] ' : ''}Predicted battery level: ${Math.max(0, Math.min(100, predictedLevel)).toFixed(0)}% at start.`
             });
         }
 

@@ -1,7 +1,7 @@
 /**
  * Graph Node Types for the Pulse Assistant
  */
-export type NodeType = "NOW" | "APPOINTMENT" | "PLACE" | "BATTERY_STATE" | "MESSAGE_OBLIGATION" | "TASK";
+export type NodeType = "NOW" | "APPOINTMENT" | "ACT" | "PLACE" | "BATTERY_STATE" | "MESSAGE_OBLIGATION" | "TASK";
 
 export interface GraphNode {
   id: string;

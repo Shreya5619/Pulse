@@ -401,6 +401,14 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
         icon = LucideIcons.messageSquare;
         color = Colors.purpleAccent;
         break;
+      case 'act':
+        icon = LucideIcons.zap;
+        color = Colors.amberAccent;
+        break;
+      case 'event':
+        icon = LucideIcons.calendar;
+        color = Colors.redAccent;
+        break;
       default:
         icon = LucideIcons.circle;
         color = Colors.white30;
