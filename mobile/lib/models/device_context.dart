@@ -70,11 +70,17 @@ class CalendarEvent {
   final String title;
   final DateTime start;
   final DateTime end;
+  final String? locationText;
+  final double? latitude;
+  final double? longitude;
 
   CalendarEvent({
     required this.title,
     required this.start,
     required this.end,
+    this.locationText,
+    this.latitude,
+    this.longitude,
   });
 }
 

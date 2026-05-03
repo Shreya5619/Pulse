@@ -124,6 +124,7 @@ class ContextServices {
                     title: e.title ?? "Untitled",
                     start: e.start ?? now,
                     end: e.end ?? now,
+                    locationText: e.location,
                   ),
                 )
                 .toList();

@@ -1116,7 +1116,7 @@ class AppState extends ChangeNotifier {
 
       // Construct payload matching the requested schema
       final payload = {
-        "id": Uuid().v4(),
+        "id": const Uuid().v4(),
         "user_id": userId,
         "timestamp": now.toUtc().toIso8601String(),
         "location": {
@@ -1139,11 +1139,13 @@ class AppState extends ChangeNotifier {
                   "end_time": _deviceContext.upcomingEvents.first.end
                       .toUtc()
                       .toIso8601String(),
-                  "location_text": "Detected Location",
-                  "location": {
-                    "lat": _deviceContext.location.latitude,
-                    "lon": _deviceContext.location.longitude,
-                  },
+                  "location_text": _deviceContext.upcomingEvents.first.locationText,
+                  "location": _deviceContext.upcomingEvents.first.latitude != null
+                      ? {
+                          "lat": _deviceContext.upcomingEvents.first.latitude,
+                          "lon": _deviceContext.upcomingEvents.first.longitude,
+                        }
+                      : null,
                   "is_all_day": false,
                   "importance": "high",
                 }
@@ -1156,6 +1158,13 @@ class AppState extends ChangeNotifier {
                   "title": e.title,
                   "start_time": e.start.toUtc().toIso8601String(),
                   "end_time": e.end.toUtc().toIso8601String(),
+                  "location_text": e.locationText,
+                  "location": e.latitude != null
+                      ? {
+                          "lat": e.latitude,
+                          "lon": e.longitude,
+                        }
+                      : null,
                 },
               )
               .toList(),

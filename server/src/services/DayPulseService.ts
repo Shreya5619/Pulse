@@ -5,6 +5,7 @@ import { plannerEngine } from "./PlannerEngine";
 import { assessLateness, assessBattery } from "./RiskEngine";
 import { GraphAdapter } from "./GraphAdapter";
 import { routingService } from "./RoutingService";
+import { geocodingService } from "./GeocodingService";
 import { CalendarEvent } from "../../../shared/context_snapshot";
 import { routineRepo } from "../db/RoutineRepository";
 import { userEventsRepo } from "../db/UserEventsRepository";
@@ -122,16 +123,33 @@ export class DayPulseService {
 
         // 5. Simulate risk for each event block
         for (const event of events) {
+            // 5. Calculate ETA
             let etaMinutes: number | undefined;
-            if (event.location?.lat && event.location?.lon && context) {
-                try {
-                    const route = await routingService.getRoute(
-                        { lat: context.location.lat, lon: context.location.lon },
-                        { lat: event.location.lat, lon: event.location.lon }
-                    );
-                    etaMinutes = Math.ceil(route.durationSeconds / 60);
-                } catch (e) {
-                    console.error(`[DayPulseService] Failed to fetch ETA for ${event.title}:`, e);
+            if (context) {
+                let eventLat = event.location?.lat;
+                let eventLon = event.location?.lon;
+
+                // If coordinates are missing but text is available, try geocoding
+                if ((!eventLat || !eventLon) && event.location_text) {
+                    console.log(`[DayPulseService] Attempting to geocode location text: ${event.location_text}`);
+                    const geo = await geocodingService.geocode(event.location_text);
+                    if (geo) {
+                        eventLat = geo.lat;
+                        eventLon = geo.lon;
+                        console.log(`[DayPulseService] Geocoded ${event.location_text} to ${eventLat}, ${eventLon}`);
+                    }
+                }
+
+                if (eventLat && eventLon) {
+                    try {
+                        const route = await routingService.getRoute(
+                            { lat: context.location.lat, lon: context.location.lon },
+                            { lat: eventLat, lon: eventLon }
+                        );
+                        etaMinutes = Math.ceil(route.durationSeconds / 60);
+                    } catch (e) {
+                        console.error(`[DayPulseService] Failed to fetch ETA for ${event.title}:`, e);
+                    }
                 }
             }
 

@@ -5,6 +5,7 @@ import { GraphNode, GraphEdge, GraphSummary, RiskSummaryItem } from "../types/gr
 import { ContextSnapshot, CalendarEvent } from "../../../shared/context_snapshot";
 import { MemoryState } from "../../../shared/memory";
 import { routingService } from "./RoutingService";
+import { geocodingService } from "./GeocodingService";
 import {
   latenessRisk,
   batteryRisk,
@@ -58,21 +59,33 @@ export class GraphBuilder {
       });
 
       // TRAVEL Edge from current location
-      let travelWeight = 20; // Default fallback if no coordinates at all
-      if (context.location.lat && context.location.lon && event.location?.lat && event.location?.lon) {
-        try {
-          const route = await routingService.getRoute(
-            { lat: context.location.lat, lon: context.location.lon },
-            { lat: event.location.lat, lon: event.location.lon }
-          );
-          travelWeight = Math.ceil(route.durationSeconds / 60);
-          console.log(`[Graph] TRAVEL edge ${currentPlaceId} → ${event.title}, etaMinutes=${travelWeight}`);
-        } catch (err) {
-          console.warn(`[Graph] Routing failed for ${event.title}, using fallback.`);
+      let travelWeight = 20; // Default fallback
+      if (context.location.lat && context.location.lon) {
+        let eventLat = event.location?.lat;
+        let eventLon = event.location?.lon;
+
+        // Try geocoding if coordinates are missing
+        if ((!eventLat || !eventLon) && event.location_text) {
+          console.log(`[Graph] Geocoding for ${event.title}: ${event.location_text}`);
+          const geo = await geocodingService.geocode(event.location_text);
+          if (geo) {
+            eventLat = geo.lat;
+            eventLon = geo.lon;
+          }
         }
-      } else {
-          // If we have history of this event, we could use that. For now, 20m.
-          travelWeight = 20; 
+
+        if (eventLat && eventLon) {
+          try {
+            const route = await routingService.getRoute(
+              { lat: context.location.lat, lon: context.location.lon },
+              { lat: eventLat, lon: eventLon }
+            );
+            travelWeight = Math.ceil(route.durationSeconds / 60);
+            console.log(`[Graph] TRAVEL edge ${currentPlaceId} → ${event.title}, etaMinutes=${travelWeight}`);
+          } catch (err) {
+            console.warn(`[Graph] Routing failed for ${event.title}, using fallback.`);
+          }
+        }
       }
 
       edges.push({
