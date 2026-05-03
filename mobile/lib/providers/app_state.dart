@@ -602,6 +602,12 @@ class AppState extends ChangeNotifier {
       debugPrint('[Pulse Context] Location Services Disabled');
     }
 
+    _initCalendarIngestion();
+    _initNotificationIngestion();
+  }
+
+
+  void _initCalendarIngestion() async {
     // Calendar - Refresh every 15 minutes
     Timer.periodic(const Duration(minutes: 15), (timer) async {
       final events = await _contextServices.getUpcomingEvents();
@@ -635,7 +641,9 @@ class AppState extends ChangeNotifier {
       timestamp: DateTime.now(),
     );
     notifyListeners();
+  }
 
+  void _initNotificationIngestion() async {
     // Notifications
     await _contextServices.initNotifications((data) {
       final packageName = data['packageName'] ?? "unknown";
@@ -1671,7 +1679,6 @@ class AppState extends ChangeNotifier {
   }
 
   String _getBackendHost() {
-    // ADB Reverse Tunnel active - always route through USB loopback
     return '10.123.31.141';
   }
 

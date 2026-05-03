@@ -37,7 +37,7 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
     final state = Provider.of<AppState>(context, listen: false);
 
     // Load both explanation and suggested actions in parallel
-    final results = await Future.wait([
+    final results = await Future.wait<dynamic>([
       state.fetchGraphExplanation(widget.nodeId),
       state.fetchSuggestedActions(widget.riskType, nodeId: widget.nodeId),
     ]);

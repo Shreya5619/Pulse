@@ -127,8 +127,7 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
   }
 
   String _getBackendHost(AppState state) {
-    // Using host machine's local IP for reliable device/emulator connectivity
-    return '10.44.187.156';
+    return '10.123.31.141';
   }
 
   String _formatDuration(int seconds) {
