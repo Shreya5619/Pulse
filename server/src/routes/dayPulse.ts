@@ -33,12 +33,39 @@ router.post("/day-pulse/modify", async (req: Request, res: Response) => {
             // Ensure times are in HH:mm for the routine repository
             const routineUpdates: any = { ...updates, days };
             if (updates.startTime) {
-                routineUpdates.startTime = new Date(updates.startTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+                if (updates.startTime.includes('T')) {
+                    routineUpdates.startTime = updates.startTime.split('T')[1].substring(0, 5);
+                } else {
+                    routineUpdates.startTime = updates.startTime;
+                }
             }
             if (updates.endTime) {
-                routineUpdates.endTime = new Date(updates.endTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+                if (updates.endTime.includes('T')) {
+                    routineUpdates.endTime = updates.endTime.split('T')[1].substring(0, 5);
+                } else {
+                    routineUpdates.endTime = updates.endTime;
+                }
             }
-            await routineRepo.updateRoutine(userId, eventId, routineUpdates);
+
+            // Check if this is an existing routine or a new conversion
+            const routines = await routineRepo.getForUser(userId);
+            const existingRoutine = routines.find(r => r.id === eventId);
+
+            if (existingRoutine) {
+                console.log(`[DayPulseRoute] Updating existing routine ${eventId}`);
+                await routineRepo.updateRoutine(userId, eventId, routineUpdates);
+            } else {
+                console.log(`[DayPulseRoute] Converting manual event ${eventId} to new routine`);
+                await routineRepo.addRoutine(userId, {
+                    title: updates.title || "New Routine",
+                    startTime: routineUpdates.startTime || "09:00",
+                    endTime: routineUpdates.endTime || "10:00",
+                    category: updates.category || 'buffer',
+                    days: days
+                });
+                // Also mark the original manual event as deleted/overridden so it doesn't double up
+                await userEventsRepo.addOverride(userId, { userId, eventId, updates: {}, isDeleted: true });
+            }
         } else {
             await userEventsRepo.addOverride(userId, { userId, eventId, updates });
         }
@@ -64,16 +91,15 @@ router.post("/day-pulse/add", async (req: Request, res: Response) => {
         const { userId, event, isRecurring, days, category } = req.body;
         console.log(`[DayPulseRoute] Adding manual event for user ${userId}:`, event.title);
         if (isRecurring && days) {
-            // Extract HH:mm from ISO strings
             // Extract HH:mm from ISO strings if they are ISO strings
             let startStr = event.start_time;
             let endStr = event.end_time;
             
             if (startStr.includes('T')) {
-                startStr = new Date(startStr).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+                startStr = startStr.split('T')[1].substring(0, 5);
             }
             if (endStr.includes('T')) {
-                endStr = new Date(endStr).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+                endStr = endStr.split('T')[1].substring(0, 5);
             }
             
             await routineRepo.addRoutine(userId, {

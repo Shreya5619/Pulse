@@ -205,6 +205,20 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildDayPulsePreview(BuildContext context, AppState state) {
+    final hasActiveBlocks = state.dayPulseBlocks.isNotEmpty;
+    
+    // Safely find the next event or fallback to the first available block
+    DayPulseBlock? nextEventBlock;
+    if (hasActiveBlocks) {
+      try {
+        nextEventBlock = state.dayPulseBlocks.firstWhere(
+          (b) => b.type == 'event' && b.startTime.isAfter(DateTime.now()),
+        );
+      } catch (_) {
+        nextEventBlock = state.dayPulseBlocks.first;
+      }
+    }
+
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -245,18 +259,70 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              Text(
-                "Your schedule is being simulated for the entire day. ${state.dayPulseBlocks.length} activities tracked.",
-                style: GoogleFonts.outfit(fontSize: 13, color: Colors.white60),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _miniRiskBadge(LucideIcons.clock, "No delay"),
-                  const SizedBox(width: 8),
-                  _miniRiskBadge(LucideIcons.battery, "Power ok"),
+              if (hasActiveBlocks && nextEventBlock != null) ...[
+                Text(
+                  nextEventBlock.startTime.isAfter(DateTime.now()) 
+                    ? "Next: ${nextEventBlock.title}" 
+                    : "Current: ${nextEventBlock.title}",
+                  style: GoogleFonts.outfit(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w600),
+                ),
+                if (nextEventBlock.locationText != null) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(LucideIcons.mapPin, size: 12, color: Colors.white38),
+                      const SizedBox(width: 6),
+                      Text(
+                        nextEventBlock.locationText!,
+                        style: GoogleFonts.outfit(fontSize: 12, color: Colors.white38),
+                      ),
+                      if (nextEventBlock.etaMinutes != null) ...[
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            "ETA: ${nextEventBlock.etaMinutes}m",
+                            style: GoogleFonts.outfit(fontSize: 10, color: Colors.amber, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
-              ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    _miniRiskBadge(
+                      LucideIcons.clock, 
+                      nextEventBlock.risks.any((r) => r.type == 'lateness') ? "Delay Risk" : "On-time",
+                      color: nextEventBlock.risks.any((r) => r.type == 'lateness' && r.level == 'high') ? AppColors.danger : Colors.white30
+                    ),
+                    const SizedBox(width: 8),
+                    _miniRiskBadge(
+                      LucideIcons.battery, 
+                      nextEventBlock.risks.any((r) => r.type == 'battery') ? "Power Alert" : "Power ok",
+                      color: nextEventBlock.risks.any((r) => r.type == 'battery' && r.level == 'high') ? AppColors.danger : Colors.white30
+                    ),
+                  ],
+                ),
+              ] else ...[
+                Text(
+                  "Your schedule is being simulated for the entire day. No activities detected yet.",
+                  style: GoogleFonts.outfit(fontSize: 13, color: Colors.white60),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    _miniRiskBadge(LucideIcons.clock, "No data"),
+                    const SizedBox(width: 8),
+                    _miniRiskBadge(LucideIcons.battery, "Power ok"),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -264,20 +330,20 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _miniRiskBadge(IconData icon, String text) {
+  Widget _miniRiskBadge(IconData icon, String text, {Color color = Colors.white30}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: color.withOpacity(0.05),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 10, color: Colors.white30),
+          Icon(icon, size: 10, color: color),
           const SizedBox(width: 4),
           Text(
             text,
-            style: GoogleFonts.outfit(fontSize: 10, color: Colors.white30),
+            style: GoogleFonts.outfit(fontSize: 10, color: color),
           ),
         ],
       ),

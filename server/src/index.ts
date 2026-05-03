@@ -42,6 +42,8 @@ app.use("/api/planner", plannerRouter);
 app.use("/api", futuresRouter);
 import commRouter from "./routes/comm";
 app.use("/api/comm", commRouter);
+import routeRouter from "./routes/route";
+app.use("/api/route", routeRouter);
 app.use("/api/twin", twinRouter);
 import dayPulseRouter from "./routes/dayPulse";
 app.use("/api", dayPulseRouter);

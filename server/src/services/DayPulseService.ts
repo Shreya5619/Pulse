@@ -163,10 +163,44 @@ export class DayPulseService {
             });
         }
 
+        // 6. Detect Clashes (Overlaps)
+        const sortedBlocks = blocks.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+        for (let i = 0; i < sortedBlocks.length - 1; i++) {
+            const current = sortedBlocks[i];
+            const next = sortedBlocks[i + 1];
+
+            const currentEnd = new Date(current.endTime);
+            const nextStart = new Date(next.startTime);
+
+            if (currentEnd > nextStart) {
+                const overlapMins = Math.round((currentEnd.getTime() - nextStart.getTime()) / 60000);
+
+                if (overlapMins > 0) {
+                    // Add risk to both blocks
+                    const riskLevel = overlapMins > 30 ? 'high' : (overlapMins > 10 ? 'medium' : 'low');
+                    const score = Math.min(1, overlapMins / 60);
+
+                    current.risks.push({
+                        type: 'overload',
+                        level: riskLevel,
+                        score: score,
+                        explanation: `Timing clash: Overlaps with "${next.title}" by ${overlapMins} mins.`
+                    });
+
+                    next.risks.push({
+                        type: 'overload',
+                        level: riskLevel,
+                        score: score,
+                        explanation: `Timing clash: Overlaps with "${current.title}" by ${overlapMins} mins.`
+                    });
+                }
+            }
+        }
+
         return {
             userId,
             date: dateStr,
-            blocks: blocks.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+            blocks: sortedBlocks
         };
     }
 
