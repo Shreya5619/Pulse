@@ -49,7 +49,18 @@ export class GraphBuilder {
     });
 
     // 3. APPOINTMENT Nodes & TRAVEL Edges
-    for (const event of upcomingEvents) {
+    const allEventsRaw = [];
+    if (context.calendar.next_event) allEventsRaw.push(context.calendar.next_event);
+    if (context.calendar.upcoming_events) allEventsRaw.push(...context.calendar.upcoming_events);
+
+    // Dedupe by ID
+    const eventMap = new Map();
+    for (const e of allEventsRaw) {
+      if (e.id) eventMap.set(e.id, e);
+    }
+    const allEvents = Array.from(eventMap.values());
+
+    for (const event of allEvents) {
       const hasLocation = !!(event.location?.lat || event.location_text);
       const eventNodeId = `APP_${event.id}`;
       nodes.push({
@@ -57,7 +68,7 @@ export class GraphBuilder {
         type: hasLocation ? "APPOINTMENT" : "ACT",
         label: event.title,
         timeWindow: { start: event.start_time, end: event.end_time },
-        scores: { lateness: 0, overload: 0 }
+        scores: { lateness: 0, overload: 0, battery: 0, responseDebt: 0 }
       });
 
       if (!hasLocation) {

@@ -210,8 +210,9 @@ class FuturesEngine {
       baseBattery,
       (arrivalTime - nowTime) / 60000,
       memory.battery?.profile?.discharge_rates?.active ?? 8,
-      undefined,
-      [],
+      false, // isCharging
+      "BATTERY", // nodeId
+      [], // preferences
       personality
     );
 
@@ -281,7 +282,8 @@ class FuturesEngine {
       baseBattery,
       (arrivalTime - nowTime) / 60000,
       saverMemory.battery?.profile?.discharge_rates?.active ?? 5.6,
-      undefined,
+      false,
+      "BATTERY",
       [],
       personality
     );
@@ -350,7 +352,8 @@ class FuturesEngine {
       batteryAfterCharge,
       route.durationSeconds / 60,
       memory.battery?.profile?.discharge_rates?.active ?? 8,
-      undefined,
+      false,
+      "BATTERY",
       [],
       personality
     );

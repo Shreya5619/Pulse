@@ -8,6 +8,7 @@ import '../theme/colors.dart';
 import 'glass_card.dart';
 import '../screens/graph_explanation_screen.dart';
 import '../screens/timeline_screen.dart';
+import '../models/risk_snapshot.dart';
 
 class RiskHeroCard extends StatelessWidget {
   const RiskHeroCard({super.key});
@@ -16,11 +17,20 @@ class RiskHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, state, child) {
-        final count = state.risksNext90Min;
+        final risks = state.currentRiskSnapshot?.risks ?? [];
+
+        // Filter high risks (score >= 0.4) for count and main tags
+        final highRisks = risks.where((r) => (r.score ?? 0) >= 0.4).toList();
+        final count = highRisks.length;
+
         debugPrint(
-          '[Pulse UI] RiskHeroCard count: $count, types: ${state.activeRiskTypes}',
+          '[Pulse UI] RiskHeroCard high-risk count: $count / total: ${risks.length}',
         );
-        final riskTypes = state.activeRiskTypes;
+
+        final highRiskTypes = highRisks
+            .map((r) => r.type.toString().split('.').last)
+            .toSet()
+            .toList();
 
         final now = DateTime.now();
         final windowEnd = now.add(const Duration(minutes: 90));
@@ -35,18 +45,17 @@ class RiskHeroCard extends StatelessWidget {
           'response_debt': 'Response Debt',
         };
 
-        final summaryLine = riskTypes.isEmpty
+        final summaryLine = highRiskTypes.isEmpty
             ? "Everything looks nominal for now."
-            : riskTypes.map((t) => typeMap[t] ?? t).join(" + ");
+            : highRiskTypes.map((t) => typeMap[t] ?? t).join(" + ");
 
         final title =
-            "$count ${count == 1 ? 'risk' : 'risks'} forming in next 90 minutes";
+            "$count ${count == 1 ? 'risk' : 'risks'}  forming in next 90 minutes";
 
         return GestureDetector(
           onTap: () {
-            final risks = state.currentRiskSnapshot?.risks ?? [];
-            if (risks.isNotEmpty) {
-              final topRisk = risks[0];
+            if (highRisks.isNotEmpty) {
+              final topRisk = highRisks[0];
               if (topRisk.nodeId != null) {
                 Navigator.push(
                   context,
@@ -109,15 +118,16 @@ class RiskHeroCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
+                // Main chips: only high risks (>=0.4)
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 600),
                   child: Wrap(
-                    key: ValueKey(riskTypes.join(',')),
+                    key: ValueKey(highRiskTypes.join(',')),
                     spacing: 8,
                     runSpacing: 8,
-                    children: riskTypes.isEmpty
+                    children: highRiskTypes.isEmpty
                         ? [_statusChip("Nominal", Colors.greenAccent)]
-                        : riskTypes
+                        : highRiskTypes
                               .map(
                                 (t) => _statusChip(
                                   typeMap[t] ?? t,
@@ -127,56 +137,26 @@ class RiskHeroCard extends StatelessWidget {
                               .toList(),
                   ),
                 ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    const Icon(
-                      LucideIcons.activity,
-                      size: 12,
-                      color: Colors.white30,
+                const SizedBox(height: 12),
+                // All risks boxes with scores
+                if (risks.isNotEmpty) ...[
+                  Text(
+                    "All risks (${risks.length}):",
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      color: Colors.white.withValues(alpha: 0.6),
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 400),
-                        child: Text(
-                          summaryLine,
-                          key: ValueKey(summaryLine),
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            color: Colors.white.withValues(alpha: 0.4),
-                            fontStyle: FontStyle.italic,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    TextButton.icon(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const TimelineScreen(),
-                        ),
-                      ),
-                      icon: Icon(LucideIcons.list, size: 12, color: AppColors.primary),
-                      label: Text(
-                        "TIMELINE",
-                        style: GoogleFonts.outfit(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: risks
+                        .map((risk) => _riskBox(risk, typeMap))
+                        .toList(),
+                  ),
+                ],
               ],
             ),
           ),
@@ -200,6 +180,54 @@ class RiskHeroCard extends StatelessWidget {
           fontSize: 10,
           fontWeight: FontWeight.bold,
         ),
+      ),
+    );
+  }
+
+  Widget _riskBox(RiskScore risk, Map<String, String> typeMap) {
+    final typeName = risk.type.toString().split('.').last;
+    final typeLabel = typeMap[typeName] ?? typeName;
+    final score = risk.score.toStringAsFixed(2);
+    final isHigh = risk.score >= 0.4;
+    final color = isHigh ? _getColorForType(typeName) : Colors.grey;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            typeLabel,
+            style: TextStyle(
+              color: color,
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+            decoration: BoxDecoration(
+              color: isHigh
+                  ? Colors.white.withValues(alpha: 0.2)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: Text(
+              score,
+              style: TextStyle(
+                color: isHigh ? Colors.white : Colors.white54,
+                fontSize: 8,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

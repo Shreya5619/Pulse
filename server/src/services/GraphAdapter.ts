@@ -318,16 +318,18 @@ export class GraphAdapter {
 
       const result = await session.run(
         `MATCH (p:Person {id: $userId})
-         OPTIONAL MATCH (p)-[r1:HAS_EVENT]->(e:Event)
+         OPTIONAL MATCH (p)-[:HAS_EVENT]->(e:Event)
          WHERE e.startTime >= $now AND e.startTime <= $horizon
-         OPTIONAL MATCH (e)-[r2:AT_LOCATION]->(loc:Location)
+         OPTIONAL MATCH (e)-[:AT_LOCATION]->(loc:Location)
+         WITH p, e, loc
          OPTIONAL MATCH (p)-[:HAS_BATTERY]->(b:BatteryState)
          WITH p, e, loc, b ORDER BY b.timestamp DESC LIMIT 1
          OPTIONAL MATCH (p)-[:HAS_PREFERENCE]->(pr:Preference)
          OPTIONAL MATCH (p)-[:HAS_TRAIT]->(t:Trait)
          OPTIONAL MATCH (p)-[:INTERESTED_IN]->(i:Interest)
          OPTIONAL MATCH (p)-[:FEELS]->(s:Sentiment)
-         RETURN p, collect(distinct e) as events, collect(distinct loc) as locations,
+         RETURN p, 
+                collect(distinct {event: e, location: loc}) as eventLocPairs,
                 collect(distinct b) as batteries,
                 p.totalNotifications as totalNotifications,
                 p.urgentOtpCount as urgentOtpCount,
@@ -339,8 +341,7 @@ export class GraphAdapter {
         { 
           userId, 
           now, 
-          horizon,
-          now_minus_60: new Date(Date.now() - 60 * 60000).toISOString()
+          horizon
         }
       );
 
@@ -379,18 +380,39 @@ export class GraphAdapter {
     }
 
     // 2. Events & Locations
-    const events = record.get('events');
-    events.forEach((e: any, idx: number) => {
-        const eId = 'EVENT_' + e.properties.id;
-        nodes.push({
-            id: eId,
-            label: e.properties.title,
-            type: e.labels?.includes('Act') ? 'act' : 'event',
-            x: 200 + (idx * 300),
-            y: 500,
-            risk: e.properties.riskScore || 0
-        });
-        edges.push({ from: 'PERSON_' + userId, to: eId, type: 'HAS_EVENT' });
+    const eventLocPairs = record.get('eventLocPairs') || [];
+    eventLocPairs.forEach((pair: any, idx: number) => {
+        const e = pair.event;
+        const loc = pair.location;
+        
+        if (e) {
+            const eId = 'EVENT_' + e.properties.id;
+            nodes.push({
+                id: eId,
+                label: e.properties.title,
+                type: e.labels?.includes('Act') ? 'act' : 'event',
+                x: 200 + (idx * 300),
+                y: 500,
+                risk: e.properties.riskScore || 0
+            });
+            edges.push({ from: 'PERSON_' + userId, to: eId, type: 'HAS_EVENT' });
+
+            if (loc) {
+                const locId = 'LOC_' + loc.properties.id;
+                // Add location node if not already added
+                if (!nodes.find(n => n.id === locId)) {
+                    nodes.push({
+                        id: locId,
+                        label: loc.properties.name || 'Unknown Location',
+                        type: 'location',
+                        x: 200 + (idx * 300),
+                        y: 700,
+                        risk: 0
+                    });
+                }
+                edges.push({ from: eId, to: locId, type: 'AT_LOCATION' });
+            }
+        }
     });
 
     // 3. Battery

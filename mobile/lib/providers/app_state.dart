@@ -923,6 +923,8 @@ class AppState extends ChangeNotifier {
             .toSet()
             .toList();
 
+        debugPrint('[Pulse AppState] Risk sync complete: types=$_activeRiskTypes, count=$_risksNext90Min');
+
         _currentRisk = RiskState(
           score: _currentRiskSnapshot!.risks.isEmpty
               ? 0.0

@@ -98,12 +98,17 @@ export class RiskEngineService {
    * Compute all risk dimensions for a user and persist the result.
    */
   async computeForUser(userId: string): Promise<RiskSnapshot> {
-    const graph = await graphBuilder.buildForUser(userId);
-    const memory = await memoryStore.loadAll(userId);
-    const preferences = await GraphAdapter.getUserPreferences(userId);
-    const personality = await GraphAdapter.getUserPersonality(userId);
-    const now = new Date().toISOString();
-    const nowMs = Date.now();
+    console.log(`[RiskEngineService] Starting computeForUser for ${userId}`);
+    try {
+      const graph = await graphBuilder.buildForUser(userId);
+      console.log(`[RiskEngineService] Graph built: ${graph.nodes.length} nodes`);
+      
+      const memory = await memoryStore.loadAll(userId);
+      const preferences = await GraphAdapter.getUserPreferences(userId);
+      const personality = await GraphAdapter.getUserPersonality(userId);
+      
+      const now = graph.context.timestamp;
+      const nowMs = new Date(now).getTime();
 
     const risks: RiskScore[] = [];
 
@@ -144,10 +149,12 @@ export class RiskEngineService {
       const appointmentNodes = graph.nodes.filter(
         (n) => n.type === "APPOINTMENT" || n.type === "ACT"
       );
+      
       const nextEventMs = appointmentNodes
         .map((n) =>
           n.timeWindow ? new Date(n.timeWindow.start).getTime() : Infinity
         )
+        .filter(t => t > nowMs)
         .sort((a, b) => a - b)[0];
       const horizonMinutes =
         nextEventMs && nextEventMs !== Infinity
@@ -217,6 +224,10 @@ export class RiskEngineService {
     );
 
     return snapshot;
+    } catch (error) {
+      console.error(`[RiskEngineService] Critical failure in computeForUser(${userId}):`, error);
+      throw error;
+    }
   }
 }
 
