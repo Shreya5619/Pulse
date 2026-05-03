@@ -8,76 +8,92 @@ export interface RoutineBlock {
     endTime: string;   // HH:mm
     category: 'sleep' | 'study' | 'commute' | 'buffer';
     days: number[]; // 0-6 (Sun-Sat)
+    startLocation?: { lat: number; lon: number; name?: string | null } | null;
 }
 
 export class RoutineRepository {
-    private routines: RoutineBlock[] = [
-        {
-            id: 'routine_sleep',
-            userId: 'demo-user',
-            title: 'Sleep',
-            startTime: '23:00',
-            endTime: '07:00',
-            category: 'sleep',
-            days: [0, 1, 2, 3, 4, 5, 6]
-        },
-        {
-            id: 'routine_study',
-            userId: 'demo-user',
-            title: 'Study block',
-            startTime: '09:00',
-            endTime: '11:00',
-            category: 'study',
-            days: [1, 2, 3, 4, 5]
-        },
-        {
-            id: 'routine_commute',
-            userId: 'demo-user',
-            title: 'Usual commute',
-            startTime: '08:30',
-            endTime: '09:00',
-            category: 'commute',
-            days: [1, 2, 3, 4, 5]
-        },
-        {
-            id: 'routine_buffer',
-            userId: 'demo-user',
-            title: 'Free buffer',
-            startTime: '12:00',
-            endTime: '13:00',
-            category: 'buffer',
-            days: [0, 1, 2, 3, 4, 5, 6]
-        }
-    ];
-
     async getForUser(userId: string): Promise<RoutineBlock[]> {
-        return this.routines.filter(r => r.userId === userId || r.userId === 'demo-user');
+        const sql = `SELECT * FROM routines WHERE user_id = $1 OR user_id = 'demo-user'`;
+        const res = await query(sql, [userId]);
+        return res.rows.map(row => ({
+            id: row.id,
+            userId: row.user_id,
+            title: row.title,
+            startTime: row.start_time,
+            endTime: row.end_time,
+            category: row.category,
+            days: row.days,
+            startLocation: row.start_location
+        }));
     }
 
     async getForDay(userId: string, date: Date): Promise<RoutineBlock[]> {
         const day = date.getDay();
-        return (await this.getForUser(userId)).filter(r => r.days.includes(day));
+        const routines = await this.getForUser(userId);
+        return routines.filter(r => r.days.includes(day));
     }
 
     async addRoutine(userId: string, routine: Omit<RoutineBlock, 'id' | 'userId'>): Promise<RoutineBlock> {
-        const newRoutine: RoutineBlock = {
-            ...routine,
-            id: `routine_${Date.now()}`,
-            userId
-        };
-        this.routines.push(newRoutine);
-        return newRoutine;
+        const id = `routine_${Date.now()}`;
+        const sql = `
+            INSERT INTO routines (id, user_id, title, start_time, end_time, category, days, start_location)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `;
+        await query(sql, [
+            id, 
+            userId, 
+            routine.title, 
+            routine.startTime, 
+            routine.endTime, 
+            routine.category, 
+            routine.days, 
+            routine.startLocation ? JSON.stringify(routine.startLocation) : null
+        ]);
+        return { ...routine, id, userId };
     }
 
     async updateRoutine(userId: string, routineId: string, updates: Partial<RoutineBlock>): Promise<void> {
-        const index = this.routines.findIndex(r => r.id === routineId && (r.userId === userId || r.userId === 'demo-user'));
-        if (index !== -1) {
-            this.routines[index] = { ...this.routines[index], ...updates };
-        }
+        const current = await this.getRoutine(userId, routineId);
+        if (!current) return;
+
+        const updated = { ...current, ...updates };
+        const sql = `
+            UPDATE routines 
+            SET title = $1, start_time = $2, end_time = $3, category = $4, days = $5, start_location = $6
+            WHERE id = $7 AND user_id = $8
+        `;
+        await query(sql, [
+            updated.title, 
+            updated.startTime, 
+            updated.endTime, 
+            updated.category, 
+            updated.days, 
+            updated.startLocation ? JSON.stringify(updated.startLocation) : null,
+            routineId, 
+            userId
+        ]);
     }
 
     async deleteRoutine(userId: string, routineId: string): Promise<void> {
-        this.routines = this.routines.filter(r => !(r.id === routineId && (r.userId === userId || r.userId === 'demo-user')));
+        const sql = `DELETE FROM routines WHERE id = $1 AND user_id = $2`;
+        await query(sql, [routineId, userId]);
+    }
+
+    private async getRoutine(userId: string, routineId: string): Promise<RoutineBlock | null> {
+        const sql = `SELECT * FROM routines WHERE id = $1 AND (user_id = $2 OR user_id = 'demo-user')`;
+        const res = await query(sql, [routineId, userId]);
+        if (res.rows.length === 0) return null;
+        const row = res.rows[0];
+        return {
+            id: row.id,
+            userId: row.user_id,
+            title: row.title,
+            startTime: row.start_time,
+            endTime: row.end_time,
+            category: row.category,
+            days: row.days,
+            startLocation: row.start_location
+        };
     }
 }
 

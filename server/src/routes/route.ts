@@ -10,38 +10,61 @@ const router = Router();
  */
 router.get("/eta", async (req, res) => {
   try {
-    const { fromLat, fromLon, toLoc } = req.query;
+    const { fromLat, fromLon, fromLoc, toLoc } = req.query;
 
-    if (!fromLat || !fromLon || !toLoc) {
+    if (!toLoc || (!fromLoc && (!fromLat || !fromLon))) {
       return res.status(400).json({ 
         ok: false, 
-        error: "Missing required parameters: fromLat, fromLon, toLoc" 
+        error: "Missing required parameters. Provide toLoc and either (fromLat, fromLon) or fromLoc." 
       });
     }
 
-    console.log(`[Route] Calculating ETA from (${fromLat}, ${fromLon}) to "${toLoc}"`);
+    // 1. Resolve starting point
+    let startLat: number;
+    let startLon: number;
+    let startName: string | undefined;
 
-    // 1. Geocode the destination
+    if (fromLoc) {
+      console.log(`[Route] Geocoding origin: ${fromLoc}`);
+      const origin = await geocodingService.geocode(fromLoc as string);
+      if (!origin) {
+        return res.status(404).json({ ok: false, error: `Could not find origin: ${fromLoc}` });
+      }
+      startLat = origin.lat;
+      startLon = origin.lon;
+      startName = origin.displayName;
+    } else {
+      startLat = Number(fromLat);
+      startLon = Number(fromLon);
+    }
+
+    console.log(`[Route] Calculating ETA from ${startName || `(${startLat}, ${startLon})`} to "${toLoc}"`);
+
+    // 2. Geocode the destination
     const destination = await geocodingService.geocode(toLoc as string);
     if (!destination) {
       return res.status(404).json({ 
         ok: false, 
-        error: `Could not find location: ${toLoc}` 
+        error: `Could not find destination: ${toLoc}` 
       });
     }
 
     console.log(`[Route] Destination geocoded to: ${destination.displayName} (${destination.lat}, ${destination.lon})`);
 
-    // 2. Get ETA from OSRM (via routingService)
-    const from = { lat: Number(fromLat), lon: Number(fromLon) };
-    const to = { lat: destination.lat, lon: destination.lon };
-    
-    const routeResult = await routingService.getRoute(from, to);
+    // 3. Get ETA from OSRM
+    const routeResult = await routingService.getRoute(
+      { lat: startLat, lon: startLon },
+      { lat: destination.lat, lon: destination.lon }
+    );
 
     res.json({
       ok: true,
       data: {
-        from: { lat: from.lat, lon: from.lon },
+        from: { 
+          lat: startLat, 
+          lon: startLon,
+          name: startName || "Custom Location"
+        },
         to: { 
           lat: destination.lat, 
           lon: destination.lon, 

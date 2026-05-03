@@ -103,4 +103,39 @@ CREATE TABLE IF NOT EXISTS heartbeat_audit (
 );
 
 CREATE INDEX IF NOT EXISTS idx_heartbeat_audit_user ON heartbeat_audit(user_id);
-CREATE INDEX IF NOT EXISTS idx_heartbeat_audit_ts ON heartbeat_audit(user_id, started_at DESC);
+-- Routine Blocks
+CREATE TABLE IF NOT EXISTS routines (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    start_time TEXT NOT NULL, -- HH:mm
+    end_time TEXT NOT NULL,   -- HH:mm
+    category TEXT NOT NULL,
+    days INTEGER[] NOT NULL,
+    start_location JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_routines_user ON routines(user_id);
+
+-- Manual Events
+CREATE TABLE IF NOT EXISTS manual_events (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_manual_events_user ON manual_events(user_id);
+
+-- Event Overrides
+CREATE TABLE IF NOT EXISTS event_overrides (
+    user_id TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    updates JSONB NOT NULL,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (user_id, event_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_overrides_user ON event_overrides(user_id);

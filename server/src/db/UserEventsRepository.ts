@@ -1,3 +1,4 @@
+import { query } from "./db";
 import { CalendarEvent } from "../../../shared/context_snapshot";
 
 export interface UserEventOverride {
@@ -8,44 +9,50 @@ export interface UserEventOverride {
 }
 
 export class UserEventsRepository {
-    private overrides: Map<string, UserEventOverride[]> = new Map();
-    private manualEvents: Map<string, CalendarEvent[]> = new Map();
-
     async getOverrides(userId: string): Promise<UserEventOverride[]> {
-        return this.overrides.get(userId) || [];
+        const sql = `SELECT * FROM event_overrides WHERE user_id = $1`;
+        const res = await query(sql, [userId]);
+        return res.rows.map(row => ({
+            userId: row.user_id,
+            eventId: row.event_id,
+            updates: row.updates,
+            isDeleted: row.is_deleted
+        }));
     }
 
     async addOverride(userId: string, override: UserEventOverride): Promise<void> {
-        const userOverrides = this.overrides.get(userId) || [];
-        const existing = userOverrides.findIndex(o => o.eventId === override.eventId);
-        if (existing !== -1) {
-            userOverrides[existing] = { ...userOverrides[existing], ...override };
-        } else {
-            userOverrides.push(override);
-        }
-        this.overrides.set(userId, userOverrides);
+        const sql = `
+            INSERT INTO event_overrides (user_id, event_id, updates, is_deleted)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (user_id, event_id) 
+            DO UPDATE SET updates = event_overrides.updates || $3, is_deleted = $4
+        `;
+        await query(sql, [userId, override.eventId, JSON.stringify(override.updates), override.isDeleted ?? false]);
     }
 
     async getManualEvents(userId: string): Promise<CalendarEvent[]> {
-        return this.manualEvents.get(userId) || [];
+        const sql = `SELECT payload FROM manual_events WHERE user_id = $1`;
+        const res = await query(sql, [userId]);
+        return res.rows.map(row => row.payload as CalendarEvent);
     }
 
     async addManualEvent(userId: string, event: CalendarEvent): Promise<void> {
-        const events = this.manualEvents.get(userId) || [];
-        events.push(event);
-        this.manualEvents.set(userId, events);
+        const sql = `
+            INSERT INTO manual_events (id, user_id, payload)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (id) DO UPDATE SET payload = $3
+        `;
+        await query(sql, [event.id, userId, JSON.stringify(event)]);
     }
 
     async deleteManualEvent(userId: string, eventId: string): Promise<void> {
-        const events = this.manualEvents.get(userId) || [];
-        const filtered = events.filter(e => e.id !== eventId);
-        this.manualEvents.set(userId, filtered);
+        const sql = `DELETE FROM manual_events WHERE id = $1 AND user_id = $2`;
+        await query(sql, [eventId, userId]);
     }
 
     async deleteOverride(userId: string, eventId: string): Promise<void> {
-        const userOverrides = this.overrides.get(userId) || [];
-        const filtered = userOverrides.filter(o => o.eventId !== eventId);
-        this.overrides.set(userId, filtered);
+        const sql = `DELETE FROM event_overrides WHERE user_id = $1 AND event_id = $2`;
+        await query(sql, [userId, eventId]);
     }
 }
 

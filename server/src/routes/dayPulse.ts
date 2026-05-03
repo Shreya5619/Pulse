@@ -7,7 +7,7 @@ const router = Router();
 
 router.get("/day-pulse", async (req: Request, res: Response) => {
     try {
-        const userId = req.query.userId as string || "demo-user";
+        const userId = req.header("X-User-Id") || req.query.userId as string || req.query.deviceId as string || "demo-user";
         const date = req.query.date as string || new Date().toISOString().split('T')[0];
         
         const timeline = await dayPulseService.getDailyTimeline(userId, date);
@@ -26,7 +26,8 @@ router.get("/day-pulse", async (req: Request, res: Response) => {
 
 router.post("/day-pulse/modify", async (req: Request, res: Response) => {
     try {
-        const { userId, eventId, updates, isRecurring, days } = req.body;
+        const { userId: bodyUserId, deviceId, eventId, updates, isRecurring, days } = req.body;
+        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "demo-user";
         console.log(`[DayPulseRoute] Modifying event ${eventId} for user ${userId}:`, updates);
         
         if (isRecurring && days) {
@@ -88,7 +89,8 @@ router.post("/day-pulse/modify", async (req: Request, res: Response) => {
 
 router.post("/day-pulse/add", async (req: Request, res: Response) => {
     try {
-        const { userId, event, isRecurring, days, category } = req.body;
+        const { userId: bodyUserId, deviceId, event, isRecurring, days, category } = req.body;
+        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "demo-user";
         console.log(`[DayPulseRoute] Adding manual event for user ${userId}:`, event.title);
         if (isRecurring && days) {
             // Extract HH:mm from ISO strings if they are ISO strings
@@ -131,7 +133,8 @@ router.post("/day-pulse/add", async (req: Request, res: Response) => {
 
 router.post("/day-pulse/optimize", async (req: Request, res: Response) => {
     try {
-        const { userId, date } = req.body;
+        const { userId: bodyUserId, deviceId, date } = req.body;
+        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "demo-user";
         const targetDate = date || new Date().toISOString().split('T')[0];
         
         const timeline = await dayPulseService.optimizeTimeline(userId, targetDate);
@@ -151,7 +154,8 @@ router.post("/day-pulse/optimize", async (req: Request, res: Response) => {
 
 router.post("/day-pulse/delete", async (req: Request, res: Response) => {
     try {
-        const { userId, eventId, isRoutine } = req.body;
+        const { userId: bodyUserId, deviceId, eventId, isRoutine } = req.body;
+        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "demo-user";
         console.log(`[DayPulseRoute] Deleting ${isRoutine ? 'routine' : 'event'} ${eventId} for user ${userId}`);
         
         if (isRoutine) {

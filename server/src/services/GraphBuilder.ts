@@ -58,13 +58,29 @@ export class GraphBuilder {
         scores: { lateness: 0 } // Will calculate below
       });
 
-      // TRAVEL Edge from current location
+      // TRAVEL Edge
       let travelWeight = 20; // Default fallback
       if (context.location.lat && context.location.lon) {
+        // Determine Start Coordinates
+        let startLat = event.start_location?.lat;
+        let startLon = event.start_location?.lon;
+
+        if ((!startLat || !startLon) && event.start_location?.name) {
+          const geoStart = await geocodingService.geocode(event.start_location.name);
+          if (geoStart) {
+            startLat = geoStart.lat;
+            startLon = geoStart.lon;
+          }
+        }
+
+        // Fallback to current GPS
+        startLat = startLat ?? context.location.lat;
+        startLon = startLon ?? context.location.lon;
+
+        // Determine Destination Coordinates
         let eventLat = event.location?.lat;
         let eventLon = event.location?.lon;
 
-        // Try geocoding if coordinates are missing
         if ((!eventLat || !eventLon) && event.location_text) {
           console.log(`[Graph] Geocoding for ${event.title}: ${event.location_text}`);
           const geo = await geocodingService.geocode(event.location_text);
@@ -74,10 +90,10 @@ export class GraphBuilder {
           }
         }
 
-        if (eventLat && eventLon) {
+        if (startLat && startLon && eventLat && eventLon) {
           try {
             const route = await routingService.getRoute(
-              { lat: context.location.lat, lon: context.location.lon },
+              { lat: startLat, lon: startLon },
               { lat: eventLat, lon: eventLon }
             );
             travelWeight = Math.ceil(route.durationSeconds / 60);

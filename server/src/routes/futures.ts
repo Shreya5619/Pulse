@@ -5,9 +5,9 @@ const router = Router();
 
 router.get("/futures", async (req, res) => {
   try {
-    const userId = req.query.userId as string;
+    const userId = req.header("X-User-Id") || req.query.userId as string || req.query.deviceId as string;
     if (!userId) {
-      return res.status(400).json({ ok: false, error: "Missing userId" });
+      return res.status(400).json({ ok: false, error: "Missing userId or deviceId" });
     }
 
     const result = await futuresEngine.computeForUser(userId);

@@ -14,6 +14,7 @@ import '../services/local_repository.dart';
 import '../services/notification_service.dart';
 import '../models/risk_snapshot.dart';
 import '../models/twin_graph.dart';
+import '../services/storage_service.dart';
 
 class TimelineEvent {
   final String id;
@@ -123,6 +124,7 @@ class DayPulseBlock {
   final List<int>? days;
   final List<DayPulseRisk> risks;
   final Map<String, dynamic>? suggestion;
+  final Map<String, dynamic>? startLocation;
 
   DayPulseBlock({
     required this.eventId,
@@ -136,6 +138,7 @@ class DayPulseBlock {
     this.days,
     required this.risks,
     this.suggestion,
+    this.startLocation,
   });
 
   factory DayPulseBlock.fromJson(Map<String, dynamic> json) {
@@ -153,6 +156,7 @@ class DayPulseBlock {
           .map((r) => DayPulseRisk.fromJson(r))
           .toList(),
       suggestion: json['suggestion'],
+      startLocation: json['startLocation'],
     );
   }
 }
@@ -161,7 +165,7 @@ class AppState extends ChangeNotifier {
   final ContextServices _contextServices = ContextServices();
   final LocalRepository _localRepo = LocalRepository();
   DeviceContext _deviceContext = DeviceContext.initial();
-  String _userId = "user1";
+  String _userId = "unknown";
 
   DeviceContext get deviceContext => _deviceContext;
   RiskState _currentRisk = RiskState(
@@ -285,11 +289,12 @@ class AppState extends ChangeNotifier {
         url,
         body: json.encode({
           'userId': _userId,
+          'deviceId': _userId,
           'actionId': actionId,
           'status': status,
           'timestamp': DateTime.now().toUtc().toIso8601String(),
         }),
-        headers: {'Content-Type': 'application/json'},
+        headers: _authHeaders,
       );
     } catch (e) {
       debugPrint('[Pulse AppState] Error syncing action status: $e');
@@ -304,8 +309,8 @@ class AppState extends ChangeNotifier {
   Future<void> fetchDayPulse() async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/day-pulse?userId=$_userId');
-      final response = await http.get(url);
+      final url = Uri.parse('http://$host:8080/api/day-pulse?userId=$_userId&deviceId=$_userId');
+      final response = await http.get(url, headers: _authHeaders);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -327,9 +332,10 @@ class AppState extends ChangeNotifier {
       final url = Uri.parse('http://$host:8080/api/day-pulse/modify');
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: _authHeaders,
         body: json.encode({
           'userId': _userId,
+          'deviceId': _userId,
           'eventId': eventId,
           'updates': updates,
           'isRecurring': updates['isRecurring'],
@@ -358,6 +364,7 @@ class AppState extends ChangeNotifier {
     String? category,
     bool isRecurring = false,
     List<int>? days,
+    Map<String, dynamic>? startLocation,
   }) async {
     try {
       final host = _getBackendHost();
@@ -371,12 +378,7 @@ class AppState extends ChangeNotifier {
           'start_time': start.toUtc().toIso8601String(),
           'end_time': end.toUtc().toIso8601String(),
           'location_text': location,
-          'location': location != null && location.isNotEmpty
-              ? {
-                  'lat': 12.9716, // Simulated lat/lon for manual entries
-                  'lon': 77.5946,
-                }
-              : null,
+          'start_location': startLocation,
         },
         'isRecurring': isRecurring,
         'days': days,
@@ -385,8 +387,22 @@ class AppState extends ChangeNotifier {
 
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(payload),
+        headers: _authHeaders,
+        body: json.encode({
+          'userId': _userId,
+          'deviceId': _userId,
+          'event': {
+            'id': 'manual_${DateTime.now().millisecondsSinceEpoch}',
+            'title': title,
+            'start_time': start.toUtc().toIso8601String(),
+            'end_time': end.toUtc().toIso8601String(),
+            'location_text': location,
+            'start_location': startLocation,
+          },
+          'isRecurring': isRecurring,
+          'days': days,
+          'category': category,
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -407,9 +423,10 @@ class AppState extends ChangeNotifier {
       final url = Uri.parse('http://$host:8080/api/day-pulse/delete');
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: _authHeaders,
         body: json.encode({
           'userId': _userId,
+          'deviceId': _userId,
           'eventId': eventId,
           'isRoutine': isRoutine,
         }),
@@ -433,9 +450,10 @@ class AppState extends ChangeNotifier {
       final url = Uri.parse('http://$host:8080/api/day-pulse/optimize');
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: _authHeaders,
         body: json.encode({
           'userId': _userId,
+          'deviceId': _userId,
           'date': DateTime.now().toIso8601String().split('T')[0],
         }),
       );
@@ -487,6 +505,13 @@ class AppState extends ChangeNotifier {
   String get userId => _userId;
 
   AppState() {
+    _init();
+  }
+
+  Future<void> _init() async {
+    _userId = await StorageService.getUserId();
+    notifyListeners();
+
     _initLocalData();
     _generateMockData();
     _initNotificationService();
@@ -1117,7 +1142,8 @@ class AppState extends ChangeNotifier {
       // Construct payload matching the requested schema
       final payload = {
         "id": const Uuid().v4(),
-        "user_id": userId,
+        "user_id": _userId,
+        "device_id": _userId,
         "timestamp": now.toUtc().toIso8601String(),
         "location": {
           "lat": _deviceContext.location.latitude,
@@ -1146,6 +1172,7 @@ class AppState extends ChangeNotifier {
                           "lon": _deviceContext.upcomingEvents.first.longitude,
                         }
                       : null,
+                  "start_location": _deviceContext.upcomingEvents.first.startLocation,
                   "is_all_day": false,
                   "importance": "high",
                 }
@@ -1165,6 +1192,7 @@ class AppState extends ChangeNotifier {
                           "lon": e.longitude,
                         }
                       : null,
+                  "start_location": e.startLocation,
                 },
               )
               .toList(),
@@ -1205,7 +1233,7 @@ class AppState extends ChangeNotifier {
 
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json', 'X-User-Id': userId},
+        headers: _authHeaders,
         body: jsonEncode(payload),
       );
 
@@ -1238,8 +1266,8 @@ class AppState extends ChangeNotifier {
   Future<void> fetchFutures() async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/futures?userId=$_userId');
-      final response = await http.get(url);
+      final url = Uri.parse('http://$host:8080/api/futures?userId=$_userId&deviceId=$_userId');
+      final response = await http.get(url, headers: _authHeaders);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -1255,9 +1283,9 @@ class AppState extends ChangeNotifier {
     try {
       final host = _getBackendHost();
       final url = Uri.parse(
-        'http://$host:8080/api/routing/next-appointment-eta?userId=$_userId',
+        'http://$host:8080/api/routing/next-appointment-eta?userId=$_userId&deviceId=$_userId',
       );
-      final response = await http.get(url);
+      final response = await http.get(url, headers: _authHeaders);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -1272,8 +1300,8 @@ class AppState extends ChangeNotifier {
   Future<void> fetchTwinGraph() async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/twin/graph?userId=$_userId');
-      final response = await http.get(url);
+      final url = Uri.parse('http://$host:8080/api/twin/graph?userId=$_userId&deviceId=$_userId');
+      final response = await http.get(url, headers: _authHeaders);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -1312,8 +1340,8 @@ class AppState extends ChangeNotifier {
       );
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'userId': _userId, 'action': action}),
+        headers: _authHeaders,
+        body: jsonEncode({'userId': _userId, 'deviceId': _userId, 'action': action}),
       );
       if (response.statusCode == 200) {
         debugPrint('[Pulse] Action acknowledged by backend.');
@@ -1357,9 +1385,10 @@ class AppState extends ChangeNotifier {
       final url = Uri.parse('http://$host:8080/api/comm/prepare');
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: _authHeaders,
         body: jsonEncode({
           'userId': _userId,
+          'deviceId': _userId,
           'actionId': actionId,
           'role': role,
         }),
@@ -1399,8 +1428,8 @@ class AppState extends ChangeNotifier {
       final url = Uri.parse('http://$host:8080/api/comm/send');
       await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'userId': _userId, 'actionId': actionId}),
+        headers: _authHeaders,
+        body: jsonEncode({'userId': _userId, 'deviceId': _userId, 'actionId': actionId}),
       );
 
       // Mark as completed
@@ -1453,9 +1482,9 @@ class AppState extends ChangeNotifier {
     try {
       final host = _getBackendHost();
       final url = Uri.parse(
-        'http://$host:8080/api/planner/suggested-actions?userId=$_userId&riskType=$riskType&nodeId=${nodeId ?? ""}',
+        'http://$host:8080/api/planner/suggested-actions?userId=$_userId&deviceId=$_userId&riskType=$riskType&nodeId=${nodeId ?? ""}',
       );
-      final response = await http.get(url);
+      final response = await http.get(url, headers: _authHeaders);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -1634,6 +1663,12 @@ class AppState extends ChangeNotifier {
     // ADB Reverse Tunnel active - always route through USB loopback
     return '10.123.31.141';
   }
+
+  Map<String, String> get _authHeaders => {
+        'Content-Type': 'application/json',
+        'X-Device-Id': _userId,
+        'X-User-Id': _userId,
+      };
 
   @override
   void dispose() {

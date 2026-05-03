@@ -114,6 +114,7 @@ export class DayPulseService {
                     endTime: end.toISOString(),
                     type: 'routine',
                     category: routine.category,
+                    startLocation: routine.startLocation,
                     risks: []
                 });
             } catch (e) {
@@ -126,24 +127,38 @@ export class DayPulseService {
             // 5. Calculate ETA
             let etaMinutes: number | undefined;
             if (context) {
+                // Determine Start Coordinates
+                let startLat = event.start_location?.lat;
+                let startLon = event.start_location?.lon;
+                
+                if ((!startLat || !startLon) && event.start_location?.name) {
+                    const geoStart = await geocodingService.geocode(event.start_location.name);
+                    if (geoStart) {
+                        startLat = geoStart.lat;
+                        startLon = geoStart.lon;
+                    }
+                }
+                
+                // Fallback to current location if still no start coordinates
+                startLat = startLat ?? context.location.lat;
+                startLon = startLon ?? context.location.lon;
+
+                // Determine Destination Coordinates
                 let eventLat = event.location?.lat;
                 let eventLon = event.location?.lon;
 
-                // If coordinates are missing but text is available, try geocoding
                 if ((!eventLat || !eventLon) && event.location_text) {
-                    console.log(`[DayPulseService] Attempting to geocode location text: ${event.location_text}`);
-                    const geo = await geocodingService.geocode(event.location_text);
-                    if (geo) {
-                        eventLat = geo.lat;
-                        eventLon = geo.lon;
-                        console.log(`[DayPulseService] Geocoded ${event.location_text} to ${eventLat}, ${eventLon}`);
+                    const geoDest = await geocodingService.geocode(event.location_text);
+                    if (geoDest) {
+                        eventLat = geoDest.lat;
+                        eventLon = geoDest.lon;
                     }
                 }
 
-                if (eventLat && eventLon) {
+                if (startLat && startLon && eventLat && eventLon) {
                     try {
                         const route = await routingService.getRoute(
-                            { lat: context.location.lat, lon: context.location.lon },
+                            { lat: startLat, lon: startLon },
                             { lat: eventLat, lon: eventLon }
                         );
                         etaMinutes = Math.ceil(route.durationSeconds / 60);
@@ -176,6 +191,7 @@ export class DayPulseService {
                 locationText: event.location_text,
                 etaMinutes,
                 category: (event as any).category,
+                startLocation: event.start_location,
                 risks,
                 suggestion
             });

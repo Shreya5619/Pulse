@@ -89,10 +89,17 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
 
       // Extract dynamic backend configuration from AppState
       final host = _getBackendHost(state);
-      final url = Uri.parse('http://$host:8080/api/routing/multi-mode-eta?fromLat=$fromLat&fromLon=$fromLon&toLat=$toLat&toLon=$toLon${force ? "&force=true" : ""}');
+      final userId = state.userId;
+      final url = Uri.parse('http://$host:8080/api/routing/multi-mode-eta?userId=$userId&deviceId=$userId&fromLat=$fromLat&fromLon=$fromLon&toLat=$toLat&toLon=$toLon${force ? "&force=true" : ""}');
 
       debugPrint('[MultiMode ETA] Fetching routes from: $url');
-      final response = await http.get(url).timeout(const Duration(seconds: 60));
+      final response = await http.get(
+        url,
+        headers: {
+          'X-Device-Id': userId,
+          'X-User-Id': userId,
+        },
+      ).timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);

@@ -23,6 +23,11 @@ export const CalendarEventSchema = z.object({
     lat: z.number(),
     lon: z.number(),
   }).optional().nullable(),
+  start_location: z.object({
+    lat: z.number(),
+    lon: z.number(),
+    name: z.string().optional().nullable(),
+  }).optional().nullable(),
   is_all_day: z.boolean(),
   importance: ImportanceSchema.default("normal"),
   organizer_name: z.string().optional().nullable(),

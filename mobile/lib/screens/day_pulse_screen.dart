@@ -9,6 +9,7 @@ import '../theme/colors.dart';
 void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
     final titleController = TextEditingController(text: existingBlock?.title);
     final locationController = TextEditingController(text: existingBlock?.locationText);
+    final startLocationController = TextEditingController(text: existingBlock?.startLocation?['name']);
     DateTime startTime = existingBlock?.startTime ?? DateTime.now().add(const Duration(hours: 1));
     DateTime endTime = existingBlock?.endTime ?? DateTime.now().add(const Duration(hours: 2));
     String selectedCategory = existingBlock?.category ?? 'buffer';
@@ -35,10 +36,21 @@ void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
                 ),
                 const SizedBox(height: 16),
                 TextField(
+                  controller: startLocationController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: "Source Location (Optional)",
+                    labelStyle: TextStyle(color: Colors.white54),
+                    hintText: "e.g. Home",
+                    hintStyle: TextStyle(color: Colors.white24, fontSize: 12),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
                   controller: locationController,
                   style: const TextStyle(color: Colors.white),
                   decoration: const InputDecoration(
-                    labelText: "Location (Optional)",
+                    labelText: "Destination Location (Optional)",
                     labelStyle: TextStyle(color: Colors.white54),
                     hintText: "e.g. Office HQ",
                     hintStyle: TextStyle(color: Colors.white24, fontSize: 12),
@@ -147,12 +159,17 @@ void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
             ElevatedButton(
               onPressed: () {
                 if (titleController.text.isNotEmpty) {
+                  final startLoc = startLocationController.text.isNotEmpty 
+                      ? {'name': startLocationController.text} 
+                      : null;
+                  
                   if (existingBlock == null) {
                     context.read<AppState>().addDayPulseEvent(
                       titleController.text, 
                       startTime, 
                       endTime, 
                       location: locationController.text.isNotEmpty ? locationController.text : null,
+                      startLocation: startLoc,
                       category: selectedCategory,
                       isRecurring: isRecurring,
                       days: isRecurring ? selectedDays : null,
@@ -165,6 +182,7 @@ void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
                         'startTime': startTime.toIso8601String(),
                         'endTime': endTime.toIso8601String(),
                         'location_text': locationController.text,
+                        'start_location': startLoc,
                         'category': selectedCategory,
                         'isRecurring': isRecurring,
                         'days': isRecurring ? selectedDays : null,

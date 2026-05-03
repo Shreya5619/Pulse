@@ -8,7 +8,7 @@ const router = Router();
  * Returns a subgraph for the Digital Twin visualization.
  */
 router.get('/graph', async (req, res) => {
-  const userId = (req.query.userId as string) || 'user1';
+  const userId = req.header("X-User-Id") || (req.query.userId as string) || (req.query.deviceId as string) || 'user1';
   const horizon = req.query.horizon ? parseInt(req.query.horizon as string) : 240;
 
   try {

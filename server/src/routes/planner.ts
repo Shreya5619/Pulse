@@ -5,9 +5,9 @@ const router = Router();
 
 router.get("/decision", async (req: Request, res: Response) => {
   try {
-    const userId = req.query.userId as string;
+    const userId = req.header("X-User-Id") || req.query.userId as string || req.query.deviceId as string;
     if (!userId) {
-      return res.status(400).json({ ok: false, error: "Missing userId" });
+      return res.status(400).json({ ok: false, error: "Missing userId or deviceId" });
     }
     const decision = await plannerEngine.decideForUser(userId);
     res.json({ ok: true, data: decision });
@@ -19,9 +19,10 @@ router.get("/decision", async (req: Request, res: Response) => {
 
 router.get("/suggested-actions", async (req: Request, res: Response) => {
   try {
-    const { userId, riskType, nodeId } = req.query;
+    const { userId: queryUserId, deviceId, riskType, nodeId } = req.query;
+    const userId = req.header("X-User-Id") || queryUserId || deviceId;
     if (!userId) {
-      return res.status(400).json({ ok: false, error: "Missing userId" });
+      return res.status(400).json({ ok: false, error: "Missing userId or deviceId" });
     }
     const actions = await plannerEngine.getActionsForRisk(
       userId as string,
@@ -36,7 +37,8 @@ router.get("/suggested-actions", async (req: Request, res: Response) => {
 });
 
 router.post("/interventions/status", async (req: Request, res: Response) => {
-  const { userId, actionId, status } = req.body;
+  const { userId: bodyUserId, deviceId, actionId, status } = req.body;
+  const userId = req.header("X-User-Id") || bodyUserId || deviceId;
   console.log(`[Planner] Action status updated: user=${userId}, action=${actionId}, status=${status}`);
   // In a real app, we'd persist this to an AuditLog or UserActions table
   res.json({ ok: true });

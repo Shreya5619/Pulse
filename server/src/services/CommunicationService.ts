@@ -100,6 +100,17 @@ export class CommunicationService {
       });
 
       const data: any = await response.json();
+      
+      if (!response.ok) {
+        console.warn(`[CommService] Groq API returned error: ${data.error?.message || response.statusText}`);
+        return text;
+      }
+
+      if (!data.choices || data.choices.length === 0) {
+        console.warn("[CommService] Groq API returned no choices.");
+        return text;
+      }
+
       const polished = data.choices[0]?.message?.content?.trim();
       
       // Clean up quotes if LLM adds them
