@@ -4,8 +4,10 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
+import '../theme/colors.dart';
 import 'glass_card.dart';
 import '../screens/graph_explanation_screen.dart';
+import '../screens/timeline_screen.dart';
 
 class RiskHeroCard extends StatelessWidget {
   const RiskHeroCard({super.key});
@@ -148,6 +150,29 @@ class RiskHeroCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    TextButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TimelineScreen(),
+                        ),
+                      ),
+                      icon: Icon(LucideIcons.list, size: 12, color: AppColors.primary),
+                      label: Text(
+                        "TIMELINE",
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                     ),
                   ],

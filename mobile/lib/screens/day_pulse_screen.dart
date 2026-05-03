@@ -459,6 +459,23 @@ class _TimelineBlock extends StatelessWidget {
                                             style: GoogleFonts.outfit(fontSize: 9, color: Colors.amber, fontWeight: FontWeight.bold),
                                           ),
                                         ),
+                                      ] else if (block.batteryAtStart != null) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: (block.batteryAtStart! < 20 ? AppColors.danger : Colors.orange).withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            "BATT: ${block.batteryAtStart!.round()}%",
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 9, 
+                                              color: block.batteryAtStart! < 20 ? AppColors.danger : Colors.orange, 
+                                              fontWeight: FontWeight.bold
+                                            ),
+                                          ),
+                                        ),
                                       ],
                                     ],
                                   ),

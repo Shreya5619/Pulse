@@ -12,6 +12,7 @@ import 'screens/intervention_screen.dart';
 import 'screens/digest_screen.dart';
 import 'screens/gantt_screen.dart';
 import 'screens/scenario_player_screen.dart';
+import 'screens/day_pulse_screen.dart';
 import 'theme/colors.dart';
 
 void main() {
@@ -46,7 +47,7 @@ class _MainShellState extends State<MainShell> {
 
   final List<Widget> _screens = [
     const HomeScreen(),
-    const TimelineScreen(),
+    const DayPulseScreen(),
     const FuturesScreen(),
     const InterventionScreen(),
     const DigestScreen(),
@@ -128,7 +129,7 @@ class _MainShellState extends State<MainShell> {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _buildNavItem(0, LucideIcons.home, "Home"),
-            _buildNavItem(1, LucideIcons.list, "Timeline"),
+            _buildNavItem(1, LucideIcons.activity, "Pulse"),
             _buildNavItem(2, LucideIcons.trendingUp, "Futures"),
             _buildNavItem(3, LucideIcons.zap, "Actions"),
             _buildNavItem(4, LucideIcons.layout, "Digest"),

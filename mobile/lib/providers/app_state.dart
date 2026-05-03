@@ -121,6 +121,7 @@ class DayPulseBlock {
   final String? category; // 'sleep' | 'study' | 'commute' | 'buffer'
   final String? locationText;
   final int? etaMinutes;
+  final double? batteryAtStart;
   final List<int>? days;
   final List<DayPulseRisk> risks;
   final Map<String, dynamic>? suggestion;
@@ -135,6 +136,7 @@ class DayPulseBlock {
     this.category,
     this.locationText,
     this.etaMinutes,
+    this.batteryAtStart,
     this.days,
     required this.risks,
     this.suggestion,
@@ -151,6 +153,7 @@ class DayPulseBlock {
       category: json['category'],
       locationText: json['locationText'],
       etaMinutes: json['etaMinutes'],
+      batteryAtStart: (json['batteryAtStart'] as num?)?.toDouble(),
       days: json['days'] != null ? List<int>.from(json['days']) : null,
       risks: (json['risks'] as List? ?? [])
           .map((r) => DayPulseRisk.fromJson(r))

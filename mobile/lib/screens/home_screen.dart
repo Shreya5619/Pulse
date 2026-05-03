@@ -18,6 +18,7 @@ import '../screens/graph_explanation_screen.dart';
 import '../screens/multi_mode_eta_screen.dart';
 import '../screens/twin_graph_screen.dart';
 import '../screens/day_pulse_screen.dart';
+import '../screens/timeline_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -130,14 +131,14 @@ class HomeScreen extends StatelessWidget {
               ),
               IconButton(
                 icon: const Icon(
-                  LucideIcons.activity,
+                  LucideIcons.list,
                   size: 18,
-                  color: AppColors.primary,
+                  color: Colors.white30,
                 ),
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const DayPulseScreen(),
+                    builder: (context) => const TimelineScreen(),
                   ),
                 ),
               ),

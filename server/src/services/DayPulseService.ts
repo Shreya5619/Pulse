@@ -19,7 +19,13 @@ export interface DayPulseBlock {
     category?: 'sleep' | 'study' | 'commute' | 'buffer';
     locationText?: string;
     etaMinutes?: number;
+    batteryAtStart?: number;
     days?: number[];
+    startLocation?: {
+        lat?: number;
+        lon?: number;
+        name?: string | null;
+    } | null;
     risks: {
         type: 'lateness' | 'battery' | 'overload' | 'overlap' | 'personality';
         level: 'low' | 'medium' | 'high';
@@ -147,8 +153,12 @@ export class DayPulseService {
                 let eventLat = event.location?.lat;
                 let eventLon = event.location?.lon;
 
-                if ((!eventLat || !eventLon) && event.location_text) {
-                    const geoDest = await geocodingService.geocode(event.location_text);
+                const locationQuery = event.location_text?.trim();
+                const isVirtualLocation = locationQuery && 
+                    /online|zoom|meet|teams|call|virtual|remote|none|n\/a|tbd/i.test(locationQuery);
+
+                if ((!eventLat || !eventLon) && locationQuery && !isVirtualLocation) {
+                    const geoDest = await geocodingService.geocode(locationQuery);
                     if (geoDest) {
                         eventLat = geoDest.lat;
                         eventLon = geoDest.lon;
@@ -182,14 +192,18 @@ export class DayPulseService {
                 }
             }
 
+            const batteryRisk = risks.find(r => r.type === 'battery');
+            const batteryAtStart = batteryRisk ? parseFloat(batteryRisk.explanation?.match(/\d+/)?.[0] || "") : undefined;
+
             blocks.push({
                 eventId: event.id || `event_${(event.title as any).hashCode}`,
                 title: event.title,
                 startTime: event.start_time,
                 endTime: event.end_time,
                 type: 'event',
-                locationText: event.location_text,
+                locationText: event.location_text ?? undefined,
                 etaMinutes,
+                batteryAtStart,
                 category: (event as any).category,
                 startLocation: event.start_location,
                 risks,

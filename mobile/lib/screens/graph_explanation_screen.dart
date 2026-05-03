@@ -24,6 +24,8 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
   Map<String, dynamic>? _explanation;
   List<dynamic> _suggestedActions = [];
   bool _isLoading = true;
+  final TextEditingController _startLocController = TextEditingController();
+  final TextEditingController _destLocController = TextEditingController();
 
   @override
   void initState() {
@@ -45,8 +47,23 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
         _explanation = results[0] as Map<String, dynamic>?;
         _suggestedActions = results[1] as List<dynamic>;
         _isLoading = false;
+
+        if (_explanation != null && _explanation!['target'] != null) {
+          final target = _explanation!['target'];
+          _destLocController.text = target['locationText'] ?? "";
+          // Note: startLocation might not be in the graph node properties yet, 
+          // but we can try to get it if available
+          _startLocController.text = target['startLocation']?['name'] ?? "";
+        }
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _startLocController.dispose();
+    _destLocController.dispose();
+    super.dispose();
   }
 
   @override
@@ -148,9 +165,80 @@ class _GraphExplanationScreenState extends State<GraphExplanationScreen> {
           ),
           const SizedBox(height: 20),
           _buildScoreBar(target['scores']?[widget.riskType] ?? 0.0),
+          if (target['type'] == 'event') ...[
+            const SizedBox(height: 24),
+            const Divider(color: Colors.white10),
+            const SizedBox(height: 16),
+            Text(
+              "Manual Location Overrides",
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildLocationInput("Source Location", _startLocController),
+            const SizedBox(height: 12),
+            _buildLocationInput("Destination Location", _destLocController),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _saveLocationOverrides,
+                icon: const Icon(LucideIcons.save, size: 14),
+                label: const Text("SAVE OVERRIDES"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.2),
+                  foregroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Widget _buildLocationInput(String label, TextEditingController controller) {
+    return TextField(
+      controller: controller,
+      style: const TextStyle(color: Colors.white, fontSize: 13),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white30, fontSize: 12),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.03),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    );
+  }
+
+  Future<void> _saveLocationOverrides() async {
+    final state = Provider.of<AppState>(context, listen: false);
+    final eventId = widget.nodeId.replaceFirst('EVENT_', '').replaceFirst('APP_', '');
+    
+    await state.modifyDayPulse(
+      eventId,
+      {
+        'location_text': _destLocController.text,
+        'start_location': {'name': _startLocController.text},
+      },
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Location overrides saved to database")),
+      );
+      Navigator.pop(context);
+    }
   }
 
   List<Widget> _buildNeighborCards() {
