@@ -8,6 +8,7 @@ import { CalendarEvent, ContextSnapshot } from "../../../shared/context_snapshot
 import { MemoryState } from "../../../shared/memory";
 import { RiskScore } from "../types/risk";
 import { assessLateness, assessBattery } from "./RiskEngine";
+import { geocodingService, GeocodingService } from "./GeocodingService";
 import { GraphAdapter } from "./GraphAdapter";
 import { PersonalityAnalysis } from "./PersonalityAnalyzer";
 
@@ -15,7 +16,8 @@ class FuturesEngine {
   constructor(
     private riskEngine: RiskEngineService,
     private routingService: RoutingService,
-    private memoryStore: MemoryStore
+    private memoryStore: MemoryStore,
+    private geocodingService: GeocodingService
   ) { }
 
   async computeForUser(userId: string): Promise<FuturesResult> {
@@ -52,20 +54,43 @@ class FuturesEngine {
       };
     }
 
-    // Use multi-mode routing to find best options
-    let multiMode: MultiModeRouteResult | null = null;
-    if (context.location?.lat && context.location?.lon && nextEvent.location?.lat && nextEvent.location?.lon) {
-      try {
-        multiMode = await this.routingService.getMultiModeRoutes(
-          { lat: context.location.lat, lon: context.location.lon },
-          { lat: nextEvent.location.lat, lon: nextEvent.location.lon }
-        );
-      } catch (e) {
-        console.warn("[FuturesEngine] Multi-mode routing failed");
+    // Resolve destination coordinates if missing
+    let destLat = nextEvent.location?.lat;
+    let destLon = nextEvent.location?.lon;
+
+    if ((!destLat || !destLon) && nextEvent.location_text) {
+      console.log(`[FuturesEngine] Destination coordinates missing, attempting geocode for: ${nextEvent.location_text}`);
+      const resolved = await this.geocodingService.geocode(nextEvent.location_text);
+      if (resolved) {
+        destLat = resolved.lat;
+        destLon = resolved.lon;
+        console.log(`[FuturesEngine] Geocoded ${nextEvent.location_text} to: ${resolved.displayName} (${destLat}, ${destLon})`);
       }
     }
 
-    const route = await this.estimateRoute(context, nextEvent, memory);
+    // Use multi-mode routing to find best options
+    let multiMode: MultiModeRouteResult | null = null;
+    const startLat = context.location?.lat;
+    const startLon = context.location?.lon;
+
+    if (startLat && startLon && destLat && destLon) {
+      try {
+        console.log(`[FuturesEngine] Fetching multi-mode routes for user ${userId}...`);
+        multiMode = await this.routingService.getMultiModeRoutes(
+          { lat: startLat, lon: startLon },
+          { lat: destLat, lon: destLon }
+        );
+        console.log(`[FuturesEngine] Multi-mode result: ${multiMode ? 'SUCCESS' : 'NULL'}`);
+        if (multiMode) {
+          console.log(`[FuturesEngine] Modes available: ${Object.keys(multiMode).join(', ')}`);
+          console.log(`[FuturesEngine] Car duration: ${multiMode.car?.durationSeconds}s`);
+        }
+      } catch (e) {
+        console.warn("[FuturesEngine] Multi-mode routing threw error:", e);
+      }
+    }
+
+    const route = await this.estimateRoute(context, nextEvent, memory, destLat, destLon);
     const baseBattery = context.battery.level * 100;
 
     const futureParams = { userId, baseTime, nextEvent, route, baseBattery, memory, personality };
@@ -86,12 +111,21 @@ class FuturesEngine {
   // Shared Helpers
   // ──────────────────────────────────────────────────────────────────
 
-  private async estimateRoute(context: ContextSnapshot, nextEvent: CalendarEvent, memory: MemoryState): Promise<RouteResult> {
-    if (context.location?.lat && context.location?.lon && nextEvent.location?.lat && nextEvent.location?.lon) {
+  private async estimateRoute(
+    context: ContextSnapshot,
+    nextEvent: CalendarEvent,
+    memory: MemoryState,
+    destLat?: number | null,
+    destLon?: number | null
+  ): Promise<RouteResult> {
+    const startLat = context.location?.lat;
+    const startLon = context.location?.lon;
+
+    if (startLat && startLon && destLat && destLon) {
       try {
         return await this.routingService.getRoute(
-          { lat: context.location.lat, lon: context.location.lon },
-          { lat: nextEvent.location.lat, lon: nextEvent.location.lon }
+          { lat: startLat, lon: startLon },
+          { lat: destLat, lon: destLon }
         );
       } catch (e) {
         console.warn("[FuturesEngine] Routing failed, falling back to memory");
@@ -264,22 +298,29 @@ class FuturesEngine {
   }): Promise<FutureCard> {
     let { nextEvent, route, baseBattery, memory, personality, multiMode } = params;
 
+    const allModes = multiMode ? [
+      { name: "Car/Taxi", data: multiMode.car },
+      { name: "Auto Rickshaw", data: multiMode.auto },
+      { name: "Two-Wheeler", data: multiMode.twoWheeler },
+      { name: "Public Transit", data: multiMode.transit },
+      { name: "Walking", data: multiMode.walk }
+    ].filter(m => m.data.durationSeconds > 0)
+     .sort((a, b) => a.data.durationSeconds - b.data.durationSeconds) : [];
+
     // Pick BEST mode if available
     let transportMode = "Car/Taxi";
-    if (multiMode) {
-      const modes = [
-        { name: "Car/Taxi", data: multiMode.car },
-        { name: "Auto Rickshaw", data: multiMode.auto },
-        { name: "Two-Wheeler", data: multiMode.twoWheeler },
-        { name: "Public Transit", data: multiMode.transit },
-        { name: "Walking", data: multiMode.walk }
-      ].filter(m => m.data.durationSeconds > 0)
-       .sort((a, b) => a.data.durationSeconds - b.data.durationSeconds);
+    let alternateModes: { mode: string; etaMinutes: number }[] = [];
 
-      if (modes.length > 0) {
-        route = modes[0].data;
-        transportMode = modes[0].name;
-      }
+    if (allModes.length > 0) {
+      const best = allModes[0];
+      route = best.data;
+      transportMode = best.name;
+      
+      // Also show other modes as alternates even in Recommended
+      alternateModes = allModes.slice(1).map(m => ({
+        mode: m.name,
+        etaMinutes: Math.round(m.data.durationSeconds / 60)
+      }));
     }
 
     // Leave slightly earlier or now
@@ -331,6 +372,7 @@ class FuturesEngine {
         batteryPercent: Math.round(batteryAtArrival),
         expectedLatenessMinutes: Math.round(expectedLatenessMinutes),
         transportMode,
+        alternateModes,
         missedCommitments: 0,
         notificationCount: 18,
         overlapCount: 1,
@@ -360,25 +402,34 @@ class FuturesEngine {
     let transportMode = "Car/Taxi";
     let alternateDescription = "Charge for 15 minutes before leaving. You arrive slightly later but with significantly more battery.";
     let chargeDuration = 15;
-    const chargeRate = 1.5; 
+    const chargeRate = 1.5;
 
-    if (multiMode) {
-      const modes = [
-        { name: "Car/Taxi", data: multiMode.car },
-        { name: "Auto Rickshaw", data: multiMode.auto },
-        { name: "Two-Wheeler", data: multiMode.twoWheeler },
-        { name: "Public Transit", data: multiMode.transit },
-        { name: "Walking", data: multiMode.walk }
-      ].filter(m => m.data.durationSeconds > 0)
-       .sort((a, b) => a.data.durationSeconds - b.data.durationSeconds);
+    const allModes = multiMode ? [
+      { name: "Car/Taxi", data: multiMode.car },
+      { name: "Auto Rickshaw", data: multiMode.auto },
+      { name: "Two-Wheeler", data: multiMode.twoWheeler },
+      { name: "Public Transit", data: multiMode.transit },
+      { name: "Walking", data: multiMode.walk }
+    ].filter(m => m.data.durationSeconds > 0)
+      .sort((a, b) => a.data.durationSeconds - b.data.durationSeconds) : [];
 
-      if (modes.length >= 2) {
-        // Use 2nd best mode
-        route = modes[1].data;
-        transportMode = modes[1].name;
-        alternateDescription = `Use ${transportMode} as a secondary option if the primary mode is unavailable.`;
-        chargeDuration = 0; // Don't charge in this specific alternate branch if it's just a mode switch
-      }
+    console.log(`[FuturesEngine] simulateAlternate: allModes.length = ${allModes.length}`);
+
+    let alternateModes: { mode: string; etaMinutes: number }[] = [];
+
+    if (allModes.length >= 2) {
+      // Use 2nd best mode as the primary for this card
+      const secondBest = allModes[1];
+      route = secondBest.data;
+      transportMode = secondBest.name;
+      alternateDescription = `Use ${transportMode} (${Math.round(route.durationSeconds / 60)}m) as a secondary option. Other modes also available.`;
+      chargeDuration = 0;
+
+      // Populate metadata for all other modes
+      alternateModes = allModes.slice(1).map(m => ({
+        mode: m.name,
+        etaMinutes: Math.round(m.data.durationSeconds / 60)
+      }));
     }
 
     const nowTime = new Date(params.baseTime).getTime();
@@ -424,6 +475,7 @@ class FuturesEngine {
         batteryPercent: Math.round(batteryAtArrival),
         expectedLatenessMinutes: Math.round(expectedLatenessMinutes),
         transportMode,
+        alternateModes,
         missedCommitments: expectedLatenessMinutes > 5 ? 1 : 0,
         notificationCount: 9,
         overlapCount: 0,
@@ -434,4 +486,4 @@ class FuturesEngine {
   }
 }
 
-export const futuresEngine = new FuturesEngine(riskEngine, routingService, memoryStore);
+export const futuresEngine = new FuturesEngine(riskEngine, routingService, memoryStore, geocodingService);

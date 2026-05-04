@@ -12,6 +12,7 @@ export interface FutureMetrics {
   notificationCount?: number;
   overlapCount?: number;
   stressScore: number; // 0–1
+  alternateModes?: { mode: string; etaMinutes: number }[];
 }
 
 export interface FutureCard {

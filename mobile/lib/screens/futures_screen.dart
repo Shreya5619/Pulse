@@ -131,13 +131,20 @@ class _FuturesScreenState extends State<FuturesScreen> {
     dynamic data,
     bool isSelected,
   ) {
-    final metrics = data['metrics'];
+    final metrics = data['metrics'] ?? {};
     final stressScore = (metrics['stressScore'] as num?)?.toDouble() ?? 0.0;
     final color = stressScore > 0.7
         ? AppColors.danger
         : stressScore > 0.4
-        ? Colors.orangeAccent
-        : AppColors.success;
+            ? Colors.orangeAccent
+            : AppColors.success;
+
+    final lateness = metrics['expectedLatenessMinutes'] ?? 0;
+    final eta = metrics['etaMinutes'] ?? 0;
+    final battery = metrics['batteryPercent'] ?? 0;
+    final notifs = metrics['notificationCount'] ?? 0;
+    final overlaps = metrics['overlapCount'] ?? 0;
+    final transport = metrics['transportMode'];
 
     return GestureDetector(
       onTap: () {
@@ -153,52 +160,135 @@ class _FuturesScreenState extends State<FuturesScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      data['title'] ?? "Scenario",
-                      style: GoogleFonts.outfit(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: isSelected ? color : Colors.white,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        data['title'] ?? "Scenario",
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isSelected ? color : Colors.white,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
+                      const SizedBox(height: 4),
+                      Text(
+                        data['description'] ?? "",
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          color: Colors.white38,
+                          height: 1.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
                     _getStatusBadge(data['id']),
+                    if (isSelected) ...[
+                      const SizedBox(height: 8),
+                      Icon(LucideIcons.checkCircle2, color: color, size: 20),
+                    ],
                   ],
                 ),
-                if (isSelected)
-                  Icon(LucideIcons.checkCircle2, color: color, size: 20),
               ],
             ),
             const SizedBox(height: 20),
-            _metricRow(
-              LucideIcons.clock,
-              _formatLateness(metrics['expectedLatenessMinutes'] ?? 0),
-              color,
-            ),
+            if (lateness > 0 || eta > 0)
+              _metricRow(
+                LucideIcons.clock,
+                lateness > 0 ? _formatLateness(lateness) : "ETA: $eta min",
+                color,
+              ),
+            if (transport != null)
+              _metricRow(
+                LucideIcons.car,
+                "Via: $transport",
+                color,
+              ),
+            if ((metrics['missedCommitments'] ?? 0) > 0)
+              _metricRow(
+                LucideIcons.calendarX,
+                "${metrics['missedCommitments']} missed commitments",
+                AppColors.danger,
+              ),
             _metricRow(
               LucideIcons.battery,
-              "Battery: ~${metrics['batteryPercent'] ?? '?'}% at end",
+              "Battery level: ~$battery% remaining",
               color,
             ),
-            _metricRow(
-              LucideIcons.bell,
-              "+${metrics['notificationCount'] ?? 0} new notifications",
-              color,
-            ),
-            _metricRow(
-              LucideIcons.layers,
-              "${metrics['overlapCount'] ?? 0} overlapping blocks",
-              color,
-            ),
+            if (notifs > 0)
+              _metricRow(
+                LucideIcons.bell,
+                "+$notifs new notifications",
+                color,
+              ),
+            if (overlaps > 0)
+              _metricRow(
+                LucideIcons.layers,
+                "$overlaps overlapping blocks",
+                color,
+              ),
+            if (metrics['alternateModes'] != null && (metrics['alternateModes'] as List).isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "ALTERNATE OPTIONS",
+                      style: GoogleFonts.outfit(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white24,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: (metrics['alternateModes'] as List).map((m) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.white.withOpacity(0.1)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(_getModeIcon(m['mode'] ?? ""), size: 12, color: color.withOpacity(0.7)),
+                              const SizedBox(width: 8),
+                              Text(
+                                "${m['mode']}: ${m['etaMinutes']}m",
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  color: Colors.white.withOpacity(0.8),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  "RISK TREND",
+                  "STRESS IMPACT",
                   style: GoogleFonts.outfit(
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
@@ -245,8 +335,9 @@ class _FuturesScreenState extends State<FuturesScreen> {
 
   String _formatLateness(int mins) {
     if (mins <= 0) return "Arrive on time";
-    if (mins < 10) return "Arrive slightly late ($mins min)";
-    return "Arrive $mins–${mins + 5} min late";
+    if (mins < 5) return "Minor delay ($mins min)";
+    if (mins < 15) return "Lateness: $mins min";
+    return "Significant delay ($mins+ min)";
   }
 
   Widget _metricRow(IconData icon, String text, Color color) {
@@ -293,33 +384,11 @@ class _FuturesScreenState extends State<FuturesScreen> {
     AppState state,
     dynamic data,
   ) {
-    final metrics = data['metrics'];
-    final id = data['id'];
-
-    List<String> interventions = [];
-    if (id == "RECOMMENDED") {
-      interventions = [
-        "Leave 15 min earlier",
-        "Enable commute mode",
-        "Send 'running late' message",
-        "Plan a charging stop",
-      ];
-    } else if (id == "ALTERNATE") {
-      interventions = [
-        "Plan 15 min charging stop",
-        "Arrive 10 min late",
-        "Full battery visibility",
-      ];
-    } else {
-      interventions = [
-        "Maintain current routine",
-        "Accept potential delays",
-        "No battery saving",
-      ];
-    }
+    final risks = data['risks'] as List<dynamic>? ?? [];
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => GlassCard(
         padding: const EdgeInsets.all(24),
@@ -327,6 +396,16 @@ class _FuturesScreenState extends State<FuturesScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white10,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
             Text(
               "Strategy: ${data['title']}",
               style: GoogleFonts.outfit(
@@ -346,7 +425,7 @@ class _FuturesScreenState extends State<FuturesScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              "REQUIRED ACTIONS",
+              risks.isEmpty ? "PROJECTED IMPACTS" : "KEY RISKS & MITIGATIONS",
               style: GoogleFonts.outfit(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
@@ -354,31 +433,82 @@ class _FuturesScreenState extends State<FuturesScreen> {
                 letterSpacing: 1.2,
               ),
             ),
-            const SizedBox(height: 12),
-            ...interventions
-                .map(
-                  (i) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          LucideIcons.check,
-                          size: 14,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          i,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
+            const SizedBox(height: 16),
+            if (risks.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 20),
+                child: Text(
+                  "No critical risks identified for this path. Stability is maintained.",
+                  style: TextStyle(color: Colors.white30, fontSize: 13),
+                ),
+              )
+            else
+              ...risks.map((risk) {
+                final type = risk['type'] ?? 'unknown';
+                final label = risk['label'] ?? 'MEDIUM';
+                final summary = risk['summary'] ?? '';
+                final score = (risk['score'] as num?)?.toDouble() ?? 0.5;
+
+                IconData icon = LucideIcons.alertTriangle;
+                Color color = Colors.orangeAccent;
+                if (type == 'lateness') icon = LucideIcons.clock;
+                if (type == 'battery') icon = LucideIcons.battery;
+                if (label == 'HIGH') color = AppColors.danger;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: color.withValues(alpha: 0.2)),
                   ),
-                )
-                .toList(),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(icon, size: 16, color: color),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  type.toUpperCase(),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: color,
+                                  ),
+                                ),
+                                Text(
+                                  label,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: color,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              summary,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
@@ -413,5 +543,14 @@ class _FuturesScreenState extends State<FuturesScreen> {
         ),
       ),
     );
+  }
+
+  IconData _getModeIcon(String mode) {
+    if (mode.contains("Car")) return LucideIcons.car;
+    if (mode.contains("Auto")) return LucideIcons.bus;
+    if (mode.contains("Two-Wheeler")) return LucideIcons.bike;
+    if (mode.contains("Transit")) return LucideIcons.train;
+    if (mode.contains("Walk")) return LucideIcons.footprints;
+    return LucideIcons.navigation;
   }
 }

@@ -23,7 +23,7 @@ interface CacheEntry<T> {
   timestamp: number;
 }
 
-class RoutingService {
+export class RoutingService {
   private baseUrl: string;
   private olaApiKey: string | undefined;
   private routeCache = new Map<string, CacheEntry<RouteResult>>();
@@ -47,9 +47,9 @@ class RoutingService {
     return `${fLat},${fLon}-${tLat},${tLon}`;
   }
 
-  async getRoute(from: LatLng, to: LatLng, force = false): Promise<RouteResult> {
+  async getRoute(from: LatLng, to: LatLng, force = false, mode: string = "driving"): Promise<RouteResult> {
     const now = Date.now();
-    const key = this.cacheKey(from, to);
+    const key = `${this.cacheKey(from, to)}:${mode}`;
 
     const cached = this.routeCache.get(key);
     if (cached && !force) {
@@ -69,7 +69,7 @@ class RoutingService {
     this.runningFetches.add(key);
 
     try {
-      const result = await this.performRouteFetch(from, to, key);
+      const result = await this.performRouteFetch(from, to, key, mode);
       this.routeCache.set(key, { result, timestamp: Date.now() });
       return result;
     } catch (error) {
@@ -81,7 +81,7 @@ class RoutingService {
       return {
         durationSeconds,
         distanceMeters: Math.round(distance),
-        travelMode: "car",
+        travelMode: mode as any,
         worstSegment: { name: "Local Road", delayMinutes: 5 }
       };
     } finally {
@@ -90,16 +90,17 @@ class RoutingService {
     }
   }
 
-  private async performRouteFetch(from: LatLng, to: LatLng, key: string): Promise<RouteResult> {
+  private async performRouteFetch(from: LatLng, to: LatLng, key: string, mode: string = "driving"): Promise<RouteResult> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.FETCH_TIMEOUT);
 
     try {
       // Attempt Ola Maps API if API Key is available
       if (this.olaApiKey) {
-        const olaUrl = `https://api.olamaps.io/routing/v1/directions?origin=${from.lat},${from.lon}&destination=${to.lat},${to.lon}&api_key=${this.olaApiKey}`;
+        const olaUrl = `https://api.olamaps.io/routing/v1/directions?origin=${from.lat},${from.lon}&destination=${to.lat},${to.lon}&mode=${mode}&api_key=${this.olaApiKey}`;
 
         try {
+          console.log(`[Routing] Requesting Ola [${mode}]: FROM(${from.lat.toFixed(4)},${from.lon.toFixed(4)}) TO(${to.lat.toFixed(4)},${to.lon.toFixed(4)})`);
           const res = await fetch(olaUrl, {
             method: "POST",
             headers: {
@@ -115,11 +116,17 @@ class RoutingService {
               const leg = json.routes[0].legs?.[0];
               const durationSeconds = leg?.duration?.value ?? leg?.duration ?? 0;
               const distanceMeters = leg?.distance?.value ?? leg?.distance ?? 0;
+              console.log(`[Routing] Ola Maps Success [${mode}]: ${Math.round(durationSeconds/60)} mins`);
               return { durationSeconds, distanceMeters };
+            } else {
+              console.warn(`[Routing] Ola Maps API returned success status but invalid route data [${mode}]:`, json.status);
             }
+          } else {
+            const errText = await res.text();
+            console.warn(`[Routing] Ola Maps API error [${mode}]: ${res.status}`, errText);
           }
         } catch (olaError) {
-          console.warn(`[Routing] Ola Maps failed, trying OSRM...`, olaError instanceof Error ? olaError.message : "");
+          console.warn(`[Routing] Ola Maps network/fetch failure [${mode}]:`, olaError instanceof Error ? olaError.message : "");
         }
       }
 
@@ -191,14 +198,18 @@ class RoutingService {
     this.runningFetches.add(key);
 
     try {
-      const car = await this.performRouteFetch(from, to, key);
+      // Fetch all modes in parallel for performance
+      const [car, twoWheeler, walk] = await Promise.all([
+        this.getRoute(from, to, force, "driving"),
+        this.getRoute(from, to, force, "two_wheeler"),
+        this.getRoute(from, to, force, "walking")
+      ]);
 
-      // Apply realistic physics-based heuristics to the live traffic route
       const result: MultiModeRouteResult = {
         car,
         auto: { durationSeconds: Math.round(car.durationSeconds * 1.1), distanceMeters: car.distanceMeters },
-        twoWheeler: { durationSeconds: Math.round(car.durationSeconds * 0.85), distanceMeters: car.distanceMeters },
-        walk: { durationSeconds: Math.round(car.distanceMeters / 1.4), distanceMeters: car.distanceMeters },
+        twoWheeler,
+        walk,
         transit: { durationSeconds: Math.round(car.durationSeconds * 1.3) + 480, distanceMeters: car.distanceMeters }
       };
 
