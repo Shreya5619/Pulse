@@ -50,7 +50,7 @@ class FuturesEngine {
         userId,
         baseTime,
         horizonMinutes,
-        futures: this.buildIdleFutures(memory, context.battery.level * 100)
+        futures: this.buildIdleFutures(memory, context.battery.level * 100, context.battery.power_saver_on)
       };
     }
 
@@ -163,10 +163,10 @@ class FuturesEngine {
     return (maxScore * 0.7 + avgScore * 0.3);
   }
 
-  private buildIdleFutures(memory: MemoryState, baseBattery: number): FutureCard[] {
-    const drainNormal = this.predictBattery(baseBattery, 120, 'idle', memory, false);
+  private buildIdleFutures(memory: MemoryState, baseBattery: number, currentPowerSaver: boolean): FutureCard[] {
+    const drainNormal = this.predictBattery(baseBattery, 120, 'idle', memory, currentPowerSaver);
     const drainSaver = this.predictBattery(baseBattery, 120, 'idle', memory, true);
-    const drainAggressive = this.predictBattery(baseBattery, 120, 'mixed', memory, false);
+    const drainAggressive = this.predictBattery(baseBattery, 120, 'idle', memory, currentPowerSaver);
 
     return [
       {

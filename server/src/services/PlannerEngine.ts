@@ -163,23 +163,42 @@ class PlannerEngine {
 
     // Battery intervention
     if (battery && battery.score >= 0.6) {
-      candidates.push({
-        id: "ACTION_ENABLE_BATTERY_SAVER",
-        title: "Enable Battery Saver mode",
-        description: "Optimizes background syncing and brightness to preserve power.",
-        approvalMode: "ASK_FIRST",
-        reasons: battery.causes || [],
-        sideEffects: ["Reduces background activity", "May delay some notifications"],
-        category: "Focus",
-        impact: "Ensures device remains active until destination",
-        templateId: "BATTERY_LOW",
-        channel: "SMS",
-        suggestedRecipient
-      });
+      if (!context.battery.power_saver_on) {
+        candidates.push({
+          id: "ACTION_ENABLE_BATTERY_SAVER",
+          title: "Enable Battery Saver mode",
+          description: "Optimizes background syncing and brightness to preserve power.",
+          approvalMode: "ASK_FIRST",
+          reasons: battery.causes || [],
+          sideEffects: ["Reduces background activity", "May delay some notifications"],
+          category: "Focus",
+          impact: "Ensures device remains active until destination",
+          templateId: "BATTERY_LOW",
+          channel: "SMS",
+          suggestedRecipient
+        });
+      } else {
+        candidates.push({
+          id: "ACTION_FIND_CHARGER",
+          title: "Find a charging station",
+          description: "Battery is critical even in power-saving mode. Pulse recommends charging immediately.",
+          approvalMode: "ASK_FIRST",
+          reasons: battery.causes || [],
+          sideEffects: ["Requires manual action"],
+          category: "General",
+          impact: "Prevents device shutdown",
+          templateId: "CHARGING_NEEDED",
+          channel: "SMS",
+          suggestedRecipient
+        });
+      }
     }
 
     // Overload / notifications
     if (overload && overload.score >= 0.6) {
+      const noisyThreads = (snapshot.notification_digest?.top_threads || [])
+        .filter(t => t.count >= 3); // Threads with at least 3 notifications
+
       candidates.push({
         id: "ACTION_SUPPRESS_NOISY_NOTIFICATIONS",
         title: "Suppress noisy senders for 60 min",
@@ -188,7 +207,14 @@ class PlannerEngine {
         reasons: overload.causes || [],
         sideEffects: ["Temporarily mutes selected apps"],
         category: "Focus",
-        impact: "Reduces cognitive load during peak stress"
+        impact: "Reduces cognitive load during peak stress",
+        metadata: {
+          noisyApps: noisyThreads.map(t => ({
+            name: t.sender,
+            count: t.count,
+            packageName: t.app_package
+          }))
+        }
       });
     }
 

@@ -3,9 +3,12 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
+import 'dart:io';
 import '../theme/colors.dart';
 import '../widgets/glass_card.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:app_settings/app_settings.dart';
+import 'package:android_intent_plus/android_intent.dart';
 
 class InterventionScreen extends StatelessWidget {
   const InterventionScreen({super.key});
@@ -247,10 +250,6 @@ class InterventionScreen extends StatelessWidget {
         if (focus.isNotEmpty) _buildCategoryHeader("Focus", LucideIcons.brain),
         ...focus.map((a) => _buildActionRow(context, state, a)),
 
-        if (comms.isNotEmpty)
-          _buildCategoryHeader("Communication", LucideIcons.messageSquare),
-        ...comms.map((a) => _buildActionRow(context, state, a)),
-
         if (general.isNotEmpty)
           _buildCategoryHeader("Other", LucideIcons.moreHorizontal),
         ...general.map((a) => _buildActionRow(context, state, a)),
@@ -313,6 +312,9 @@ class InterventionScreen extends StatelessWidget {
                         color: Colors.white30,
                       ),
                     ),
+                    if (action['id'] == "ACTION_SUPPRESS_NOISY_NOTIFICATIONS" &&
+                        action['metadata'] != null)
+                      _buildNoisyAppsList(context, action['metadata']),
                   ],
                 ),
               ),
@@ -429,6 +431,17 @@ class InterventionScreen extends StatelessWidget {
 
     if (id.contains("NOTIFICATIONS")) {
       message = "Noisy senders muted for 60 minutes.";
+    } else if (id.contains("BATTERY_SAVER")) {
+      message = "Redirecting to Battery settings...";
+      if (Platform.isAndroid) {
+        const intent = AndroidIntent(
+          action: 'android.settings.BATTERY_SAVER_SETTINGS',
+        );
+        intent.launch();
+      } else {
+        // Fallback for iOS or other platforms
+        AppSettings.openAppSettings(type: AppSettingsType.batteryOptimization);
+      }
     } else if (id.contains("MESSAGE")) {
       _showDraftSheet(context, action);
       return;
@@ -515,6 +528,108 @@ class InterventionScreen extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildNoisyAppsList(BuildContext context, dynamic metadata) {
+    final List<dynamic> apps = metadata['noisyApps'] ?? [];
+    if (apps.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "NOISY APPS DETECTED:",
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.bold,
+              color: Colors.white24,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...apps.map(
+            (app) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(
+                      LucideIcons.bellOff,
+                      size: 12,
+                      color: Colors.white30,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          app['name'] ?? "Unknown App",
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.white70,
+                          ),
+                        ),
+                        Text(
+                          "${app['count']} notifications",
+                          style: const TextStyle(
+                            fontSize: 9,
+                            color: Colors.white30,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () =>
+                        _openAppNotificationSettings(app['packageName']),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      "SET MUTE",
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openAppNotificationSettings(String? packageName) {
+    if (packageName == null) return;
+
+    if (Platform.isAndroid) {
+      final intent = AndroidIntent(
+        action: 'android.settings.APP_NOTIFICATION_SETTINGS',
+        arguments: {
+          'android.provider.extra.APP_PACKAGE': packageName,
+          'app_package': packageName,
+        },
+      );
+      intent.launch();
+    } else {
+      AppSettings.openAppSettings(type: AppSettingsType.notification);
+    }
+  }
 }
 
 class CommActionCard extends StatefulWidget {
@@ -538,7 +653,10 @@ class _CommActionCardState extends State<CommActionCard> {
   }
 
   Future<void> _fetchDraft() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _draftText = null;
+    });
     final state = Provider.of<AppState>(context, listen: false);
     final prepared = await state.prepareCommAction(
       widget.action['actionId'],
@@ -598,7 +716,7 @@ class _CommActionCardState extends State<CommActionCard> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    "SMART NOTIFICATION",
+                    "SMART MESSAGE",
                     style: GoogleFonts.outfit(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
@@ -665,6 +783,39 @@ class _CommActionCardState extends State<CommActionCard> {
             ),
           ),
           const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "MESSAGE DRAFT",
+                style: GoogleFonts.outfit(
+                  fontSize: 10,
+                  color: Colors.white24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (!_isLoading && _draftText != null)
+                Row(
+                  children: [
+                    const Icon(
+                      LucideIcons.sparkles,
+                      size: 10,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      "AI POLISHED",
+                      style: GoogleFonts.outfit(
+                        fontSize: 9,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(12),
             width: double.infinity,

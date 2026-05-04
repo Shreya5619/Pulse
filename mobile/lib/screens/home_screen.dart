@@ -41,8 +41,6 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   _buildHeaderStrip(context, state),
                   const SizedBox(height: 16),
-                  RouteEtaStrip(),
-                  const SizedBox(height: 16),
                   _buildFuturesPathLabel(state),
                   const SizedBox(height: 24),
                   RiskHeroCard(),
@@ -164,9 +162,7 @@ class HomeScreen extends StatelessWidget {
               ),
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const TimelineScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => const TimelineScreen()),
               ),
             ),
             IconButton(
@@ -429,14 +425,14 @@ class HomeScreen extends StatelessWidget {
                 state.deviceContext.battery.isCharging
                     ? LucideIcons.batteryCharging
                     : (state.deviceContext.battery.isInBatterySaveMode
-                        ? LucideIcons.batteryLow
-                        : LucideIcons.battery),
+                          ? LucideIcons.batteryLow
+                          : LucideIcons.battery),
                 "Battery ${state.deviceContext.battery.level}% (${state.deviceContext.battery.isCharging ? 'Charging' : (state.deviceContext.battery.isInBatterySaveMode ? 'Saver' : 'Normal')})",
                 color: state.deviceContext.battery.isCharging
                     ? AppColors.success
                     : (state.deviceContext.battery.isInBatterySaveMode
-                        ? Colors.orangeAccent
-                        : null),
+                          ? Colors.orangeAccent
+                          : null),
               ),
               _contextChip(
                 LucideIcons.calendar,

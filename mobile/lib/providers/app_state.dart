@@ -737,6 +737,7 @@ class AppState extends ChangeNotifier {
       if (!threads.containsKey(sender)) {
         threads[sender] = {
           "sender": sender,
+          "packageName": n.packageName,
           "count": 0,
           "category": n.category,
         };

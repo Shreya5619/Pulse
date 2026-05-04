@@ -9,7 +9,8 @@ dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 const MESSAGE_TEMPLATES = {
   RUNNING_LATE: 'Running {minutes} minutes late to {event}. ETA {eta}.',
   BATTERY_LOW: 'Battery low, will call after {time}.',
-  ON_THE_WAY: 'On the way, new ETA {eta}.'
+  ON_THE_WAY: 'On the way, new ETA {eta}.',
+  CHARGING_NEEDED: 'Battery is critical ({level}%). I might be hard to reach while I find a charger.'
 };
 
 export class CommunicationService {
@@ -24,6 +25,7 @@ export class CommunicationService {
     if (actionId.includes("DELAY") || actionId.includes("LATE")) templateId = "RUNNING_LATE";
     else if (actionId.includes("BATTERY")) templateId = "BATTERY_LOW";
     else if (actionId.includes("LEAVE_NOW")) templateId = "ON_THE_WAY";
+    else if (actionId.includes("CHARGER")) templateId = "CHARGING_NEEDED";
 
     if (!templateId) {
       throw new Error("No template found for action: " + actionId);
@@ -45,10 +47,13 @@ export class CommunicationService {
     } else if (templateId === "ON_THE_WAY") {
       const eta = "10:05 AM"; // From futures if available
       text = text.replace('{eta}', eta);
+    } else if (templateId === "CHARGING_NEEDED") {
+      const level = Math.round((context?.battery?.level || 0) * 100);
+      text = text.replace('{level}', level.toString());
     }
 
     // Polishing with LLM (Groq) - incorporating role
-    const polishedText = await this.polishWithLLM(text, memory, role);
+    const polishedText = await this.polishWithLLM(text, memory, role, actionId);
 
     return {
       channel: "SMS",
@@ -66,7 +71,7 @@ export class CommunicationService {
     return etaDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
-  private async polishWithLLM(text: string, memory: any, role: string): Promise<string> {
+  private async polishWithLLM(text: string, memory: any, role: string, actionId: string): Promise<string> {
     const apiKey = process.env.GROQ_API;
     if (!apiKey) {
       console.warn("[CommService] No GROQ_API found, skipping polish.");
@@ -75,14 +80,26 @@ export class CommunicationService {
 
     try {
       const roleGuidance = {
-        "Manager": "formal, concise, and professional",
-        "Customer": "very formal, apologetic, and professional",
-        "Family": "casual, warm, and reassuring",
-        "General": "polite and neutral"
+        "Manager": "professional, respectful, and concise. use a formal tone.",
+        "Customer": "highly professional, polite, and reassuring. emphasize that you will be back online soon.",
+        "Family": "casual, warm, and personal. feel free to use informal language or emojis.",
+        "General": "polite, neutral, and clear."
       }[role] || "polite and neutral";
 
-      const prompt = `Rewrite this message for my ${role}. Tone should be ${roleGuidance}. Keep it under 20 words. Include all details like time/ETA. Text: '${text}'`;
+      const scenario = actionId.includes("LATE") ? "running late for a meeting" : 
+                       actionId.includes("BATTERY") ? "low battery/device shutting down" : 
+                       actionId.includes("CHARGER") ? "finding a charger" : "on the way";
+
+      const prompt = `Persona: You are writing a short SMS to your ${role}.
+      Relationship Tone: ${roleGuidance}.
+      Context: ${scenario}.
       
+      Task: Rewrite the message below to match this persona while keeping it under 15 words.
+      CRITICAL: You MUST include the battery level and the intention to find a charger.
+      
+      Original: '${text}'`;
+
+      console.log(`[CommService] Polishing for role: ${role}. Prompt: ${prompt}`);
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -90,7 +107,7 @@ export class CommunicationService {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "mixtral-8x7b-32768",
+          model: "llama-3.1-8b-instant",
           messages: [
             { role: "system", content: "You are a helpful assistant that polishes messages to be polite and concise." },
             { role: "user", content: prompt }
@@ -100,6 +117,7 @@ export class CommunicationService {
       });
 
       const data: any = await response.json();
+      console.log(`[CommService] Groq Response:`, JSON.stringify(data));
       
       if (!response.ok) {
         console.warn(`[CommService] Groq API returned error: ${data.error?.message || response.statusText}`);

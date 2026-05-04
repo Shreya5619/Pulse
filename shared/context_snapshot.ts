@@ -84,6 +84,7 @@ export const ContextSnapshotSchema = z.object({
     top_threads: z.array(z.object({
       sender: z.string(),
       count: z.number(),
+      app_package: z.string().optional(),
     })),
   }).optional(),
 

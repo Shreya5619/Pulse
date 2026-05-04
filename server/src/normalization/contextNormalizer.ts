@@ -64,7 +64,8 @@ export function normalizeContext(raw: any): ContextSnapshot {
     by_category: raw.notification_digest.by_category || {},
     top_threads: (raw.notification_digest.top_threads || []).map((t: any) => ({
       sender: String(t.sender),
-      count: Number(t.count)
+      count: Number(t.count),
+      app_package: t.packageName ? String(t.packageName) : undefined
     }))
   } : undefined;
 

@@ -162,12 +162,12 @@ export function assessBattery(
   }
 
   const label = scoreToLabel(score);
-  const chargePerHour = 20;
-  const delta = isCharging ? (chargePerHour * horizonMinutes) / 60 : -(dischargePerHour * horizonMinutes) / 60;
-  const predictedPct = currentPct + delta;
-
   let effectiveDischarge = dischargePerHour;
   if (powerSaverOn) effectiveDischarge *= 0.6;
+
+  const chargePerHour = 20;
+  const delta = isCharging ? (chargePerHour * horizonMinutes) / 60 : -(effectiveDischarge * horizonMinutes) / 60;
+  const predictedPct = currentPct + delta;
 
   const causes: string[] = [
     `Current battery: ${currentPct}%`,
