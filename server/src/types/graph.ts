@@ -14,6 +14,7 @@ export interface GraphNode {
     overload?: number;
     responseDebt?: number;
   };
+  location?: { lat: number; lon: number };
 }
 
 /**

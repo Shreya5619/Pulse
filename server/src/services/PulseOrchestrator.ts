@@ -1,18 +1,18 @@
 import { heartbeatOrchestrator } from "./HeartbeatOrchestrator";
 import { WebSocketServer, WebSocket } from "ws";
 
-let isPulseRunning = false;
+const runningUsers = new Set<string>();
 let lastInterventionText = "";
 
 export async function runAgentPulseFlow(initialContext: any, broadcast: (message: any) => void) {
     const userId = initialContext.user_id || initialContext.userId || "demo-user";
-    if (isPulseRunning) {
-        console.log("[Pulse] Run already in progress, skipping.");
+    if (runningUsers.has(userId)) {
+        console.log(`[Pulse] Run already in progress for user ${userId}, skipping.`);
         return;
     }
 
     try {
-        isPulseRunning = true;
+        runningUsers.add(userId);
         console.log(`[Pulse] Starting orchestrated flow for ${userId}...`);
 
         const result = await heartbeatOrchestrator.runOnce(userId);
@@ -126,6 +126,6 @@ export async function runAgentPulseFlow(initialContext: any, broadcast: (message
     } catch (error) {
         console.error("[Pulse] Orchestrated flow error:", error);
     } finally {
-        isPulseRunning = false;
+        runningUsers.delete(userId);
     }
 }

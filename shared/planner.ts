@@ -4,7 +4,8 @@ export type ActionId =
   | "ACTION_ENABLE_BATTERY_SAVER"
   | "ACTION_SUPPRESS_NOISY_NOTIFICATIONS"
   | "ACTION_PREPARE_DELAY_MESSAGE"
-  | "ACTION_RECOMMEND_CHARGING_STOP";
+  | "ACTION_RECOMMEND_CHARGING_STOP"
+  | "ACTION_MULTI_MODE_TRANSIT";
 
 export type ApprovalMode = "AUTO_SAFE" | "ASK_FIRST" | "NEVER_AUTO";
 
@@ -21,6 +22,12 @@ export interface PlannerAction {
   channel?: 'SMS' | 'TELEGRAM' | 'NONE';
   templateId?: 'RUNNING_LATE' | 'BATTERY_LOW' | 'ON_THE_WAY';
   suggestedRecipient?: string; // phone / Telegram handle
+  transportModeInfo?: {
+    bestMode: string;
+    bestEta: string;
+    altMode: string;
+    altEta: string;
+  };
 }
 
 export interface PlannerDecision {

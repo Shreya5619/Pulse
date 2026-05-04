@@ -29,11 +29,9 @@ class RoutingService {
   private routeCache = new Map<string, CacheEntry<RouteResult>>();
   private multiModeCache = new Map<string, CacheEntry<MultiModeRouteResult>>();
 
-  private isRoutingInProgress = false;
-  private lastGlobalFetch = 0;
-  private readonly CACHE_TTL = 120 * 1000; // 120 seconds (2 minutes)
-  private readonly MULTI_MODE_COOLDOWN = 120 * 1000; // 120 seconds (2 minutes)
-  private readonly GLOBAL_COOLDOWN = 120 * 1000; // 2 minute global rate limit
+  private runningFetches = new Set<string>();
+  private readonly CACHE_TTL = 30 * 1000; // 30 seconds
+  private readonly MULTI_MODE_TTL = 30 * 1000; // 30 seconds
   private readonly FETCH_TIMEOUT = 30000; // 30 seconds
 
   constructor() {
@@ -53,10 +51,7 @@ class RoutingService {
     const now = Date.now();
     const key = this.cacheKey(from, to);
 
-    // 1. Check Cache + Global Cooldown
     const cached = this.routeCache.get(key);
-    const globalAge = now - this.lastGlobalFetch;
-
     if (cached && !force) {
       const age = now - cached.timestamp;
       if (age < this.CACHE_TTL) {
@@ -64,25 +59,18 @@ class RoutingService {
       }
     }
 
-    // 2. Enforce global cooldown if not forced
-    if (globalAge < this.GLOBAL_COOLDOWN && !force) {
-      console.log(`[Routing] Global cooldown active (${Math.round(globalAge / 1000)}s ago). Skipping Ola fetch for ${key}.`);
-      return cached?.result || this.getFallbackRoute();
-    }
-
-    // 2. Guard against parallel calls
-    if (this.isRoutingInProgress) {
+    // 2. Guard against parallel calls for the SAME key
+    if (this.runningFetches.has(key)) {
       console.log(`[Routing] Skipping fetch for ${key}: Request already in progress`);
       return cached?.result || this.getFallbackRoute();
     }
 
     console.log(`[Routing] START: Fetching route for ${key} @ ${now}`);
-    this.isRoutingInProgress = true;
+    this.runningFetches.add(key);
 
     try {
       const result = await this.performRouteFetch(from, to, key);
       this.routeCache.set(key, { result, timestamp: Date.now() });
-      this.lastGlobalFetch = Date.now(); // Update global timestamp on success
       return result;
     } catch (error) {
       console.error(`[Routing] Fetch failed for ${key}:`, error instanceof Error ? error.message : "Unknown error");
@@ -97,7 +85,7 @@ class RoutingService {
         worstSegment: { name: "Local Road", delayMinutes: 5 }
       };
     } finally {
-      this.isRoutingInProgress = false;
+      this.runningFetches.delete(key);
       console.log(`[Routing] END: Route fetch finished for ${key} @ ${Date.now()}`);
     }
   }
@@ -183,31 +171,24 @@ class RoutingService {
     const now = Date.now();
     const key = this.cacheKey(from, to);
 
-    // 1. Check Cache + Cooldown
+    // 1. Check Cache
     const cached = this.multiModeCache.get(key);
-    const globalAge = now - this.lastGlobalFetch;
 
     if (cached && !force) {
       const age = now - cached.timestamp;
-      if (age < this.MULTI_MODE_COOLDOWN) {
+      if (age < this.MULTI_MODE_TTL) {
         return cached.result;
       }
     }
 
-    // 2. Enforce global cooldown if not forced
-    if (globalAge < this.GLOBAL_COOLDOWN && !force) {
-      console.log(`[Routing] Global cooldown active (${Math.round(globalAge / 1000)}s ago). Skipping multi-mode fetch for ${key}.`);
-      return cached?.result || this.getFallbackMultiMode();
-    }
-
     // 2. Guard against parallel calls
-    if (this.isRoutingInProgress) {
-      console.log(`[Routing] Skipping multi-mode fetch: Routing already in progress`);
+    if (this.runningFetches.has(key)) {
+      console.log(`[Routing] Skipping multi-mode fetch: Routing already in progress for ${key}`);
       return cached?.result || this.getFallbackMultiMode();
     }
 
     console.log(`[Routing] START: Multi-mode fetch for ${key} @ ${now}`);
-    this.isRoutingInProgress = true;
+    this.runningFetches.add(key);
 
     try {
       const car = await this.performRouteFetch(from, to, key);
@@ -227,7 +208,7 @@ class RoutingService {
       console.error("[Routing] Multi-mode fetch failed:", e);
       return cached?.result || this.getFallbackMultiMode();
     } finally {
-      this.isRoutingInProgress = false;
+      this.runningFetches.delete(key);
       console.log(`[Routing] END: Multi-mode fetch finished for ${key} @ ${Date.now()}`);
     }
   }

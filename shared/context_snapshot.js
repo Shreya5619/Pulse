@@ -16,8 +16,19 @@ exports.CalendarEventSchema = zod_1.z.object({
     start_time: zod_1.z.string().datetime(),
     end_time: zod_1.z.string().datetime(),
     location_text: zod_1.z.string().optional().nullable(),
+    location: zod_1.z.object({
+        lat: zod_1.z.number(),
+        lon: zod_1.z.number(),
+    }).optional().nullable(),
+    start_location: zod_1.z.object({
+        lat: zod_1.z.number(),
+        lon: zod_1.z.number(),
+        name: zod_1.z.string().optional().nullable(),
+    }).optional().nullable(),
     is_all_day: zod_1.z.boolean(),
     importance: exports.ImportanceSchema.default("normal"),
+    organizer_name: zod_1.z.string().optional().nullable(),
+    organizer_contact: zod_1.z.string().optional().nullable(),
 });
 exports.NotificationItemSchema = zod_1.z.object({
     id: zod_1.z.string(), // or hash
@@ -28,6 +39,8 @@ exports.NotificationItemSchema = zod_1.z.object({
     posted_at: zod_1.z.string().datetime(),
     is_ongoing_call: zod_1.z.boolean().optional(),
     is_otp_hint: zod_1.z.boolean().optional(),
+    title: zod_1.z.string().optional().nullable(),
+    body: zod_1.z.string().optional().nullable(),
 });
 exports.BatteryBandSchema = zod_1.z.enum(["critical", "low", "ok", "high"]);
 exports.ContextSnapshotSchema = zod_1.z.object({
@@ -53,7 +66,15 @@ exports.ContextSnapshotSchema = zod_1.z.object({
         temperature: zod_1.z.number().optional().nullable(),
         last_full_charge_at: zod_1.z.string().datetime().optional().nullable(),
     }),
-    notifications: zod_1.z.array(exports.NotificationItemSchema),
+    notification_digest: zod_1.z.object({
+        summary_window_minutes: zod_1.z.number(),
+        total_count: zod_1.z.number(),
+        by_category: zod_1.z.record(zod_1.z.string(), zod_1.z.number()),
+        top_threads: zod_1.z.array(zod_1.z.object({
+            sender: zod_1.z.string(),
+            count: zod_1.z.number(),
+        })),
+    }).optional(),
     device_state: zod_1.z.object({
         network_type: zod_1.z.enum(["wifi", "4g", "5g", "none"]),
         is_roaming: zod_1.z.boolean(),

@@ -118,6 +118,12 @@ export class GraphBuilder {
         }
 
         if (startLat && startLon && eventLat && eventLon) {
+          // Store location in node for Planner usage
+          const targetNode = nodes.find(n => n.id === eventNodeId);
+          if (targetNode) {
+            targetNode.location = { lat: eventLat, lon: eventLon };
+          }
+
           try {
             const route = await routingService.getRoute(
               { lat: startLat, lon: startLon },

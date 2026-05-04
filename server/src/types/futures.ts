@@ -7,6 +7,7 @@ export interface FutureMetrics {
   etaMinutes?: number;
   batteryPercent?: number;
   expectedLatenessMinutes?: number;
+  transportMode?: string;
   missedCommitments: number;
   notificationCount?: number;
   overlapCount?: number;

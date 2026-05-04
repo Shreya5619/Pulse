@@ -1,5 +1,5 @@
 import { RiskEngineService, riskEngine } from "./RiskEngineService";
-import { RoutingService, routingService, RouteResult } from "./RoutingService";
+import { RoutingService, routingService, RouteResult, MultiModeRouteResult } from "./RoutingService";
 import { MemoryStore, memoryStore } from "./MemoryStore";
 import { contextSnapshotRepo } from "../db/ContextSnapshotRepository";
 import { eventsRepo } from "../db/EventsRepository";
@@ -52,15 +52,27 @@ class FuturesEngine {
       };
     }
 
-    // Use routing + battery profile once as base
+    // Use multi-mode routing to find best options
+    let multiMode: MultiModeRouteResult | null = null;
+    if (context.location?.lat && context.location?.lon && nextEvent.location?.lat && nextEvent.location?.lon) {
+      try {
+        multiMode = await this.routingService.getMultiModeRoutes(
+          { lat: context.location.lat, lon: context.location.lon },
+          { lat: nextEvent.location.lat, lon: nextEvent.location.lon }
+        );
+      } catch (e) {
+        console.warn("[FuturesEngine] Multi-mode routing failed");
+      }
+    }
+
     const route = await this.estimateRoute(context, nextEvent, memory);
     const baseBattery = context.battery.level * 100;
 
     const futureParams = { userId, baseTime, nextEvent, route, baseBattery, memory, personality };
 
     const futureA = await this.simulateDoNothing(futureParams);
-    const futureB = await this.simulateRecommended(futureParams);
-    const futureC = await this.simulateAlternate(futureParams);
+    const futureB = await this.simulateRecommended({ ...futureParams, multiMode });
+    const futureC = await this.simulateAlternate({ ...futureParams, multiMode });
 
     return {
       userId,
@@ -248,8 +260,27 @@ class FuturesEngine {
     baseBattery: number;
     memory: MemoryState;
     personality: PersonalityAnalysis;
+    multiMode: MultiModeRouteResult | null;
   }): Promise<FutureCard> {
-    const { nextEvent, route, baseBattery, memory, personality } = params;
+    let { nextEvent, route, baseBattery, memory, personality, multiMode } = params;
+
+    // Pick BEST mode if available
+    let transportMode = "Car/Taxi";
+    if (multiMode) {
+      const modes = [
+        { name: "Car/Taxi", data: multiMode.car },
+        { name: "Auto Rickshaw", data: multiMode.auto },
+        { name: "Two-Wheeler", data: multiMode.twoWheeler },
+        { name: "Public Transit", data: multiMode.transit },
+        { name: "Walking", data: multiMode.walk }
+      ].filter(m => m.data.durationSeconds > 0)
+       .sort((a, b) => a.data.durationSeconds - b.data.durationSeconds);
+
+      if (modes.length > 0) {
+        route = modes[0].data;
+        transportMode = modes[0].name;
+      }
+    }
 
     // Leave slightly earlier or now
     const nowTime = new Date(params.baseTime).getTime();
@@ -293,12 +324,13 @@ class FuturesEngine {
     return {
       id: "RECOMMENDED",
       title: "Pulse Recommendation",
-      description: "Leave now and enable Battery Saver. This ensures on-time arrival and preserves device power.",
+      description: `Leave now via ${transportMode} and enable Battery Saver. This ensures the fastest arrival.`,
       metrics: {
         endTime: nextEvent.end_time,
         etaMinutes: Math.round(etaMinutes),
         batteryPercent: Math.round(batteryAtArrival),
         expectedLatenessMinutes: Math.round(expectedLatenessMinutes),
+        transportMode,
         missedCommitments: 0,
         notificationCount: 18,
         overlapCount: 1,
@@ -320,12 +352,34 @@ class FuturesEngine {
     baseBattery: number;
     memory: MemoryState;
     personality: PersonalityAnalysis;
+    multiMode: MultiModeRouteResult | null;
   }): Promise<FutureCard> {
-    const { nextEvent, route, baseBattery, memory, personality } = params;
+    let { nextEvent, route, baseBattery, memory, personality, multiMode } = params;
 
-    // Strategy: Charge for 15 minutes, then leave.
-    const chargeDuration = 15;
-    const chargeRate = 1.5; // 1.5% per minute heuristic
+    // Pick 2nd BEST mode if available, otherwise stick to Charge & Go logic but with a mode
+    let transportMode = "Car/Taxi";
+    let alternateDescription = "Charge for 15 minutes before leaving. You arrive slightly later but with significantly more battery.";
+    let chargeDuration = 15;
+    const chargeRate = 1.5; 
+
+    if (multiMode) {
+      const modes = [
+        { name: "Car/Taxi", data: multiMode.car },
+        { name: "Auto Rickshaw", data: multiMode.auto },
+        { name: "Two-Wheeler", data: multiMode.twoWheeler },
+        { name: "Public Transit", data: multiMode.transit },
+        { name: "Walking", data: multiMode.walk }
+      ].filter(m => m.data.durationSeconds > 0)
+       .sort((a, b) => a.data.durationSeconds - b.data.durationSeconds);
+
+      if (modes.length >= 2) {
+        // Use 2nd best mode
+        route = modes[1].data;
+        transportMode = modes[1].name;
+        alternateDescription = `Use ${transportMode} as a secondary option if the primary mode is unavailable.`;
+        chargeDuration = 0; // Don't charge in this specific alternate branch if it's just a mode switch
+      }
+    }
 
     const nowTime = new Date(params.baseTime).getTime();
     const eventStartTime = new Date(nextEvent.start_time).getTime();
@@ -362,13 +416,14 @@ class FuturesEngine {
 
     return {
       id: "ALTERNATE",
-      title: "Charge & Go",
-      description: "Charge for 15 minutes before leaving. You arrive slightly later but with significantly more battery.",
+      title: multiMode && multiMode.car.durationSeconds > 0 ? `Switch to ${transportMode}` : "Charge & Go",
+      description: alternateDescription,
       metrics: {
         endTime: nextEvent.end_time,
         etaMinutes: Math.round(etaMinutes),
         batteryPercent: Math.round(batteryAtArrival),
         expectedLatenessMinutes: Math.round(expectedLatenessMinutes),
+        transportMode,
         missedCommitments: expectedLatenessMinutes > 5 ? 1 : 0,
         notificationCount: 9,
         overlapCount: 0,

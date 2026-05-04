@@ -8,6 +8,8 @@ import { MemoryState } from "../../../shared/memory";
 import { contextSnapshotRepo } from "../db/ContextSnapshotRepository";
 import { GraphAdapter } from "./GraphAdapter";
 import { PersonalityAnalysis } from "./PersonalityAnalyzer";
+import { routingService } from "./RoutingService";
+import { graphBuilder } from "./GraphBuilder";
 
 class PlannerEngine {
   async decideForUser(userId: string): Promise<PlannerDecision> {
@@ -18,7 +20,7 @@ class PlannerEngine {
     const context = await contextSnapshotRepo.findLatestByUser(userId);
     const personality = await GraphAdapter.getUserPersonality(userId);
 
-    const candidates = this.buildCandidates(riskSnapshot, futures, memory, context, personality);
+    const candidates = await this.buildCandidates(riskSnapshot, futures, memory, context, personality);
     const chosen = this.pickBest(candidates, memory, personality);
 
     return {
@@ -36,11 +38,11 @@ class PlannerEngine {
     const context = await contextSnapshotRepo.findLatestByUser(userId);
     const personality = await GraphAdapter.getUserPersonality(userId);
 
-    const allCandidates = this.buildCandidates(riskSnapshot, futures, memory, context, personality);
+    const allCandidates = await this.buildCandidates(riskSnapshot, futures, memory, context, personality);
 
     // Filter candidates relevant to this risk type/node
     let relevant = allCandidates.filter(c => {
-      if (riskType === 'lateness') return c.id === 'ACTION_LEAVE_NOW' || c.id === 'ACTION_RECOMMEND_CHARGING_STOP';
+      if (riskType === 'lateness') return c.id === 'ACTION_LEAVE_NOW' || c.id === 'ACTION_MULTI_MODE_TRANSIT' || c.id === 'ACTION_RECOMMEND_CHARGING_STOP';
       if (riskType === 'battery') return c.id === 'ACTION_ENABLE_BATTERY_SAVER' || c.id === 'ACTION_RECOMMEND_CHARGING_STOP';
       if (riskType === 'overload') return c.id === 'ACTION_SUPPRESS_NOISY_NOTIFICATIONS';
       if (riskType === 'response_debt') return c.id === 'ACTION_PREPARE_DELAY_MESSAGE';
@@ -69,13 +71,13 @@ class PlannerEngine {
     return relevant.slice(0, 3);
   }
 
-  private buildCandidates(
+  private async buildCandidates(
     risk: RiskSnapshot,
     futures: FuturesResult,
     memory: MemoryState,
     context: any,
     personality?: PersonalityAnalysis
-  ): PlannerAction[] {
+  ): Promise<PlannerAction[]> {
     const candidates: PlannerAction[] = [];
     const suggestedRecipient = context?.calendar?.next_event?.organizer_contact || "123-456-7890"; // Hardcoded fallback as requested
 
@@ -87,21 +89,76 @@ class PlannerEngine {
 
     // Lateness intervention
     if (lateness && lateness.score >= 0.6) {
-      const routineOverlap = "this would cut into your usual study block"; // Placeholder logic for now
-      candidates.push({
-        id: "ACTION_LEAVE_NOW",
-        title: "Leave now and take cab to Office HQ",
-        description: `Switching to a cab now saves 15 mins. Note: ${routineOverlap}.`,
-        approvalMode: "ASK_FIRST",
-        reasons: lateness.causes || [],
-        sideEffects: ["May trigger navigation", "May send an optional delay message"],
-        appliesToEventId: lateness.nodeId,
-        category: "Commute",
-        impact: "Cuts lateness risk from High to Low",
-        templateId: "ON_THE_WAY",
-        channel: "SMS",
-        suggestedRecipient
-      });
+      // 1. Fetch multi-mode routes if we have a target node
+      let transportInfo: PlannerAction["transportModeInfo"] | undefined;
+      let destinationName = "Destination";
+
+      if (lateness.nodeId) {
+        const cached = graphBuilder.getCachedGraph(risk.userId);
+        const node = cached?.nodes.find(n => n.id === lateness.nodeId);
+        destinationName = node?.label || destinationName;
+
+        if (node?.location && context?.location?.lat) {
+          try {
+            const routes = await routingService.getMultiModeRoutes(
+              { lat: context.location.lat, lon: context.location.lon },
+              { lat: node.location.lat, lon: node.location.lon }
+            );
+
+            const modes = [
+              { name: "Car/Taxi", data: routes.car },
+              { name: "Auto Rickshaw", data: routes.auto },
+              { name: "Two-Wheeler", data: routes.twoWheeler },
+              { name: "Public Transit", data: routes.transit },
+              { name: "Walking", data: routes.walk }
+            ];
+
+            const sorted = modes
+              .filter(m => m.data.durationSeconds > 0)
+              .sort((a, b) => a.data.durationSeconds - b.data.durationSeconds);
+
+            if (sorted.length >= 2) {
+              const best = sorted[0];
+              const alt = sorted[1];
+              transportInfo = {
+                bestMode: best.name,
+                bestEta: `${Math.round(best.data.durationSeconds / 60)} min`,
+                altMode: alt.name,
+                altEta: `${Math.round(alt.data.durationSeconds / 60)} min`
+              };
+            }
+          } catch (e) {
+            console.error("[Planner] Failed to fetch multi-mode routes:", e);
+          }
+        }
+      }
+
+      if (transportInfo) {
+        candidates.push({
+          id: "ACTION_MULTI_MODE_TRANSIT",
+          title: `Transit Recommendation: Take ${transportInfo.bestMode}`,
+          description: `Pulse recommends ${transportInfo.bestMode} (${transportInfo.bestEta}) to reach ${destinationName} on time. Alternate: ${transportInfo.altMode} (${transportInfo.altEta}).`,
+          approvalMode: "ASK_FIRST",
+          reasons: [...(lateness.causes || []), `Multi-mode analysis shows ${transportInfo.bestMode} is fastest`],
+          sideEffects: ["Opens navigation for selected mode"],
+          appliesToEventId: lateness.nodeId,
+          category: "Commute",
+          impact: `Saves time vs default mode; reduces lateness risk`,
+          transportModeInfo: transportInfo
+        });
+      } else {
+        candidates.push({
+          id: "ACTION_LEAVE_NOW",
+          title: `Leave now for ${destinationName}`,
+          description: `You are at risk of being late. Start moving now to reach your destination.`,
+          approvalMode: "ASK_FIRST",
+          reasons: lateness.causes || [],
+          sideEffects: ["May trigger navigation"],
+          appliesToEventId: lateness.nodeId,
+          category: "Commute",
+          impact: "Cuts lateness risk from High to Low"
+        });
+      }
     }
 
     // Battery intervention
@@ -175,6 +232,7 @@ class PlannerEngine {
 
     // Default priority order: lateness > battery > overload/response
     let priorities: ActionId[] = [
+      "ACTION_MULTI_MODE_TRANSIT",
       "ACTION_LEAVE_NOW",
       "ACTION_ENABLE_BATTERY_SAVER",
       "ACTION_RECOMMEND_CHARGING_STOP",
