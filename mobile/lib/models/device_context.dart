@@ -60,6 +60,7 @@ class CalendarEvent {
   final double? latitude;
   final double? longitude;
   final Map<String, dynamic>? startLocation;
+  final String? organizerContact;
 
   CalendarEvent({
     required this.title,
@@ -69,6 +70,7 @@ class CalendarEvent {
     this.latitude,
     this.longitude,
     this.startLocation,
+    this.organizerContact,
   });
 }
 

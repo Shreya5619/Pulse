@@ -307,12 +307,53 @@ class AppState extends ChangeNotifier {
   void selectScenario(String id) {
     _selectedScenarioId = id;
     notifyListeners();
+
+    // Sync to backend
+    _syncScenarioSelection(id);
+  }
+
+  Future<void> _syncScenarioSelection(String scenarioId) async {
+    try {
+      final host = _getBackendHost();
+
+      // 1. Persist selection
+      final selectUrl = Uri.parse('http://$host:8080/api/planner/scenario/select');
+      await http.post(
+        selectUrl,
+        headers: _authHeaders,
+        body: jsonEncode({
+          'userId': _userId,
+          'deviceId': _userId,
+          'scenarioId': scenarioId,
+        }),
+      );
+
+      // 2. Fetch updated decision/actions based on this scenario
+      // Map A/B/C to internal IDs if necessary, but the screen already passes RECOMMENDED etc.
+      final scenarioUrl = Uri.parse(
+        'http://$host:8080/api/planner/scenario/$scenarioId?userId=$_userId&deviceId=$_userId',
+      );
+      final response = await http.get(scenarioUrl, headers: _authHeaders);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _lastPlannerDecision = data['data'];
+        debugPrint(
+          '[Pulse AppState] Scenario decision updated for: $scenarioId',
+        );
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error syncing scenario selection: $e');
+    }
   }
 
   Future<void> fetchDayPulse() async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/day-pulse?userId=$_userId&deviceId=$_userId');
+      final url = Uri.parse(
+        'http://$host:8080/api/day-pulse?userId=$_userId&deviceId=$_userId',
+      );
       final response = await http.get(url, headers: _authHeaders);
 
       if (response.statusCode == 200) {
@@ -607,7 +648,6 @@ class AppState extends ChangeNotifier {
     _initNotificationIngestion();
   }
 
-
   void _initCalendarIngestion() async {
     // Calendar - Refresh every 15 minutes
     Timer.periodic(const Duration(minutes: 15), (timer) async {
@@ -879,16 +919,25 @@ class AppState extends ChangeNotifier {
           _deviceContext = DeviceContext(
             battery: BatteryInfo(
               level: cData['batteryPercent'] ?? _deviceContext.battery.level,
-              isCharging: cData['isCharging'] ?? _deviceContext.battery.isCharging,
-              isInBatterySaveMode: cData['isInBatterySaveMode'] ?? _deviceContext.battery.isInBatterySaveMode,
+              isCharging:
+                  cData['isCharging'] ?? _deviceContext.battery.isCharging,
+              isInBatterySaveMode:
+                  cData['isInBatterySaveMode'] ??
+                  _deviceContext.battery.isInBatterySaveMode,
               trend: _deviceContext.battery.trend,
             ),
-            location: loc != null ? LocationInfo(latitude: loc['lat'], longitude: loc['lon'], status: cData['locationLabel'] ?? "Replay") : _deviceContext.location,
+            location: loc != null
+                ? LocationInfo(
+                    latitude: loc['lat'],
+                    longitude: loc['lon'],
+                    status: cData['locationLabel'] ?? "Replay",
+                  )
+                : _deviceContext.location,
             upcomingEvents: _deviceContext.upcomingEvents,
             notifications: _deviceContext.notifications,
             timestamp: timestamp,
           );
-          
+
           // CRITICAL: Push simulated context to server so server-side routing works
           _sendContextSnapshot("replay_sync");
         }
@@ -930,11 +979,17 @@ class AppState extends ChangeNotifier {
         _currentRiskSnapshot = RiskSnapshot.fromJson(rData);
         _risksNext90Min = _currentRiskSnapshot!.risks.length;
         _activeRiskTypes = _currentRiskSnapshot!.risks
-            .map((r) => r.type == RiskType.responseDebt ? "response_debt" : r.type.name)
+            .map(
+              (r) => r.type == RiskType.responseDebt
+                  ? "response_debt"
+                  : r.type.name,
+            )
             .toSet()
             .toList();
 
-        debugPrint('[Pulse AppState] Risk sync complete: types=$_activeRiskTypes, count=$_risksNext90Min');
+        debugPrint(
+          '[Pulse AppState] Risk sync complete: types=$_activeRiskTypes, count=$_risksNext90Min',
+        );
 
         _currentRisk = RiskState(
           score: _currentRiskSnapshot!.risks.isEmpty
@@ -1187,14 +1242,19 @@ class AppState extends ChangeNotifier {
                   "end_time": _deviceContext.upcomingEvents.first.end
                       .toUtc()
                       .toIso8601String(),
-                  "location_text": _deviceContext.upcomingEvents.first.locationText,
-                  "location": _deviceContext.upcomingEvents.first.latitude != null
+                  "location_text":
+                      _deviceContext.upcomingEvents.first.locationText,
+                  "location":
+                      _deviceContext.upcomingEvents.first.latitude != null
                       ? {
                           "lat": _deviceContext.upcomingEvents.first.latitude,
                           "lon": _deviceContext.upcomingEvents.first.longitude,
                         }
                       : null,
-                  "start_location": _deviceContext.upcomingEvents.first.startLocation,
+                  "start_location":
+                      _deviceContext.upcomingEvents.first.startLocation,
+                  "organizer_contact":
+                      _deviceContext.upcomingEvents.first.organizerContact,
                   "is_all_day": false,
                   "importance": "high",
                 }
@@ -1209,10 +1269,7 @@ class AppState extends ChangeNotifier {
                   "end_time": e.end.toUtc().toIso8601String(),
                   "location_text": e.locationText,
                   "location": e.latitude != null
-                      ? {
-                          "lat": e.latitude,
-                          "lon": e.longitude,
-                        }
+                      ? {"lat": e.latitude, "lon": e.longitude}
                       : null,
                   "start_location": e.startLocation,
                 },
@@ -1288,7 +1345,9 @@ class AppState extends ChangeNotifier {
   Future<void> fetchFutures() async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/futures?userId=$_userId&deviceId=$_userId');
+      final url = Uri.parse(
+        'http://$host:8080/api/futures?userId=$_userId&deviceId=$_userId',
+      );
       final response = await http.get(url, headers: _authHeaders);
 
       if (response.statusCode == 200) {
@@ -1322,7 +1381,9 @@ class AppState extends ChangeNotifier {
   Future<void> fetchTwinGraph() async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/twin/graph?userId=$_userId&deviceId=$_userId');
+      final url = Uri.parse(
+        'http://$host:8080/api/twin/graph?userId=$_userId&deviceId=$_userId',
+      );
       final response = await http.get(url, headers: _authHeaders);
 
       if (response.statusCode == 200) {
@@ -1363,7 +1424,11 @@ class AppState extends ChangeNotifier {
       final response = await http.post(
         url,
         headers: _authHeaders,
-        body: jsonEncode({'userId': _userId, 'deviceId': _userId, 'action': action}),
+        body: jsonEncode({
+          'userId': _userId,
+          'deviceId': _userId,
+          'action': action,
+        }),
       );
       if (response.statusCode == 200) {
         debugPrint('[Pulse] Action acknowledged by backend.');
@@ -1427,20 +1492,34 @@ class AppState extends ChangeNotifier {
     }
 
     // Local fallback
-    return _generateLocalCommAction(actionId);
+    return _generateLocalCommAction(actionId, role: role);
   }
 
-  Map<String, dynamic> _generateLocalCommAction(String actionId) {
-    final eventTitle = etaInfo.eventTitle ?? "next event";
+  Map<String, dynamic> _generateLocalCommAction(
+    String actionId, {
+    String? role,
+  }) {
+    final eventTitle = _etaInfo?.eventTitle ?? "the meeting";
     String text = "Running a bit late to $eventTitle. See you soon!";
-    if (actionId.contains("BATTERY")) {
+
+    final aid = actionId.toUpperCase();
+    if (aid.contains("BATTERY") || aid.contains("CHARGE")) {
       text = "Battery low, might be hard to reach for a bit.";
     }
+
+    // Basic local "smart" variation based on role
+    if (role == "Manager") {
+      text = "Running late for $eventTitle. Will be there as soon as possible.";
+    } else if (role == "Family") {
+      text = "Hey! Running a bit behind for $eventTitle. See you in a bit! ❤️";
+    }
+
     return {
       'channel': 'SMS',
       'text': text,
       'recipient': '123-456-7890',
       'actionId': actionId,
+      'role': role ?? "General",
     };
   }
 
@@ -1451,7 +1530,11 @@ class AppState extends ChangeNotifier {
       await http.post(
         url,
         headers: _authHeaders,
-        body: jsonEncode({'userId': _userId, 'deviceId': _userId, 'actionId': actionId}),
+        body: jsonEncode({
+          'userId': _userId,
+          'deviceId': _userId,
+          'actionId': actionId,
+        }),
       );
 
       // Mark as completed
@@ -1682,14 +1765,14 @@ class AppState extends ChangeNotifier {
   }
 
   String _getBackendHost() {
-    return '10.123.31.141';
+    return '192.168.1.7';
   }
 
   Map<String, String> get _authHeaders => {
-        'Content-Type': 'application/json',
-        'X-Device-Id': _userId,
-        'X-User-Id': _userId,
-      };
+    'Content-Type': 'application/json',
+    'X-Device-Id': _userId,
+    'X-User-Id': _userId,
+  };
 
   @override
   void dispose() {

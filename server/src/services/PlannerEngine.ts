@@ -10,7 +10,6 @@ import { GraphAdapter } from "./GraphAdapter";
 import { PersonalityAnalysis } from "./PersonalityAnalyzer";
 import { routingService } from "./RoutingService";
 import { graphBuilder } from "./GraphBuilder";
-
 class PlannerEngine {
   async decideForUser(userId: string, selectedScenarioId: string = "RECOMMENDED"): Promise<PlannerDecision> {
     const now = new Date().toISOString();
@@ -20,7 +19,11 @@ class PlannerEngine {
     const context = await contextSnapshotRepo.findLatestByUser(userId);
     const personality = await GraphAdapter.getUserPersonality(userId);
 
-    const candidates = await this.buildCandidates(riskSnapshot, futures, memory, context, personality);
+    const candidates = (await this.buildCandidates(riskSnapshot, futures, memory, context, personality, selectedScenarioId))
+      .map(c => ({
+        ...c,
+        id: `${c.id}:${Buffer.from(c.title).toString('hex').slice(0, 4)}` // Ensure UI uniqueness per variation
+      }));
     const chosen = this.pickBest(candidates, memory, personality, selectedScenarioId);
 
     return {
@@ -57,14 +60,14 @@ class PlannerEngine {
     // Ensure we have at least some generic actions if nothing specific found
     if (relevant.length === 0) {
       if (riskType === 'lateness') {
-         relevant.push({
-           id: "ACTION_PREPARE_DELAY_MESSAGE",
-           title: "Send 'Running 10 minutes late'",
-           description: "Quick update to the organizer.",
-           approvalMode: "ASK_FIRST",
-           reasons: ["Mitigate lateness impact"],
-           sideEffects: []
-         });
+        relevant.push({
+          id: "ACTION_PREPARE_DELAY_MESSAGE",
+          title: "Send 'Running 10 minutes late'",
+          description: "Quick update to the organizer.",
+          approvalMode: "ASK_FIRST",
+          reasons: ["Mitigate lateness impact"],
+          sideEffects: []
+        });
       }
     }
 
@@ -76,14 +79,15 @@ class PlannerEngine {
     futures: FuturesResult,
     memory: MemoryState,
     context: any,
-    personality?: PersonalityAnalysis
+    personality?: PersonalityAnalysis,
+    selectedScenarioId?: string
   ): Promise<PlannerAction[]> {
     const candidates: PlannerAction[] = [];
     const suggestedRecipient = context?.calendar?.next_event?.organizer_contact || "123-456-7890"; // Hardcoded fallback as requested
 
 
     const lateness = risk.risks.find(r => r.type === "lateness");
-    const battery  = risk.risks.find(r => r.type === "battery");
+    const battery = risk.risks.find(r => r.type === "battery");
     const overload = risk.risks.find(r => r.type === "overload");
     const response = risk.risks.find(r => r.type === "response_debt");
 
@@ -133,18 +137,33 @@ class PlannerEngine {
         }
       }
 
-      if (transportInfo) {
+      const isRecommended = selectedScenarioId === "RECOMMENDED";
+      const isDoNothing = selectedScenarioId === "DO_NOTHING";
+
+      if (transportInfo && isRecommended) {
         candidates.push({
           id: "ACTION_MULTI_MODE_TRANSIT",
-          title: `Transit Recommendation: Take ${transportInfo.bestMode}`,
-          description: `Pulse recommends ${transportInfo.bestMode} (${transportInfo.bestEta}) to reach ${destinationName} on time. Alternate: ${transportInfo.altMode} (${transportInfo.altEta}).`,
+          title: `Optimization: Use ${transportInfo.bestMode}`,
+          description: `Pulse identifies ${transportInfo.bestMode} as the fastest way to ${destinationName} (${transportInfo.bestEta}). Using this mode secures your schedule.`,
           approvalMode: "ASK_FIRST",
-          reasons: [...(lateness.causes || []), `Multi-mode analysis shows ${transportInfo.bestMode} is fastest`],
+          reasons: [...(lateness.causes || []), `Simulations confirm ${transportInfo.bestMode} is optimal for this traffic`],
           sideEffects: ["Opens navigation for selected mode"],
           appliesToEventId: lateness.nodeId,
           category: "Commute",
-          impact: `Saves time vs default mode; reduces lateness risk`,
+          impact: `Saves time vs default mode; reduces lateness risk to Low`,
           transportModeInfo: transportInfo
+        });
+      } else if (isDoNothing) {
+        candidates.push({
+          id: "ACTION_LEAVE_NOW",
+          title: `CRITICAL: Leave now for ${destinationName}`,
+          description: `You are currently trending toward a 15+ minute delay. Immediate departure is required to minimize impact.`,
+          approvalMode: "ASK_FIRST",
+          reasons: lateness.causes || [],
+          sideEffects: ["May trigger navigation"],
+          appliesToEventId: lateness.nodeId,
+          category: "Commute",
+          impact: "Prevents escalating lateness risk"
         });
       } else {
         candidates.push({
@@ -178,38 +197,29 @@ class PlannerEngine {
           suggestedRecipient
         });
       } else {
-        candidates.push({
-          id: "ACTION_FIND_CHARGER",
-          title: "Find a charging station",
-          description: "Battery is critical even in power-saving mode. Pulse recommends charging immediately.",
-          approvalMode: "ASK_FIRST",
-          reasons: battery.causes || [],
-          sideEffects: ["Requires manual action"],
-          category: "General",
-          impact: "Prevents device shutdown",
-          templateId: "CHARGING_NEEDED",
-          channel: "SMS",
-          suggestedRecipient
-        });
+
       }
     }
 
-    // Overload / notifications
-    if (overload && overload.score >= 0.6) {
-      const noisyThreads = (snapshot.notification_digest?.top_threads || [])
-        .filter(t => t.count >= 3); // Threads with at least 3 notifications
+    // Overload / notifications - More aggressive in Focus Path (Scenario C)
+    const isFocusPath = selectedScenarioId === "ALTERNATE";
+    if ((overload && overload.score >= 0.6) || (isFocusPath && context.notification_digest && context.notification_digest.total_count > 0)) {
+      const noisyThreads = (context.notification_digest?.top_threads || [])
+        .filter((t: any) => t.count >= (isFocusPath ? 1 : 3));
 
       candidates.push({
         id: "ACTION_SUPPRESS_NOISY_NOTIFICATIONS",
-        title: "Suppress noisy senders for 60 min",
-        description: "Temporarily filters low-priority notifications to reduce overload.",
+        title: isFocusPath ? "Enable Focus Filtering" : "Suppress noisy senders for 60 min",
+        description: isFocusPath
+          ? "Minimize cognitive load by filtering all non-essential notifications."
+          : "Temporarily filters low-priority notifications to reduce overload.",
         approvalMode: "ASK_FIRST",
-        reasons: overload.causes || [],
+        reasons: overload?.causes || ["Focus mode requested for this block"],
         sideEffects: ["Temporarily mutes selected apps"],
         category: "Focus",
         impact: "Reduces cognitive load during peak stress",
         metadata: {
-          noisyApps: noisyThreads.map(t => ({
+          noisyApps: noisyThreads.map((t: any) => ({
             name: t.sender,
             count: t.count,
             packageName: t.app_package
@@ -236,16 +246,19 @@ class PlannerEngine {
     }
 
     // Charging stop (from Futures)
+    const isChargePath = selectedScenarioId === "ALTERNATE";
     const threshold = memory.battery?.profile?.thresholds?.low ?? 20;
     const baseline = futures.futures.find(f => f.id === "DO_NOTHING");
-    
-    if (baseline && baseline.metrics.batteryPercent !== undefined && baseline.metrics.batteryPercent < (threshold * 100)) {
+
+    if (isChargePath || (baseline && baseline.metrics.batteryPercent !== undefined && baseline.metrics.batteryPercent < (threshold * 100))) {
       candidates.push({
         id: "ACTION_RECOMMEND_CHARGING_STOP",
-        title: "Plan a charging stop",
-        description: "A brief 15-min charge at a nearby station is recommended to ensure you reach your destination.",
+        title: isChargePath ? "Plan a brief charging stop" : "Emergency charging stop",
+        description: isChargePath 
+          ? "Charge for 15 minutes before leaving. This strategy prioritizes device safety over a minor delay."
+          : "Battery is critical. A brief 15-min charge at a nearby station is required to ensure arrival.",
         approvalMode: "ASK_FIRST",
-        reasons: [`Battery predicted to drop to ${Math.round(baseline.metrics.batteryPercent)}% by the end of this block`],
+        reasons: isChargePath ? ["Prioritize battery buffer"] : [`Battery predicted to drop to ${Math.round(baseline?.metrics.batteryPercent || 0)}%`],
         sideEffects: ["Slightly changes route or departure time"],
         category: "Commute",
         impact: "Prevents total battery depletion before arrival"
@@ -292,9 +305,11 @@ class PlannerEngine {
       priorities = ["ACTION_SUPPRESS_NOISY_NOTIFICATIONS", ...priorities.filter(p => p !== "ACTION_SUPPRESS_NOISY_NOTIFICATIONS")];
     }
 
-    const preferred = [...candidates].sort((a, b) =>
-      priorities.indexOf(a.id) - priorities.indexOf(b.id)
-    );
+    const preferred = [...candidates].sort((a, b) => {
+      const baseA = a.id.split(':')[0] as ActionId;
+      const baseB = b.id.split(':')[0] as ActionId;
+      return priorities.indexOf(baseA) - priorities.indexOf(baseB);
+    });
 
     return preferred[0];
   }

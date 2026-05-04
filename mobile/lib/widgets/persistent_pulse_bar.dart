@@ -31,9 +31,10 @@ class _PersistentPulseBarState extends State<PersistentPulseBar>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.75, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
-    );
+    _pulseAnim = Tween<double>(
+      begin: 0.75,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -70,19 +71,35 @@ class _PersistentPulseBarState extends State<PersistentPulseBar>
             color: const Color(0xFF14141E),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: glowColor.withOpacity(isCritical ? 0.70 : isAction ? 0.50 : 0.35),
+              color: glowColor.withValues(
+                alpha: isCritical
+                    ? 0.70
+                    : isAction
+                    ? 0.50
+                    : 0.35,
+              ),
               width: isCritical ? 1.5 : 1.0,
             ),
             boxShadow: [
               BoxShadow(
-                color: glowColor.withOpacity(isCritical ? 0.40 : isAction ? 0.25 : 0.12),
-                blurRadius: isCritical ? 28 : isAction ? 18 : 10,
+                color: glowColor.withValues(
+                  alpha: isCritical
+                      ? 0.40
+                      : isAction
+                      ? 0.25
+                      : 0.12,
+                ),
+                blurRadius: isCritical
+                    ? 28
+                    : isAction
+                    ? 18
+                    : 10,
                 spreadRadius: isCritical ? 2 : 0,
                 offset: const Offset(0, 2),
               ),
               // Subtle upward shadow for depth
               BoxShadow(
-                color: Colors.black.withOpacity(0.55),
+                color: Colors.black.withValues(alpha: 0.55),
                 blurRadius: 12,
                 offset: const Offset(0, -2),
               ),
@@ -152,9 +169,12 @@ class _PersistentPulseBarState extends State<PersistentPulseBar>
                 else
                   // State label badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: glowColor.withOpacity(0.12),
+                      color: glowColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -176,7 +196,8 @@ class _PersistentPulseBarState extends State<PersistentPulseBar>
         if (isCritical) {
           bar = AnimatedBuilder(
             animation: _pulseAnim,
-            builder: (_, child) => Opacity(opacity: _pulseAnim.value, child: child),
+            builder: (_, child) =>
+                Opacity(opacity: _pulseAnim.value, child: child),
             child: bar,
           );
         }
@@ -196,19 +217,27 @@ class _PersistentPulseBarState extends State<PersistentPulseBar>
 
   Color _stateColor(String state) {
     switch (state) {
-      case 'CRITICAL':      return const Color(0xFFFF4444);
-      case 'ACTION_NEEDED': return const Color(0xFF4A9EFF);
-      case 'RISK_FORMING':  return const Color(0xFFFFB830);
-      default:              return const Color(0xFF44FF88);
+      case 'CRITICAL':
+        return const Color(0xFFFF4444);
+      case 'ACTION_NEEDED':
+        return const Color(0xFF4A9EFF);
+      case 'RISK_FORMING':
+        return const Color(0xFFFFB830);
+      default:
+        return const Color(0xFF44FF88);
     }
   }
 
   String _stateLabel(String state) {
     switch (state) {
-      case 'CRITICAL':      return 'CRITICAL';
-      case 'ACTION_NEEDED': return 'ACT NOW';
-      case 'RISK_FORMING':  return 'WATCH';
-      default:              return 'NOMINAL';
+      case 'CRITICAL':
+        return 'CRITICAL';
+      case 'ACTION_NEEDED':
+        return 'ACT NOW';
+      case 'RISK_FORMING':
+        return 'WATCH';
+      default:
+        return 'NOMINAL';
     }
   }
 }
@@ -236,9 +265,10 @@ class _StateDotState extends State<_StateDot>
       vsync: this,
       duration: const Duration(milliseconds: 700),
     );
-    _scale = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
+    _scale = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
     if (widget.animate) _ctrl.repeat(reverse: true);
   }
 
@@ -271,7 +301,7 @@ class _StateDotState extends State<_StateDot>
           color: widget.color,
           boxShadow: [
             BoxShadow(
-              color: widget.color.withOpacity(0.75),
+              color: widget.color.withValues(alpha: 0.75),
               blurRadius: 7,
               spreadRadius: 1,
             ),
@@ -302,9 +332,9 @@ class _CtaButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.18),
+          color: color.withValues(alpha: 0.18),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.55), width: 1),
+          border: Border.all(color: color.withValues(alpha: 0.55), width: 1),
         ),
         child: Text(
           label,

@@ -136,8 +136,8 @@ class _FuturesScreenState extends State<FuturesScreen> {
     final color = stressScore > 0.7
         ? AppColors.danger
         : stressScore > 0.4
-            ? Colors.orangeAccent
-            : AppColors.success;
+        ? Colors.orangeAccent
+        : AppColors.success;
 
     final lateness = metrics['expectedLatenessMinutes'] ?? 0;
     final eta = metrics['etaMinutes'] ?? 0;
@@ -207,11 +207,7 @@ class _FuturesScreenState extends State<FuturesScreen> {
                 color,
               ),
             if (transport != null)
-              _metricRow(
-                LucideIcons.car,
-                "Via: $transport",
-                color,
-              ),
+              _metricRow(LucideIcons.car, "Via: $transport", color),
             if ((metrics['missedCommitments'] ?? 0) > 0)
               _metricRow(
                 LucideIcons.calendarX,
@@ -224,18 +220,15 @@ class _FuturesScreenState extends State<FuturesScreen> {
               color,
             ),
             if (notifs > 0)
-              _metricRow(
-                LucideIcons.bell,
-                "+$notifs new notifications",
-                color,
-              ),
+              _metricRow(LucideIcons.bell, "+$notifs new notifications", color),
             if (overlaps > 0)
               _metricRow(
                 LucideIcons.layers,
                 "$overlaps overlapping blocks",
                 color,
               ),
-            if (metrics['alternateModes'] != null && (metrics['alternateModes'] as List).isNotEmpty)
+            if (metrics['alternateModes'] != null &&
+                (metrics['alternateModes'] as List).isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 16),
                 child: Column(
@@ -256,22 +249,31 @@ class _FuturesScreenState extends State<FuturesScreen> {
                       runSpacing: 8,
                       children: (metrics['alternateModes'] as List).map((m) {
                         return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
+                            color: Colors.white.withValues(alpha: 0.05),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.white.withOpacity(0.1)),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.1),
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(_getModeIcon(m['mode'] ?? ""), size: 12, color: color.withOpacity(0.7)),
+                              Icon(
+                                _getModeIcon(m['mode'] ?? ""),
+                                size: 12,
+                                color: color.withValues(alpha: 0.7),
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 "${m['mode']}: ${m['etaMinutes']}m",
                                 style: GoogleFonts.outfit(
                                   fontSize: 11,
-                                  color: Colors.white.withOpacity(0.8),
+                                  color: Colors.white.withValues(alpha: 0.8),
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),

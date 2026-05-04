@@ -250,6 +250,13 @@ class InterventionScreen extends StatelessWidget {
         if (focus.isNotEmpty) _buildCategoryHeader("Focus", LucideIcons.brain),
         ...focus.map((a) => _buildActionRow(context, state, a)),
 
+        if (comms.isNotEmpty)
+          _buildCategoryHeader("Communication", LucideIcons.messageSquare),
+        ...comms.map((a) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: CommActionCard(action: a),
+            )),
+
         if (general.isNotEmpty)
           _buildCategoryHeader("Other", LucideIcons.moreHorizontal),
         ...general.map((a) => _buildActionRow(context, state, a)),
@@ -279,8 +286,9 @@ class InterventionScreen extends StatelessWidget {
   }
 
   Widget _buildActionRow(BuildContext context, AppState state, dynamic action) {
-    final isAccepted = state.isActionAccepted(action['id']);
-    final isDismissed = state.isActionDismissed(action['id']);
+    final String actionId = action['id'] ?? "";
+    final isAccepted = state.isActionAccepted(actionId);
+    final isDismissed = state.isActionDismissed(actionId);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -290,7 +298,7 @@ class InterventionScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
-              _getIconForAction(action['id']),
+              _getIconForAction(actionId),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -360,23 +368,24 @@ class InterventionScreen extends StatelessWidget {
     );
   }
 
-  Widget _getIconForAction(String id) {
+  Widget _getIconForAction(String? id) {
+    final String actionId = id ?? "";
     IconData iconData = LucideIcons.zap;
     Color color = AppColors.primary;
 
-    if (id.contains("LEAVE")) {
+    if (actionId.contains("LEAVE")) {
       iconData = LucideIcons.car;
       color = Colors.blueAccent;
-    } else if (id.contains("BATTERY")) {
+    } else if (actionId.contains("BATTERY")) {
       iconData = LucideIcons.battery;
       color = AppColors.warning;
-    } else if (id.contains("NOTIFICATIONS")) {
+    } else if (actionId.contains("NOTIFICATIONS")) {
       iconData = LucideIcons.bellOff;
       color = Colors.deepPurpleAccent;
-    } else if (id.contains("MESSAGE")) {
+    } else if (actionId.contains("MESSAGE")) {
       iconData = LucideIcons.messageSquare;
       color = AppColors.success;
-    } else if (id.contains("CHARGING")) {
+    } else if (actionId.contains("CHARGING")) {
       iconData = LucideIcons.zap;
       color = Colors.amber;
     }
@@ -430,7 +439,14 @@ class InterventionScreen extends StatelessWidget {
     String message = "Plan updated; Pulse will track ETA against this.";
 
     if (id.contains("NOTIFICATIONS")) {
-      message = "Noisy senders muted for 60 minutes.";
+      message = "Focus mode active. Adjusting notification settings...";
+      final metadata = action['metadata'];
+      if (metadata != null && metadata['noisyApps'] != null) {
+        final apps = metadata['noisyApps'] as List;
+        if (apps.isNotEmpty && apps[0]['packageName'] != null) {
+          _openAppNotificationSettings(apps[0]['packageName']);
+        }
+      }
     } else if (id.contains("BATTERY_SAVER")) {
       message = "Redirecting to Battery settings...";
       if (Platform.isAndroid) {
@@ -659,7 +675,7 @@ class _CommActionCardState extends State<CommActionCard> {
     });
     final state = Provider.of<AppState>(context, listen: false);
     final prepared = await state.prepareCommAction(
-      widget.action['actionId'],
+      widget.action['id'],
       role: _selectedRole,
     );
     if (prepared != null) {
@@ -685,7 +701,7 @@ class _CommActionCardState extends State<CommActionCard> {
 
     if (await canLaunchUrl(smsUri)) {
       await launchUrl(smsUri);
-      state.completeCommAction(widget.action['actionId']);
+      state.completeCommAction(widget.action['id']);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Could not launch messaging app")),
@@ -696,7 +712,8 @@ class _CommActionCardState extends State<CommActionCard> {
   @override
   Widget build(BuildContext context) {
     final state = Provider.of<AppState>(context);
-    final isAccepted = state.isActionAccepted(widget.action['actionId']);
+    final String actionId = widget.action['id'] ?? "";
+    final isAccepted = state.isActionAccepted(actionId);
 
     return GlassCard(
       padding: const EdgeInsets.all(20),
