@@ -5,6 +5,7 @@ import { riskEngine } from "./RiskEngineService";
 import { futuresEngine } from "./FuturesEngine";
 import { plannerEngine } from "./PlannerEngine";
 import { guardianAgent } from "../../../agents/guardian";
+import { plannerRepo } from "../db/PlannerRepository";
 import { heartbeatRepo } from "../db/HeartbeatRepository";
 import { logEvent } from "../utils/logger";
 import { computeNextHeartbeatDelay } from "./HeartbeatPolicy";
@@ -94,7 +95,8 @@ export class HeartbeatOrchestrator {
     });
 
     // 5. Planner
-    const decision = await plannerEngine.decideForUser(userId);
+    const activeScenario = memory.status?.active_scenario || "RECOMMENDED";
+    const decision = await plannerEngine.decideForUser(userId, activeScenario);
     logEvent({
       ts: new Date().toISOString(),
       userId,
@@ -119,6 +121,7 @@ export class HeartbeatOrchestrator {
     await memoryAgent.onHeartbeat(userId);
 
     // 8. Persist an audit record
+    await plannerRepo.save(decision);
     await heartbeatRepo.save({
       userId,
       startedAt: t0,

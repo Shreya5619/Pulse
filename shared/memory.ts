@@ -136,5 +136,8 @@ export type MemoryState = {
   battery: BatteryMemory | null;
   commute: CommuteMemory | null;
   notifications: NotificationMemory | null;
+  status?: {
+    active_scenario?: string;
+  };
 };
 

@@ -12,7 +12,7 @@ import { routingService } from "./RoutingService";
 import { graphBuilder } from "./GraphBuilder";
 
 class PlannerEngine {
-  async decideForUser(userId: string): Promise<PlannerDecision> {
+  async decideForUser(userId: string, selectedScenarioId: string = "RECOMMENDED"): Promise<PlannerDecision> {
     const now = new Date().toISOString();
     const riskSnapshot = await riskEngine.computeForUser(userId);
     const futures = await futuresEngine.computeForUser(userId);
@@ -21,7 +21,7 @@ class PlannerEngine {
     const personality = await GraphAdapter.getUserPersonality(userId);
 
     const candidates = await this.buildCandidates(riskSnapshot, futures, memory, context, personality);
-    const chosen = this.pickBest(candidates, memory, personality);
+    const chosen = this.pickBest(candidates, memory, personality, selectedScenarioId);
 
     return {
       userId,
@@ -210,14 +210,16 @@ class PlannerEngine {
     }
 
     // Charging stop (from Futures)
-    const alt = futures.futures.find(f => f.id === "ALTERNATE");
-    if (alt && alt.metrics.batteryPercent !== undefined && alt.metrics.batteryPercent > 20) {
+    const threshold = memory.battery?.profile?.thresholds?.low ?? 20;
+    const baseline = futures.futures.find(f => f.id === "DO_NOTHING");
+    
+    if (baseline && baseline.metrics.batteryPercent !== undefined && baseline.metrics.batteryPercent < (threshold * 100)) {
       candidates.push({
         id: "ACTION_RECOMMEND_CHARGING_STOP",
         title: "Plan a charging stop",
-        description: "A brief 15-min charge at a nearby station is recommended.",
+        description: "A brief 15-min charge at a nearby station is recommended to ensure you reach your destination.",
         approvalMode: "ASK_FIRST",
-        reasons: [`Alternate future keeps battery at ~${Math.round(alt.metrics.batteryPercent)}%`],
+        reasons: [`Battery predicted to drop to ${Math.round(baseline.metrics.batteryPercent)}% by the end of this block`],
         sideEffects: ["Slightly changes route or departure time"],
         category: "Commute",
         impact: "Prevents total battery depletion before arrival"
@@ -227,7 +229,12 @@ class PlannerEngine {
     return candidates;
   }
 
-  private pickBest(candidates: PlannerAction[], memory: MemoryState, personality?: PersonalityAnalysis): PlannerAction | null {
+  private pickBest(candidates: PlannerAction[], memory: MemoryState, personality?: PersonalityAnalysis, selectedScenarioId: string = "RECOMMENDED"): PlannerAction | null {
+    if (selectedScenarioId === "DO_NOTHING") {
+      console.log("[Planner] User selected DO_NOTHING path, suppressing interventions.");
+      return null;
+    }
+
     if (candidates.length === 0) return null;
 
     // Default priority order: lateness > battery > overload/response
@@ -239,6 +246,16 @@ class PlannerEngine {
       "ACTION_SUPPRESS_NOISY_NOTIFICATIONS",
       "ACTION_PREPARE_DELAY_MESSAGE"
     ];
+
+    // If user chose ALTERNATE (Focus Path), prioritize focus/battery actions over travel
+    if (selectedScenarioId === "ALTERNATE") {
+      priorities = [
+        "ACTION_SUPPRESS_NOISY_NOTIFICATIONS",
+        "ACTION_ENABLE_BATTERY_SAVER",
+        "ACTION_PREPARE_DELAY_MESSAGE",
+        ...priorities.filter(p => !["ACTION_SUPPRESS_NOISY_NOTIFICATIONS", "ACTION_ENABLE_BATTERY_SAVER", "ACTION_PREPARE_DELAY_MESSAGE"].includes(p))
+      ];
+    }
 
     // Adjust priorities based on personality traits
     if (personality?.traits.includes("Goal-oriented")) {

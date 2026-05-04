@@ -26,13 +26,16 @@ class RouteEtaStrip extends StatelessWidget {
           );
         }
 
-        final isAtRisk = eta.latenessRisk == 'at_risk' || eta.latenessRisk == 'HIGH';
+        final isAtRisk =
+            eta.latenessRisk == 'at_risk' || eta.latenessRisk == 'HIGH';
         final color = isAtRisk ? AppColors.danger : AppColors.primary;
 
         return GestureDetector(
           onTap: () => _showRouteDetails(context, state),
           child: Container(
-            margin: isMini ? EdgeInsets.zero : const EdgeInsets.symmetric(vertical: 4),
+            margin: isMini
+                ? EdgeInsets.zero
+                : const EdgeInsets.symmetric(vertical: 4),
             child: GlassCard(
               padding: EdgeInsets.all(isMini ? 12 : 16),
               borderColor: color.withValues(alpha: 0.2),
@@ -62,9 +65,14 @@ class RouteEtaStrip extends StatelessWidget {
                             if (isAtRisk) ...[
                               const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: AppColors.danger.withValues(alpha: 0.2),
+                                  color: AppColors.danger.withValues(
+                                    alpha: 0.2,
+                                  ),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
@@ -82,7 +90,11 @@ class RouteEtaStrip extends StatelessWidget {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Icon(LucideIcons.mapPin, size: 10, color: Colors.white30),
+                            Icon(
+                              LucideIcons.mapPin,
+                              size: 10,
+                              color: Colors.white30,
+                            ),
                             const SizedBox(width: 4),
                             Flexible(
                               child: Text(
@@ -185,51 +197,6 @@ class RouteEtaStrip extends StatelessWidget {
     );
   }
 
-  Widget _buildFallbackStrip(BuildContext context, String message) {
-    String displayMessage = message;
-    IconData icon = LucideIcons.mapPin;
-    
-    if (message == "No context") {
-      displayMessage = "Searching for context...";
-      icon = LucideIcons.loader;
-    } else if (message == "No event") {
-      displayMessage = "No travel needed in next 2 hours.";
-      icon = LucideIcons.calendarCheck;
-    } else if (message == "No event location") {
-      displayMessage = "Add location to next event to see ETA.";
-      icon = LucideIcons.map;
-    }
-
-    return GlassCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          Icon(icon, size: 14, color: Colors.white24),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              displayMessage,
-              style: GoogleFonts.outfit(
-                fontSize: 11, 
-                color: Colors.white30,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          if (message == "No event location")
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Icon(LucideIcons.plus, size: 10, color: AppColors.primary),
-            ),
-        ],
-      ),
-    );
-  }
-
   void _showRouteDetails(BuildContext context, AppState state) {
     showModalBottomSheet(
       context: context,
@@ -237,6 +204,31 @@ class RouteEtaStrip extends StatelessWidget {
       isScrollControlled: true,
       barrierColor: Colors.black54,
       builder: (context) => RouteDetailBottomSheet(eta: state.etaInfo),
+    );
+  }
+
+  Widget _buildFallbackStrip(BuildContext context, String message) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: GlassCard(
+        padding: const EdgeInsets.all(16),
+        borderColor: Colors.white10,
+        child: Row(
+          children: [
+            const Icon(LucideIcons.map, size: 18, color: Colors.white24),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.outfit(
+                  fontSize: 14,
+                  color: Colors.white30,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

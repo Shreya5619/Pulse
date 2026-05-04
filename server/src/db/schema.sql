@@ -58,6 +58,14 @@ CREATE TABLE IF NOT EXISTS memory_commute (
     source TEXT
 );
 
+CREATE TABLE IF NOT EXISTS memory_status (
+    user_id TEXT PRIMARY KEY,
+    data JSONB NOT NULL,
+    schema_version INTEGER DEFAULT 1,
+    last_updated TIMESTAMPTZ DEFAULT NOW(),
+    source TEXT
+);
+
 -- Risk Snapshots — point-in-time risk assessments
 CREATE TABLE IF NOT EXISTS risk_snapshots (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

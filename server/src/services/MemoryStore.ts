@@ -37,7 +37,7 @@ export class MemoryStore {
       notifications: null
     };
 
-    const types: (keyof MemoryState)[] = ['identity', 'habits', 'battery', 'commute', 'notifications'];
+    const types: (keyof MemoryState)[] = ['identity', 'habits', 'battery', 'commute', 'notifications', 'status'];
 
     for (const type of types) {
       const filePath = path.join(userDir, `${type}.yaml`);

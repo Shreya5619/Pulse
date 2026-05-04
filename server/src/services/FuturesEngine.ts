@@ -40,7 +40,7 @@ class FuturesEngine {
         userId,
         baseTime,
         horizonMinutes,
-        futures: this.buildIdleFutures(memory)
+        futures: this.buildIdleFutures(memory, 80) // Default to 80 if no context
       };
     }
 
@@ -50,7 +50,7 @@ class FuturesEngine {
         userId,
         baseTime,
         horizonMinutes,
-        futures: this.buildIdleFutures(memory)
+        futures: this.buildIdleFutures(memory, context.battery.level * 100)
       };
     }
 
@@ -163,7 +163,11 @@ class FuturesEngine {
     return (maxScore * 0.7 + avgScore * 0.3);
   }
 
-  private buildIdleFutures(memory: MemoryState): FutureCard[] {
+  private buildIdleFutures(memory: MemoryState, baseBattery: number): FutureCard[] {
+    const drainNormal = this.predictBattery(baseBattery, 120, 'idle', memory, false);
+    const drainSaver = this.predictBattery(baseBattery, 120, 'idle', memory, true);
+    const drainAggressive = this.predictBattery(baseBattery, 120, 'mixed', memory, false);
+
     return [
       {
         id: "DO_NOTHING",
@@ -172,7 +176,7 @@ class FuturesEngine {
         metrics: {
           endTime: new Date(Date.now() + 120 * 60000).toISOString(),
           etaMinutes: 0,
-          batteryPercent: 88,
+          batteryPercent: Math.round(drainNormal),
           expectedLatenessMinutes: 0,
           missedCommitments: 0,
           notificationCount: 12,
@@ -188,7 +192,7 @@ class FuturesEngine {
         metrics: {
           endTime: new Date(Date.now() + 120 * 60000).toISOString(),
           etaMinutes: 0,
-          batteryPercent: 92,
+          batteryPercent: Math.round(drainSaver),
           expectedLatenessMinutes: 0,
           missedCommitments: 0,
           notificationCount: 4,
@@ -204,7 +208,7 @@ class FuturesEngine {
         metrics: {
           endTime: new Date(Date.now() + 120 * 60000).toISOString(),
           etaMinutes: 0,
-          batteryPercent: 85,
+          batteryPercent: Math.round(drainAggressive),
           expectedLatenessMinutes: 0,
           missedCommitments: 0,
           notificationCount: 2,

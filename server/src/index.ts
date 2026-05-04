@@ -47,6 +47,8 @@ app.use("/api/route", routeRouter);
 app.use("/api/twin", twinRouter);
 import dayPulseRouter from "./routes/dayPulse";
 app.use("/api", dayPulseRouter);
+import guardianRouter from "./routes/guardian";
+app.use("/api/guardian", guardianRouter);
 
 
 const httpServer = createServer(app);
