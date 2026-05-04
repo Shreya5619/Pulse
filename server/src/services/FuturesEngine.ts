@@ -92,8 +92,9 @@ class FuturesEngine {
 
     const route = await this.estimateRoute(context, nextEvent, memory, destLat, destLon);
     const baseBattery = context.battery.level * 100;
+    const powerSaverOn = context.battery.power_saver_on;
 
-    const futureParams = { userId, baseTime, nextEvent, route, baseBattery, memory, personality };
+    const futureParams = { userId, baseTime, nextEvent, route, baseBattery, powerSaverOn, memory, personality };
 
     const futureA = await this.simulateDoNothing(futureParams);
     const futureB = await this.simulateRecommended({ ...futureParams, multiMode });
@@ -140,11 +141,15 @@ class FuturesEngine {
     };
   }
 
-  private predictBattery(baseBattery: number, minutes: number, mode: 'navigation' | 'idle' | 'mixed', memory: MemoryState): number {
+  private predictBattery(baseBattery: number, minutes: number, mode: 'navigation' | 'idle' | 'mixed', memory: MemoryState, powerSaverOn: boolean = false): number {
     const dischargeRates = memory.battery?.profile?.discharge_rates || { active: 8, standby: 3 };
     let rate = dischargeRates.standby;
     if (mode === 'navigation') rate = dischargeRates.active * 1.5; // Heuristic boost for GPS
     if (mode === 'mixed') rate = (dischargeRates.active + dischargeRates.standby) / 2;
+
+    if (powerSaverOn) {
+      rate *= 0.6; // Power saver reduces drain by 40%
+    }
 
     const predicted = baseBattery - (rate * minutes / 60);
     return Math.max(0, predicted);
@@ -221,10 +226,11 @@ class FuturesEngine {
     nextEvent: CalendarEvent;
     route: RouteResult;
     baseBattery: number;
+    powerSaverOn: boolean;
     memory: MemoryState;
     personality: PersonalityAnalysis;
   }): Promise<FutureCard> {
-    const { nextEvent, route, baseBattery, memory, personality } = params;
+    const { nextEvent, route, baseBattery, powerSaverOn, memory, personality } = params;
 
     // Assume usual departure (e.g. 10 min before event)
     const departureOffset = memory.habits?.patterns?.typical_lateness ?? 5; // simplified
@@ -240,7 +246,7 @@ class FuturesEngine {
     const arrivalTime = actualDepartureTime + route.durationSeconds * 1000;
 
     const expectedLatenessMinutes = Math.max(0, (arrivalTime - eventStartTime) / 60000);
-    const batteryAtArrival = this.predictBattery(baseBattery, (arrivalTime - nowTime) / 60000, 'mixed', memory);
+    const batteryAtArrival = this.predictBattery(baseBattery, (arrivalTime - nowTime) / 60000, 'mixed', memory, powerSaverOn);
 
     // Synthetic risks
     const latenessRisk = assessLateness(
@@ -257,6 +263,7 @@ class FuturesEngine {
       (arrivalTime - nowTime) / 60000,
       memory.battery?.profile?.discharge_rates?.active ?? 8,
       false, // isCharging
+      powerSaverOn,
       "BATTERY", // nodeId
       [], // preferences
       personality
@@ -292,11 +299,12 @@ class FuturesEngine {
     nextEvent: CalendarEvent;
     route: RouteResult;
     baseBattery: number;
+    powerSaverOn: boolean;
     memory: MemoryState;
     personality: PersonalityAnalysis;
     multiMode: MultiModeRouteResult | null;
   }): Promise<FutureCard> {
-    let { nextEvent, route, baseBattery, memory, personality, multiMode } = params;
+    let { nextEvent, route, baseBattery, powerSaverOn, memory, personality, multiMode } = params;
 
     const allModes = multiMode ? [
       { name: "Car/Taxi", data: multiMode.car },
@@ -334,12 +342,8 @@ class FuturesEngine {
 
     const expectedLatenessMinutes = Math.max(0, (arrivalTime - eventStartTime) / 60000);
 
-    // Battery Saver Heuristic: 30% reduction in discharge
-    const saverMemory = JSON.parse(JSON.stringify(memory));
-    if (saverMemory.battery?.profile?.discharge_rates) {
-      saverMemory.battery.profile.discharge_rates.active *= 0.7;
-    }
-    const batteryAtArrival = this.predictBattery(baseBattery, (arrivalTime - nowTime) / 60000, 'navigation', saverMemory);
+    // RECOMMENDED scenario assumes battery saver is ON (either it was already on, or we turn it on)
+    const batteryAtArrival = this.predictBattery(baseBattery, (arrivalTime - nowTime) / 60000, 'navigation', memory, true);
 
     const latenessRisk = assessLateness(
       (eventStartTime - departureTime) / 60000,
@@ -353,8 +357,9 @@ class FuturesEngine {
     const batteryRisk = assessBattery(
       baseBattery,
       (arrivalTime - nowTime) / 60000,
-      saverMemory.battery?.profile?.discharge_rates?.active ?? 5.6,
+      memory.battery?.profile?.discharge_rates?.active ?? 8,
       false,
+      true, // Battery saver assumed in recommendation
       "BATTERY",
       [],
       personality
@@ -392,11 +397,12 @@ class FuturesEngine {
     nextEvent: CalendarEvent;
     route: RouteResult;
     baseBattery: number;
+    powerSaverOn: boolean;
     memory: MemoryState;
     personality: PersonalityAnalysis;
     multiMode: MultiModeRouteResult | null;
   }): Promise<FutureCard> {
-    let { nextEvent, route, baseBattery, memory, personality, multiMode } = params;
+    let { nextEvent, route, baseBattery, powerSaverOn, memory, personality, multiMode } = params;
 
     // Pick 2nd BEST mode if available, otherwise stick to Charge & Go logic but with a mode
     let transportMode = "Car/Taxi";
@@ -439,7 +445,7 @@ class FuturesEngine {
     const arrivalTime = departureTime + route.durationSeconds * 1000;
 
     const batteryAfterCharge = Math.min(100, baseBattery + (chargeDuration * chargeRate));
-    const batteryAtArrival = this.predictBattery(batteryAfterCharge, route.durationSeconds / 60, 'navigation', memory);
+    const batteryAtArrival = this.predictBattery(batteryAfterCharge, route.durationSeconds / 60, 'navigation', memory, powerSaverOn);
 
     const expectedLatenessMinutes = Math.max(0, (arrivalTime - eventStartTime) / 60000);
     const etaMinutes = route.durationSeconds / 60;

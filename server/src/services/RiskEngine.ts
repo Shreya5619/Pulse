@@ -115,12 +115,18 @@ export function batteryRisk(
   currentPct: number,
   horizonMinutes: number,
   dischargePerHour: number,
-  isCharging: boolean = false
+  isCharging: boolean = false,
+  powerSaverOn: boolean = false
 ): number {
   const chargePerHour = 20; // 20% per hour charging
+  let effectiveDischarge = dischargePerHour;
+  if (powerSaverOn) {
+    effectiveDischarge *= 0.6; // Heuristic: Power saver reduces consumption by 40%
+  }
+
   const delta = isCharging 
     ? (chargePerHour * horizonMinutes) / 60 
-    : -(dischargePerHour * horizonMinutes) / 60;
+    : -(effectiveDischarge * horizonMinutes) / 60;
     
   const predictedPct = currentPct + delta;
   if (predictedPct >= 30) return 0.1;
@@ -137,11 +143,12 @@ export function assessBattery(
   horizonMinutes: number,
   dischargePerHour: number,
   isCharging: boolean = false,
+  powerSaverOn: boolean = false,
   nodeId?: string,
   preferences: any[] = [],
   personality?: PersonalityAnalysis
 ): RiskScore {
-  let score = batteryRisk(currentPct, horizonMinutes, dischargePerHour, isCharging);
+  let score = batteryRisk(currentPct, horizonMinutes, dischargePerHour, isCharging, powerSaverOn);
 
   // Apply preferences
   const tolerance = preferences.find(p => p.category === 'BATTERY_TOLERANCE');
@@ -159,10 +166,13 @@ export function assessBattery(
   const delta = isCharging ? (chargePerHour * horizonMinutes) / 60 : -(dischargePerHour * horizonMinutes) / 60;
   const predictedPct = currentPct + delta;
 
+  let effectiveDischarge = dischargePerHour;
+  if (powerSaverOn) effectiveDischarge *= 0.6;
+
   const causes: string[] = [
     `Current battery: ${currentPct}%`,
-    `Status: ${isCharging ? 'Charging (+20%/hr)' : 'Discharging'}`,
-    `Typical drain: ${dischargePerHour}%/hr`,
+    `Status: ${isCharging ? 'Charging (+20%/hr)' : (powerSaverOn ? 'Battery Saver Active (-40% drain)' : 'Discharging')}`,
+    `Typical drain: ${effectiveDischarge.toFixed(1)}%/hr`,
     `Horizon: ${horizonMinutes.toFixed(1)} min`,
     `Predicted level at horizon: ${Math.max(0, Math.min(100, predictedPct)).toFixed(1)}%`,
   ];
@@ -172,7 +182,7 @@ export function assessBattery(
   }
 
   const summary =
-    `Battery ${currentPct}%, ${isCharging ? 'charging' : 'typical drain ' + dischargePerHour + '%/hr'}, ` +
+    `Battery ${currentPct}%, ${isCharging ? 'charging' : (powerSaverOn ? 'battery saver active' : 'typical drain ' + dischargePerHour + '%/hr')}, ` +
     `${horizonMinutes.toFixed(0)}min window; predicted ${Math.max(0, Math.min(100, predictedPct)).toFixed(0)}% → ${label} battery risk.`;
 
   return { type: "battery", score, label, nodeId, summary, causes };
@@ -327,11 +337,15 @@ export function assessActBattery(
   minutesToStart: number,
   dischargePerHour: number,
   isCharging: boolean,
+  powerSaverOn: boolean,
   eventLabel: string,
   nodeId?: string
 ): RiskScore {
   const chargeRate = 20; // 20% per hour charging
-  const delta = isCharging ? (chargeRate * minutesToStart) / 60 : -(dischargePerHour * minutesToStart) / 60;
+  let effectiveDischarge = dischargePerHour;
+  if (powerSaverOn) effectiveDischarge *= 0.6;
+  
+  const delta = isCharging ? (chargeRate * minutesToStart) / 60 : -(effectiveDischarge * minutesToStart) / 60;
   const predictedPct = currentPct + delta;
   
   // Stricter thresholds for Acts because they usually require the device active
@@ -344,7 +358,7 @@ export function assessActBattery(
   const causes = [
     `Target: "${eventLabel}" (ACT)`,
     `Current battery: ${currentPct}%`,
-    `Status: ${isCharging ? 'Charging (+20%/hr)' : 'Discharging'}`,
+    `Status: ${isCharging ? 'Charging (+20%/hr)' : (powerSaverOn ? 'Battery Saver Active (-40% drain)' : 'Discharging')}`,
     `Time to start: ${minutesToStart.toFixed(1)} min`,
     `Predicted level: ${Math.max(0, predictedPct).toFixed(1)}%`
   ];

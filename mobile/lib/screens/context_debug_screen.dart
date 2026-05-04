@@ -111,9 +111,23 @@ class ContextDebugScreen extends StatelessWidget {
                   color: Colors.white,
                 ),
               ),
-              Text(
-                battery.isCharging ? "Charging" : "Discharging",
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    battery.isCharging ? "Charging" : "Discharging",
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                  ),
+                  if (battery.isInBatterySaveMode)
+                    const Text(
+                      "Battery Saver Active",
+                      style: TextStyle(
+                        color: Colors.orangeAccent,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                ],
               ),
             ],
           ),

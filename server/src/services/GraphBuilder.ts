@@ -268,9 +268,10 @@ export class GraphBuilder {
         const currentPct = Math.round(context.battery.level * 100);
         const drainRate = memory.battery?.profile?.discharge_rates?.active ?? 8;
         const isCharging = context.battery.is_charging;
+        const powerSaverOn = context.battery.power_saver_on;
         
         // Populate battery score for this node specifically
-        node.scores.battery = assessActBattery(currentPct, minutesToStart, drainRate, isCharging, node.label).score;
+        node.scores.battery = assessActBattery(currentPct, minutesToStart, drainRate, isCharging, powerSaverOn, node.label).score;
       }
 
       // Battery — delegate to RiskEngine.batteryRisk
@@ -287,7 +288,7 @@ export class GraphBuilder {
             ? Math.max(0, (nextEventStart - nowTime) / 60000)
             : 120;
 
-        node.scores.battery = batteryRisk(currentPct, horizonMinutes, drainRate, context.battery.is_charging);
+        node.scores.battery = batteryRisk(currentPct, horizonMinutes, drainRate, context.battery.is_charging, context.battery.power_saver_on);
       }
 
       // Response Debt — delegate to RiskEngine.responseDebtRisk

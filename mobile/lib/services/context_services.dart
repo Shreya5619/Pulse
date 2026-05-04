@@ -56,9 +56,11 @@ class ContextServices {
   Stream<BatteryInfo> get batteryStream {
     return _battery.onBatteryStateChanged.asyncMap((state) async {
       final level = await _battery.batteryLevel;
+      final isSaveMode = await _battery.isInBatterySaveMode;
       return BatteryInfo(
         level: level,
         isCharging: state == BatteryState.charging,
+        isInBatterySaveMode: isSaveMode,
       );
     });
   }

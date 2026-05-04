@@ -60,101 +60,129 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildHeaderStrip(BuildContext context, AppState state) {
+    final battery = state.deviceContext.battery;
+    String modeText = "Normal";
+    IconData batteryIcon = LucideIcons.battery;
+    Color batteryColor = Colors.white30;
+
+    if (battery.isCharging) {
+      modeText = "Charging";
+      batteryIcon = LucideIcons.batteryCharging;
+      batteryColor = AppColors.success;
+    } else if (battery.isInBatterySaveMode) {
+      modeText = "Battery Saver";
+      batteryIcon = LucideIcons.batteryLow;
+      batteryColor = Colors.orangeAccent;
+    } else if (battery.level < 20) {
+      modeText = "Low";
+      batteryIcon = LucideIcons.batteryLow;
+      batteryColor = AppColors.danger;
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  const Icon(
-                    LucideIcons.playCircle,
-                    size: 14,
-                    color: AppColors.primary,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(batteryIcon, size: 14, color: batteryColor),
+                const SizedBox(width: 6),
+                Text(
+                  "${battery.level}% • $modeText",
+                  style: GoogleFonts.outfit(
+                    color: batteryColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(width: 6),
-                  GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ScenarioPlayerScreen(),
-                      ),
-                    ),
-                    child: const Text(
-                      "Simulation Mode",
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(
+                  LucideIcons.playCircle,
+                  size: 14,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ScenarioPlayerScreen(),
                     ),
                   ),
-                ],
-              ),
-            ],
-          ),
+                  child: const Text(
+                    "Simulation Mode",
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
         const SizedBox(width: 8),
-        Flexible(
-          flex: 0,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                icon: const Icon(
-                  LucideIcons.mapPin,
-                  size: 18,
-                  color: Colors.white30,
-                ),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const MultiModeEtaScreen(),
-                  ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(
+                LucideIcons.mapPin,
+                size: 18,
+                color: Colors.white30,
+              ),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MultiModeEtaScreen(),
                 ),
               ),
-              IconButton(
-                icon: const Icon(
-                  LucideIcons.calendar,
-                  size: 18,
-                  color: Colors.white30,
-                ),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const GanttScreen()),
+            ),
+            IconButton(
+              icon: const Icon(
+                LucideIcons.calendar,
+                size: 18,
+                color: Colors.white30,
+              ),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const GanttScreen()),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(
+                LucideIcons.list,
+                size: 18,
+                color: Colors.white30,
+              ),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TimelineScreen(),
                 ),
               ),
-              IconButton(
-                icon: const Icon(
-                  LucideIcons.list,
-                  size: 18,
-                  color: Colors.white30,
-                ),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const TimelineScreen(),
-                  ),
+            ),
+            IconButton(
+              icon: const Icon(
+                LucideIcons.gitBranch,
+                size: 18,
+                color: Colors.white30,
+              ),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TwinGraphScreen(),
                 ),
               ),
-              IconButton(
-                icon: const Icon(
-                  LucideIcons.gitBranch,
-                  size: 18,
-                  color: Colors.white30,
-                ),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const TwinGraphScreen(),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ],
     );
@@ -398,8 +426,17 @@ class HomeScreen extends StatelessWidget {
           child: Row(
             children: [
               _contextChip(
-                LucideIcons.battery,
-                "Battery ${state.deviceContext.battery.level}%${state.deviceContext.battery.isCharging ? ' (Charging)' : ''}",
+                state.deviceContext.battery.isCharging
+                    ? LucideIcons.batteryCharging
+                    : (state.deviceContext.battery.isInBatterySaveMode
+                        ? LucideIcons.batteryLow
+                        : LucideIcons.battery),
+                "Battery ${state.deviceContext.battery.level}% (${state.deviceContext.battery.isCharging ? 'Charging' : (state.deviceContext.battery.isInBatterySaveMode ? 'Saver' : 'Normal')})",
+                color: state.deviceContext.battery.isCharging
+                    ? AppColors.success
+                    : (state.deviceContext.battery.isInBatterySaveMode
+                        ? Colors.orangeAccent
+                        : null),
               ),
               _contextChip(
                 LucideIcons.calendar,
@@ -449,22 +486,26 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _contextChip(IconData icon, String label) {
+  Widget _contextChip(IconData icon, String label, {Color? color}) {
+    final displayColor = color ?? Colors.white30;
     return Container(
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
+        color: displayColor.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: displayColor.withValues(alpha: 0.05)),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 12, color: Colors.white30),
+          Icon(icon, size: 12, color: displayColor),
           const SizedBox(width: 8),
           Text(
             label,
-            style: const TextStyle(color: Colors.white70, fontSize: 11),
+            style: TextStyle(
+              color: color != null ? color : Colors.white70,
+              fontSize: 11,
+            ),
           ),
         ],
       ),

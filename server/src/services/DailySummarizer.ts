@@ -145,7 +145,7 @@ export class DailySummarizer {
       const curr = snapshots[i];
       const timeDiffHours = (new Date(curr.timestamp).getTime() - new Date(prev.timestamp).getTime()) / (1000 * 60 * 60);
       
-      if (timeDiffHours > 0 && timeDiffHours < 4 && !curr.battery.is_charging && !prev.battery.is_charging) {
+      if (timeDiffHours > 0 && timeDiffHours < 4 && !curr.battery.is_charging && !prev.battery.is_charging && !curr.battery.power_saver_on && !prev.battery.power_saver_on) {
         const drop = (prev.battery.level - curr.battery.level) / timeDiffHours;
         if (drop >= 0) drops.push(drop);
       }

@@ -560,6 +560,7 @@ class AppState extends ChangeNotifier {
         battery: BatteryInfo(
           level: info.level,
           isCharging: info.isCharging,
+          isInBatterySaveMode: info.isInBatterySaveMode,
           trend: newTrend,
         ),
         location: _deviceContext.location,
@@ -878,6 +879,7 @@ class AppState extends ChangeNotifier {
             battery: BatteryInfo(
               level: cData['batteryPercent'] ?? _deviceContext.battery.level,
               isCharging: cData['isCharging'] ?? _deviceContext.battery.isCharging,
+              isInBatterySaveMode: cData['isInBatterySaveMode'] ?? _deviceContext.battery.isInBatterySaveMode,
               trend: _deviceContext.battery.trend,
             ),
             location: loc != null ? LocationInfo(latitude: loc['lat'], longitude: loc['lon'], status: cData['locationLabel'] ?? "Replay") : _deviceContext.location,
@@ -1219,7 +1221,7 @@ class AppState extends ChangeNotifier {
         "battery": {
           "level": _deviceContext.battery.level / 100.0,
           "is_charging": _deviceContext.battery.isCharging,
-          "power_saver_on": false,
+          "power_saver_on": _deviceContext.battery.isInBatterySaveMode,
         },
         "notification_digest": _generateNotificationDigest(),
         "device_state": {

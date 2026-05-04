@@ -129,9 +129,10 @@ export class RiskEngineService {
       const currentPct = graph.context.battery ? Math.round(graph.context.battery.level * 100) : 50;
       const drainRate = memory.battery?.profile?.discharge_rates?.active ?? 8;
       const isCharging = graph.context.battery?.is_charging ?? false;
+      const powerSaverOn = graph.context.battery?.power_saver_on ?? false;
       
       risks.push(
-        assessActBattery(currentPct, minutesToEvent, drainRate, isCharging, node.label, node.id)
+        assessActBattery(currentPct, minutesToEvent, drainRate, isCharging, powerSaverOn, node.label, node.id)
       );
     }
 
@@ -144,6 +145,7 @@ export class RiskEngineService {
       const drainRate =
         memory.battery?.profile?.discharge_rates?.active ?? 8;
       const isCharging = graph.context.battery?.is_charging ?? false;
+      const powerSaverOn = graph.context.battery?.power_saver_on ?? false;
 
       // Horizon = minutes to next event or default 120
       const appointmentNodes = graph.nodes.filter(
@@ -162,7 +164,7 @@ export class RiskEngineService {
           : 120;
 
       risks.push(
-        assessBattery(currentPct, horizonMinutes, drainRate, isCharging, battNode.id, preferences, personality)
+        assessBattery(currentPct, horizonMinutes, drainRate, isCharging, powerSaverOn, battNode.id, preferences, personality)
       );
     }
 

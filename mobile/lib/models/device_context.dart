@@ -29,11 +29,13 @@ class DeviceContext {
 class BatteryInfo {
   final int level;
   final bool isCharging;
+  final bool isInBatterySaveMode;
   final List<int> trend; // Last 10 readings
 
   BatteryInfo({
     required this.level,
     required this.isCharging,
+    this.isInBatterySaveMode = false,
     this.trend = const [],
   });
 }
