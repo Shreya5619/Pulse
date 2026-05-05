@@ -6,18 +6,28 @@ import 'package:intl/intl.dart';
 import 'theme/app_theme.dart';
 import 'providers/app_state.dart';
 import 'screens/home_screen.dart';
-import 'screens/timeline_screen.dart';
 import 'screens/futures_screen.dart';
 import 'screens/intervention_screen.dart';
 import 'screens/digest_screen.dart';
-import 'screens/gantt_screen.dart';
-import 'screens/scenario_player_screen.dart';
 import 'screens/day_pulse_screen.dart';
+import 'screens/overlay_screen.dart';
 import 'theme/colors.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(
-    ChangeNotifierProvider(create: (_) => AppState(), child: const PulseApp()),
+    MultiProvider(
+      providers: [ChangeNotifierProvider(create: (_) => AppState())],
+      child: const PulseApp(),
+    ),
+  );
+}
+
+@pragma("vm:entry-point")
+void overlayMain() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(
+    const MaterialApp(debugShowCheckedModeBanner: false, home: OverlayScreen()),
   );
 }
 
@@ -67,20 +77,29 @@ class _MainShellState extends State<MainShell> {
               if (appState.isReplayMode)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-                  decoration: const BoxDecoration(
-                    color: Colors.amber,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 20,
                   ),
+                  decoration: const BoxDecoration(color: Colors.amber),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(
                         children: [
-                          const Icon(LucideIcons.playCircle, color: Colors.black, size: 16),
+                          const Icon(
+                            LucideIcons.playCircle,
+                            color: Colors.black,
+                            size: 16,
+                          ),
                           const SizedBox(width: 10),
                           Text(
                             "Replay mode: ${appState.currentScenarioName}",
-                            style: GoogleFonts.outfit(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12),
+                            style: GoogleFonts.outfit(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                       ),
@@ -88,20 +107,34 @@ class _MainShellState extends State<MainShell> {
                         children: [
                           Text(
                             "${appState.simulatedTime != null ? DateFormat.Hm().format(appState.simulatedTime!) : '08:35'} / 09:10",
-                            style: GoogleFonts.outfit(color: Colors.black, fontSize: 12, fontWeight: FontWeight.w600),
+                            style: GoogleFonts.outfit(
+                              color: Colors.black,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           const SizedBox(width: 16),
                           GestureDetector(
                             onTap: () => appState.stopReplay(),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
-                                border: Border.all(color: Colors.black, width: 1.5),
+                                border: Border.all(
+                                  color: Colors.black,
+                                  width: 1.5,
+                                ),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text(
                                 "Exit replay",
-                                style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),

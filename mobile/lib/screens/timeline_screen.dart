@@ -87,12 +87,14 @@ class _TimelineScreenState extends State<TimelineScreen> {
     AppState state,
   ) {
     if (_filter == "All") return events;
-    if (_filter == "Risks")
+    if (_filter == "Risks") {
       return events.where((e) => e.type == "Risk").toList();
-    if (_filter == "Actions")
+    }
+    if (_filter == "Actions") {
       return events
           .where((e) => e.type == "Action" || e.type == "Outcome")
           .toList();
+    }
     return events;
   }
 

@@ -74,16 +74,42 @@ class CalendarEvent {
 
 class NotificationInfo {
   final String packageName;
-  final String? title;
-  final String? text;
+  final String appName;
+  final String title;
+  final String text;
   final String category; // e.g., URGENT_OTP, IMPORTANT_SENDER, etc.
   final DateTime timestamp;
 
   NotificationInfo({
     required this.packageName,
-    this.title,
-    this.text,
+    required this.appName,
+    required this.title,
+    required this.text,
     this.category = "IGNORABLE",
     required this.timestamp,
   });
+
+  factory NotificationInfo.fromMap(Map<String, dynamic> map) {
+    return NotificationInfo(
+      packageName: map['packageName'] ?? 'unknown',
+      appName: map['appName'] ?? map['packageName'] ?? 'Unknown App',
+      title: map['title'] ?? 'No Title',
+      text: map['text'] ?? '',
+      category: map['category'] ?? 'IGNORABLE',
+      timestamp: map['time'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['time'])
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'packageName': packageName,
+      'appName': appName,
+      'title': title,
+      'text': text,
+      'category': category,
+      'timestamp': timestamp.toIso8601String(),
+    };
+  }
 }

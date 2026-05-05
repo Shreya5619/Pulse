@@ -15,6 +15,9 @@ class AppColors {
   static const Color warning = Color(0xFFFDC830);
   static const Color danger = Color(0xFFFF4B2B);
   
+  static const Color urgent = danger;
+  static const Color important = warning;
+  
   static const Color textPrimary = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0xFFB0B0CC);
   static const Color textMuted = Color(0xFF6E6E80);

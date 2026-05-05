@@ -22,13 +22,15 @@ Future<void> onNotificationEvent(NotificationEvent event) async {
     SendPort? uiPort;
     int attempts = 0;
     // Retry loop to give the main isolate time to register the port during startup/restart
-    while (uiPort == null && attempts < 20) {
+    while (uiPort == null && attempts < 50) {
       uiPort = IsolateNameServer.lookupPortByName(portName);
       if (uiPort == null) {
         await Future.delayed(const Duration(milliseconds: 100));
         attempts++;
       }
     }
+    
+    debugPrint('[Pulse Native] Port lookup finished after $attempts attempts. Found: ${uiPort != null}');
 
     if (uiPort != null) {
       uiPort.send({
@@ -40,7 +42,7 @@ Future<void> onNotificationEvent(NotificationEvent event) async {
       debugPrint('[Pulse Native] Successfully sent to main isolate port');
     } else {
       debugPrint(
-        '[Pulse Native] CRITICAL: UI Port NOT FOUND in background isolate after retries.',
+        '[Pulse Native] CRITICAL: UI Port NOT FOUND in background isolate after 50 retries (5s). Check if IsolateNameServer registration is working.',
       );
     }
   } catch (e) {
@@ -162,7 +164,8 @@ class ContextServices {
       // Register the port so the background isolate can find it
       IsolateNameServer.removePortNameMapping(portName);
       final ReceivePort uiReceivePort = ReceivePort();
-      IsolateNameServer.registerPortWithName(uiReceivePort.sendPort, portName);
+      bool registered = IsolateNameServer.registerPortWithName(uiReceivePort.sendPort, portName);
+      debugPrint('[Pulse Context] Port registration status: $registered');
 
       uiReceivePort.listen((data) {
         debugPrint(
