@@ -490,8 +490,8 @@ class FuturesEngine {
 
     return {
       id: "ALTERNATE",
-      title: multiMode && multiMode.car.durationSeconds > 0 ? `Switch to ${transportMode}` : "Charge & Go",
-      description: alternateDescription,
+      title: multiMode && multiMode.car.durationSeconds > 0 ? `Switch to ${transportMode} (Focus Path)` : "Charge & Go (Focus Path)",
+      description: `${alternateDescription} Focus filtering active to minimize distractions.`,
       metrics: {
         endTime: nextEvent.end_time,
         etaMinutes: Math.round(etaMinutes),

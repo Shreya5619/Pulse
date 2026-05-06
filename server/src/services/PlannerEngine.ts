@@ -203,9 +203,9 @@ class PlannerEngine {
 
     // Overload / notifications - More aggressive in Focus Path (Scenario C)
     const isFocusPath = selectedScenarioId === "ALTERNATE";
-    if ((overload && overload.score >= 0.6) || (isFocusPath && context.notification_digest && context.notification_digest.total_count > 0)) {
+    if ((overload && overload.score >= 0.6) || isFocusPath) {
       const noisyThreads = (context.notification_digest?.top_threads || [])
-        .filter((t: any) => t.count >= (isFocusPath ? 1 : 3));
+        .filter((t: any) => t.count >= (isFocusPath ? 0 : 3));
 
       candidates.push({
         id: "ACTION_SUPPRESS_NOISY_NOTIFICATIONS",
@@ -219,11 +219,13 @@ class PlannerEngine {
         category: "Focus",
         impact: "Reduces cognitive load during peak stress",
         metadata: {
-          noisyApps: noisyThreads.map((t: any) => ({
-            name: t.sender,
-            count: t.count,
-            packageName: t.app_package
-          }))
+          noisyApps: noisyThreads
+            .filter((t: any) => t.app_package !== 'com.pulse.pulse_mobile' && t.app_package !== 'com.android.systemui')
+            .map((t: any) => ({
+              name: t.sender,
+              count: t.count,
+              packageName: t.app_package
+            }))
         }
       });
     }

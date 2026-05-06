@@ -439,14 +439,8 @@ class InterventionScreen extends StatelessWidget {
     String message = "Plan updated; Pulse will track ETA against this.";
 
     if (id.contains("NOTIFICATIONS")) {
-      message = "Focus mode active. Adjusting notification settings...";
-      final metadata = action['metadata'];
-      if (metadata != null && metadata['noisyApps'] != null) {
-        final apps = metadata['noisyApps'] as List;
-        if (apps.isNotEmpty && apps[0]['packageName'] != null) {
-          _openAppNotificationSettings(apps[0]['packageName']);
-        }
-      }
+      message = "Focus mode active. Opening notification settings...";
+      state.openNotificationSettings();
     } else if (id.contains("BATTERY_SAVER")) {
       message = "Redirecting to Battery settings...";
       if (Platform.isAndroid) {
@@ -613,7 +607,7 @@ class InterventionScreen extends StatelessWidget {
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                     child: const Text(
-                      "SET MUTE",
+                      "MUTE",
                       style: TextStyle(
                         fontSize: 9,
                         color: AppColors.primary,
@@ -622,6 +616,24 @@ class InterventionScreen extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              onPressed: () =>
+                  Provider.of<AppState>(context, listen: false)
+                      .openNotificationSettings(),
+              icon: const Icon(LucideIcons.settings, size: 12),
+              label: const Text(
+                "OPEN GENERAL NOTIFICATION SETTINGS",
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(vertical: 8),
               ),
             ),
           ),
