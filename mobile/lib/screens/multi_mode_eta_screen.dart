@@ -51,8 +51,12 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
     final state = Provider.of<AppState>(context, listen: false);
     _destLatController = TextEditingController(text: _defaultToLat.toString());
     _destLonController = TextEditingController(text: _defaultToLon.toString());
-    _fromLatController = TextEditingController(text: state.deviceContext.location.latitude.toString());
-    _fromLonController = TextEditingController(text: state.deviceContext.location.longitude.toString());
+    _fromLatController = TextEditingController(
+      text: state.deviceContext.location.latitude.toString(),
+    );
+    _fromLonController = TextEditingController(
+      text: state.deviceContext.location.longitude.toString(),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fetchMultiModeETAs();
     });
@@ -78,10 +82,14 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
 
     try {
       final state = Provider.of<AppState>(context, listen: false);
-      
+
       // Use current device location if available, otherwise use defaults
-      double fromLat = double.tryParse(_fromLatController.text) ?? state.deviceContext.location.latitude;
-      double fromLon = double.tryParse(_fromLonController.text) ?? state.deviceContext.location.longitude;
+      double fromLat =
+          double.tryParse(_fromLatController.text) ??
+          state.deviceContext.location.latitude;
+      double fromLon =
+          double.tryParse(_fromLonController.text) ??
+          state.deviceContext.location.longitude;
 
       // Hardcoded destination or manual input
       double toLat = double.tryParse(_destLatController.text) ?? _defaultToLat;
@@ -90,16 +98,14 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
       // Extract dynamic backend configuration from AppState
       final host = _getBackendHost(state);
       final userId = state.userId;
-      final url = Uri.parse('http://$host:8080/api/routing/multi-mode-eta?userId=$userId&deviceId=$userId&fromLat=$fromLat&fromLon=$fromLon&toLat=$toLat&toLon=$toLon${force ? "&force=true" : ""}');
+      final url = Uri.parse(
+        'http://$host:8080/api/routing/multi-mode-eta?userId=$userId&deviceId=$userId&fromLat=$fromLat&fromLon=$fromLon&toLat=$toLat&toLon=$toLon${force ? "&force=true" : ""}',
+      );
 
       debugPrint('[MultiMode ETA] Fetching routes from: $url');
-      final response = await http.get(
-        url,
-        headers: {
-          'X-Device-Id': userId,
-          'X-User-Id': userId,
-        },
-      ).timeout(const Duration(seconds: 60));
+      final response = await http
+          .get(url, headers: {'X-Device-Id': userId, 'X-User-Id': userId})
+          .timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
@@ -111,23 +117,25 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
           return;
         }
       }
-      
+
       setState(() {
-        _errorMessage = "Failed to fetch routing analytics from Ola Maps (Status ${response.statusCode}).";
+        _errorMessage =
+            "Failed to fetch routing analytics from Ola Maps (Status ${response.statusCode}).";
         _isLoading = false;
       });
     } catch (e) {
       debugPrint('[MultiMode ETA] Network error: $e');
-      
+
       setState(() {
-        _errorMessage = "Connection error: ${e.toString()}\n\nNote: The Ola Maps API is heavily throttling parallel requests, which may take up to 50 seconds to resolve."; 
+        _errorMessage =
+            "Connection error: ${e.toString()}\n\nNote: The Ola Maps API is heavily throttling parallel requests, which may take up to 50 seconds to resolve.";
         _isLoading = false;
       });
     }
   }
 
   String _getBackendHost(AppState state) {
-    return '10.123.31.141';
+    return '172.20.10.5';
   }
 
   String _formatDuration(int seconds) {
@@ -150,15 +158,19 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
     final state = Provider.of<AppState>(context, listen: false);
     double toLat = double.tryParse(_destLatController.text) ?? _defaultToLat;
     double toLon = double.tryParse(_destLonController.text) ?? _defaultToLon;
-    double fromLat = double.tryParse(_fromLatController.text) ?? state.deviceContext.location.latitude;
-    double fromLon = double.tryParse(_fromLonController.text) ?? state.deviceContext.location.longitude;
-    
+    double fromLat =
+        double.tryParse(_fromLatController.text) ??
+        state.deviceContext.location.latitude;
+    double fromLon =
+        double.tryParse(_fromLonController.text) ??
+        state.deviceContext.location.longitude;
+
     setState(() {
       if (_selectedPreset == null) _toLocationName = "Custom Destination";
     });
 
     state.setSimulatedLocation(fromLat, fromLon, "Simulated Start");
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text("Simulation parameters synced to backend"),
@@ -166,32 +178,40 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
         behavior: SnackBarBehavior.floating,
       ),
     );
-    
+
     _fetchMultiModeETAs(force: true);
   }
 
   void _useCurrentLocation() {
-    // In a real scenario we'd use Geolocator. But for now, we'll try to get 
+    // In a real scenario we'd use Geolocator. But for now, we'll try to get
     // the 'Live' location if available, or just a default.
     // Note: AppState handles the actual live GPS updates in the background.
-      final state = Provider.of<AppState>(context, listen: false);
-      _fromLatController.text = state.deviceContext.location.latitude.toString();
-      _fromLonController.text = state.deviceContext.location.longitude.toString();
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Reset to Live coordinates")),
-    );
+    final state = Provider.of<AppState>(context, listen: false);
+    _fromLatController.text = state.deviceContext.location.latitude.toString();
+    _fromLonController.text = state.deviceContext.location.longitude.toString();
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text("Reset to Live coordinates")));
   }
+
   void _showEditPresetDialog({Map<String, dynamic>? preset}) {
     final nameController = TextEditingController(text: preset?['name'] ?? "");
-    final latController = TextEditingController(text: preset?['lat']?.toString() ?? "");
-    final lonController = TextEditingController(text: preset?['lon']?.toString() ?? "");
+    final latController = TextEditingController(
+      text: preset?['lat']?.toString() ?? "",
+    );
+    final lonController = TextEditingController(
+      text: preset?['lon']?.toString() ?? "",
+    );
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF0F1426),
-        title: Text(preset == null ? "Add Preset" : "Edit Preset", style: const TextStyle(color: Colors.white)),
+        title: Text(
+          preset == null ? "Add Preset" : "Edit Preset",
+          style: const TextStyle(color: Colors.white),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -203,7 +223,10 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
           TextButton(
             onPressed: () {
               if (nameController.text.isNotEmpty) {
@@ -223,7 +246,10 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
                 Navigator.pop(context);
               }
             },
-            child: const Text("Save", style: TextStyle(color: AppColors.primary)),
+            child: const Text(
+              "Save",
+              style: TextStyle(color: AppColors.primary),
+            ),
           ),
         ],
       ),
@@ -246,13 +272,13 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
           IconButton(
             icon: const Icon(LucideIcons.refreshCw),
             onPressed: _isLoading ? null : _fetchMultiModeETAs,
-          )
+          ),
         ],
       ),
       body: SafeArea(
-        child: _isLoading 
-          ? _buildLoader()
-          : _errorMessage != null
+        child: _isLoading
+            ? _buildLoader()
+            : _errorMessage != null
             ? _buildErrorView()
             : _buildContentGrid(),
       ),
@@ -282,7 +308,11 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(LucideIcons.alertTriangle, color: AppColors.danger, size: 48),
+            const Icon(
+              LucideIcons.alertTriangle,
+              color: AppColors.danger,
+              size: 48,
+            ),
             const SizedBox(height: 16),
             Text(
               _errorMessage ?? "An unexpected error occurred.",
@@ -298,7 +328,7 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.black,
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -316,7 +346,11 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
         children: [
           Text(
             "Live Commute Options",
-            style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+            style: GoogleFonts.outfit(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(height: 16),
           _buildLocationSummary(),
@@ -375,8 +409,12 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
 
   Widget _buildLocationSummary() {
     final state = Provider.of<AppState>(context);
-    double fromLat = double.tryParse(_fromLatController.text) ?? state.deviceContext.location.latitude;
-    double fromLon = double.tryParse(_fromLonController.text) ?? state.deviceContext.location.longitude;
+    double fromLat =
+        double.tryParse(_fromLatController.text) ??
+        state.deviceContext.location.latitude;
+    double fromLon =
+        double.tryParse(_fromLonController.text) ??
+        state.deviceContext.location.longitude;
 
     return GlassCard(
       padding: const EdgeInsets.all(16),
@@ -384,10 +422,21 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
         children: [
           InkWell(
             onTap: () {
-              _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: const Duration(milliseconds: 500), curve: Curves.easeOut);
+              _scrollController.animateTo(
+                _scrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeOut,
+              );
               _fromFocus.requestFocus();
             },
-            child: _locationRow(LucideIcons.mapPin, "FROM", state.deviceContext.location.status.isEmpty ? _fromLocationName : state.deviceContext.location.status, "(${fromLat.toStringAsFixed(4)}, ${fromLon.toStringAsFixed(4)})"),
+            child: _locationRow(
+              LucideIcons.mapPin,
+              "FROM",
+              state.deviceContext.location.status.isEmpty
+                  ? _fromLocationName
+                  : state.deviceContext.location.status,
+              "(${fromLat.toStringAsFixed(4)}, ${fromLon.toStringAsFixed(4)})",
+            ),
           ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8.0),
@@ -395,10 +444,19 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
           ),
           InkWell(
             onTap: () {
-              _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: const Duration(milliseconds: 500), curve: Curves.easeOut);
+              _scrollController.animateTo(
+                _scrollController.position.maxScrollExtent,
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeOut,
+              );
               _toFocus.requestFocus();
             },
-            child: _locationRow(LucideIcons.navigation, "TO", _toLocationName, "(${_destLatController.text}, ${_destLonController.text})"),
+            child: _locationRow(
+              LucideIcons.navigation,
+              "TO",
+              _toLocationName,
+              "(${_destLatController.text}, ${_destLonController.text})",
+            ),
           ),
         ],
       ),
@@ -414,12 +472,28 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(color: Colors.white30, fontSize: 10, letterSpacing: 1.1)),
-              Text(name, style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600)),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white30,
+                  fontSize: 10,
+                  letterSpacing: 1.1,
+                ),
+              ),
+              Text(
+                name,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
-        Text(coords, style: const TextStyle(color: AppColors.textMuted, fontSize: 10)),
+        Text(
+          coords,
+          style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+        ),
       ],
     );
   }
@@ -433,10 +507,19 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
           children: [
             Text(
               "DESTINATION PRESETS",
-              style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white30, letterSpacing: 1.2),
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.white30,
+                letterSpacing: 1.2,
+              ),
             ),
             IconButton(
-              icon: const Icon(LucideIcons.plusCircle, size: 16, color: Colors.white30),
+              icon: const Icon(
+                LucideIcons.plusCircle,
+                size: 16,
+                color: Colors.white30,
+              ),
               onPressed: () => _showEditPresetDialog(),
               tooltip: "Add New Preset",
             ),
@@ -446,12 +529,23 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
         const SizedBox(height: 24),
         Text(
           "MANUAL START (FROM)",
-          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white30, letterSpacing: 1.2),
+          style: GoogleFonts.outfit(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.white30,
+            letterSpacing: 1.2,
+          ),
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _buildCoordInput("Lat", _fromLatController, focusNode: _fromFocus)),
+            Expanded(
+              child: _buildCoordInput(
+                "Lat",
+                _fromLatController,
+                focusNode: _fromFocus,
+              ),
+            ),
             const SizedBox(width: 12),
             Expanded(child: _buildCoordInput("Lon", _fromLonController)),
             const SizedBox(width: 12),
@@ -466,12 +560,23 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
         const SizedBox(height: 16),
         Text(
           "MANUAL TARGET (TO)",
-          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white30, letterSpacing: 1.2),
+          style: GoogleFonts.outfit(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.white30,
+            letterSpacing: 1.2,
+          ),
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _buildCoordInput("Lat", _destLatController, focusNode: _toFocus)),
+            Expanded(
+              child: _buildCoordInput(
+                "Lat",
+                _destLatController,
+                focusNode: _toFocus,
+              ),
+            ),
             const SizedBox(width: 12),
             Expanded(child: _buildCoordInput("Lon", _destLonController)),
           ],
@@ -487,7 +592,9 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ),
@@ -509,19 +616,35 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: _selectedPreset,
-                hint: const Text("Select a preset destination", style: TextStyle(color: Colors.white30, fontSize: 14)),
+                hint: const Text(
+                  "Select a preset destination",
+                  style: TextStyle(color: Colors.white30, fontSize: 14),
+                ),
                 dropdownColor: const Color(0xFF0F1426),
                 isExpanded: true,
-                icon: const Icon(LucideIcons.chevronDown, color: Colors.white30),
+                icon: const Icon(
+                  LucideIcons.chevronDown,
+                  color: Colors.white30,
+                ),
                 items: _presets.map((p) {
                   return DropdownMenuItem<String>(
                     value: p['name'],
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(p['name'], style: const TextStyle(color: Colors.white, fontSize: 14)),
+                        Text(
+                          p['name'],
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
                         IconButton(
-                          icon: const Icon(LucideIcons.trash2, size: 14, color: Colors.redAccent),
+                          icon: const Icon(
+                            LucideIcons.trash2,
+                            size: 14,
+                            color: Colors.redAccent,
+                          ),
                           onPressed: () {
                             setState(() {
                               _presets.remove(p);
@@ -553,9 +676,15 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
         if (_selectedPreset != null) ...[
           const SizedBox(width: 8),
           IconButton(
-            icon: const Icon(LucideIcons.edit3, color: Colors.white30, size: 20),
+            icon: const Icon(
+              LucideIcons.edit3,
+              color: Colors.white30,
+              size: 20,
+            ),
             onPressed: () {
-              final preset = _presets.firstWhere((p) => p['name'] == _selectedPreset);
+              final preset = _presets.firstWhere(
+                (p) => p['name'] == _selectedPreset,
+              );
               _showEditPresetDialog(preset: preset);
             },
           ),
@@ -564,7 +693,11 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
     );
   }
 
-  Widget _buildCoordInput(String label, TextEditingController controller, {FocusNode? focusNode}) {
+  Widget _buildCoordInput(
+    String label,
+    TextEditingController controller, {
+    FocusNode? focusNode,
+  }) {
     return TextField(
       controller: controller,
       focusNode: focusNode,
@@ -574,7 +707,10 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
         labelStyle: const TextStyle(color: Colors.white30),
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.05),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),
       keyboardType: TextInputType.text,
@@ -618,11 +754,18 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(LucideIcons.shieldCheck, color: color.withValues(alpha: 0.7), size: 12),
+                    Icon(
+                      LucideIcons.shieldCheck,
+                      color: color.withValues(alpha: 0.7),
+                      size: 12,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       trafficLabel,
-                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -642,13 +785,10 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
               ),
               Text(
                 _formatDistance(meters),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textMuted,
-                ),
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
               ),
             ],
-          )
+          ),
         ],
       ),
     );

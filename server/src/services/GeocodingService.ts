@@ -4,7 +4,7 @@ export interface GeocodeResult {
   displayName: string;
 }
 
-class GeocodingService {
+export class GeocodingService {
   private readonly baseUrl = "https://nominatim.openstreetmap.org/search";
   private readonly olaBaseUrl = "https://api.olamaps.io/places/v1/geocode";
   private readonly olaApiKey: string | undefined;

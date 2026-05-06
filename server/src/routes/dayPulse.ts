@@ -2,6 +2,10 @@ import { Router, Request, Response } from "express";
 import { dayPulseService } from "../services/DayPulseService";
 import { userEventsRepo } from "../db/UserEventsRepository";
 import { routineRepo } from "../db/RoutineRepository";
+import { routingService } from "../services/RoutingService";
+import { geocodingService } from "../services/GeocodingService";
+import { runAgentPulseFlow } from "../services/PulseOrchestrator";
+import { broadcast } from "../index";
 
 const router = Router();
 
@@ -24,160 +28,285 @@ router.get("/day-pulse", async (req: Request, res: Response) => {
     }
 });
 
+async function resolveLocationAndEta(startLocation: any, locationText: string | undefined, destinationLocation?: any) {
+    let startLat = startLocation?.lat;
+    let startLon = startLocation?.lon;
+    
+    if ((!startLat || !startLon) && startLocation?.name) {
+        const geoStart = await geocodingService.geocode(startLocation.name);
+        if (geoStart) {
+            startLat = geoStart.lat;
+            startLon = geoStart.lon;
+        }
+    }
+
+    let destLat = destinationLocation?.lat;
+    let destLon = destinationLocation?.lon;
+    if ((!destLat || !destLon) && locationText) {
+        const geoDest = await geocodingService.geocode(locationText);
+        if (geoDest) {
+            destLat = geoDest.lat;
+            destLon = geoDest.lon;
+        }
+    }
+
+    let eta = null;
+    if (startLat && startLon && destLat && destLon) {
+        try {
+            const route = await routingService.getRoute(
+                { lat: startLat, lon: startLon },
+                { lat: destLat, lon: destLon }
+            );
+            eta = Math.ceil(route.durationSeconds / 60);
+        } catch (e) {
+            console.error("[DayPulseRoute] ETA calculation failed:", e);
+        }
+    }
+
+    return {
+        startLocation: startLat ? { lat: startLat, lon: startLon, name: startLocation?.name } : startLocation,
+        destinationLocation: destLat ? { lat: destLat, lon: destLon, name: locationText || destinationLocation?.name } : (locationText ? { name: locationText } : null),
+        eta
+    };
+}
+
 router.post("/day-pulse/modify", async (req: Request, res: Response) => {
     try {
-        const { userId: bodyUserId, deviceId, eventId, updates, isRecurring, days } = req.body;
+        const { userId: bodyUserId, deviceId, eventId, updates, isRecurring, days, date: reqDate } = req.body;
         const userId = req.header("X-User-Id") || bodyUserId || deviceId || "demo-user";
-        console.log(`[DayPulseRoute] Modifying event ${eventId} for user ${userId}:`, updates);
-        
-        if (isRecurring && days) {
-            // Ensure times are in HH:mm for the routine repository
-            const routineUpdates: any = { ...updates, days };
-            if (updates.startTime) {
-                if (updates.startTime.includes('T')) {
-                    routineUpdates.startTime = updates.startTime.split('T')[1].substring(0, 5);
-                } else {
-                    routineUpdates.startTime = updates.startTime;
-                }
-            }
-            if (updates.endTime) {
-                if (updates.endTime.includes('T')) {
-                    routineUpdates.endTime = updates.endTime.split('T')[1].substring(0, 5);
-                } else {
-                    routineUpdates.endTime = updates.endTime;
-                }
-            }
+        console.log(`[DayPulseRoute] Proposing modification for event ${eventId} for user ${userId}`);
 
-            // Check if this is an existing routine or a new conversion
-            const routines = await routineRepo.getForUser(userId);
-            const existingRoutine = routines.find(r => r.id === eventId);
-
-            if (existingRoutine) {
-                console.log(`[DayPulseRoute] Updating existing routine ${eventId}`);
-                await routineRepo.updateRoutine(userId, eventId, routineUpdates);
-            } else {
-                console.log(`[DayPulseRoute] Converting manual event ${eventId} to new routine`);
-                await routineRepo.addRoutine(userId, {
-                    title: updates.title || "New Routine",
-                    startTime: routineUpdates.startTime || "09:00",
-                    endTime: routineUpdates.endTime || "10:00",
-                    category: updates.category || 'buffer',
-                    days: days
-                });
-                // Also mark the original manual event as deleted/overridden so it doesn't double up
-                await userEventsRepo.addOverride(userId, { userId, eventId, updates: {}, isDeleted: true });
-            }
-        } else {
-            await userEventsRepo.addOverride(userId, { userId, eventId, updates });
-        }
-        
-        const date = new Date().toISOString().split('T')[0];
+        const date = reqDate || new Date().toISOString().split('T')[0];
         const timeline = await dayPulseService.getDailyTimeline(userId, date);
         
+        // Apply modification in memory
+        const block = timeline.blocks.find(b => b.eventId === eventId);
+        if (block) {
+            Object.assign(block, updates);
+            block.isProposed = true;
+            // Re-resolve location and ETA in memory
+            const { startLocation, destinationLocation, eta } = await resolveLocationAndEta(
+                updates.start_location || updates.startLocation || block.startLocation, 
+                updates.location_text || updates.locationText || block.locationText,
+                updates.destination_location || updates.destinationLocation
+            );
+            block.locationText = updates.location_text || updates.locationText || block.locationText;
+            block.etaMinutes = eta || block.etaMinutes;
+            block.startTime = updates.startTime || updates.start_time || block.startTime;
+            block.endTime = updates.endTime || updates.end_time || block.endTime;
+        }
+
         res.json({
             ok: true,
-            data: timeline,
-            message: "Schedule modified. All downstream risks re-calculated."
+            data: { ...timeline, isProposed: true },
+            message: "Modification proposed. Review and save permanently."
         });
     } catch (error) {
-        res.status(500).json({
-            ok: false,
-            error: "Could not modify schedule"
-        });
+        res.status(500).json({ ok: false, error: "Could not propose modification" });
     }
 });
 
 router.post("/day-pulse/add", async (req: Request, res: Response) => {
     try {
-        const { userId: bodyUserId, deviceId, event, isRecurring, days, category } = req.body;
+        const { userId: bodyUserId, deviceId, event, category, date: reqDate } = req.body;
         const userId = req.header("X-User-Id") || bodyUserId || deviceId || "demo-user";
-        console.log(`[DayPulseRoute] Adding manual event for user ${userId}:`, event.title);
-        if (isRecurring && days) {
-            // Extract HH:mm from ISO strings if they are ISO strings
-            let startStr = event.start_time;
-            let endStr = event.end_time;
-            
-            if (startStr.includes('T')) {
-                startStr = startStr.split('T')[1].substring(0, 5);
-            }
-            if (endStr.includes('T')) {
-                endStr = endStr.split('T')[1].substring(0, 5);
-            }
-            
-            await routineRepo.addRoutine(userId, {
-                title: event.title,
-                startTime: startStr,
-                endTime: endStr,
-                category: category || 'buffer',
-                days: days
-            });
-        } else {
-            await userEventsRepo.addManualEvent(userId, { ...event, category });
-        }
         
-        const date = new Date().toISOString().split('T')[0];
+        const date = reqDate || new Date().toISOString().split('T')[0];
         const timeline = await dayPulseService.getDailyTimeline(userId, date);
-        
-        res.json({
-            ok: true,
-            data: timeline,
-            message: "Event added to your pulse."
-        });
-    } catch (error) {
-        res.status(500).json({
-            ok: false,
-            error: "Could not add event"
-        });
-    }
-});
 
-router.post("/day-pulse/optimize", async (req: Request, res: Response) => {
-    try {
-        const { userId: bodyUserId, deviceId, date } = req.body;
-        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "demo-user";
-        const targetDate = date || new Date().toISOString().split('T')[0];
-        
-        const timeline = await dayPulseService.optimizeTimeline(userId, targetDate);
-        
+        const { startLocation, destinationLocation, eta } = await resolveLocationAndEta(
+            event.start_location || event.startLocation, 
+            event.location_text || event.locationText,
+            event.destination_location || event.destinationLocation
+        );
+
+        const newBlock: any = {
+            eventId: event.id || `manual_${Date.now()}`,
+            title: event.title,
+            startTime: event.start_time,
+            endTime: event.end_time,
+            type: 'act',
+            locationText: event.location_text || event.locationText,
+            etaMinutes: eta,
+            category: category || 'buffer',
+            isProposed: true,
+            risks: []
+        };
+
+        timeline.blocks.push(newBlock);
+        timeline.blocks.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
         res.json({
             ok: true,
-            data: timeline,
-            message: "Pulse optimized to minimize risks."
+            data: { ...timeline, isProposed: true },
+            message: "Event added as proposal."
         });
     } catch (error) {
-        res.status(500).json({
-            ok: false,
-            error: "Could not optimize pulse"
-        });
+        res.status(500).json({ ok: false, error: "Could not propose add" });
     }
 });
 
 router.post("/day-pulse/delete", async (req: Request, res: Response) => {
     try {
-        const { userId: bodyUserId, deviceId, eventId, isRoutine } = req.body;
+        const { userId: bodyUserId, deviceId, eventId, date: reqDate } = req.body;
         const userId = req.header("X-User-Id") || bodyUserId || deviceId || "demo-user";
-        console.log(`[DayPulseRoute] Deleting ${isRoutine ? 'routine' : 'event'} ${eventId} for user ${userId}`);
         
-        if (isRoutine) {
-            await routineRepo.deleteRoutine(userId, eventId);
-        } else {
-            // It could be a manual event or an override
-            await userEventsRepo.deleteManualEvent(userId, eventId);
-            await userEventsRepo.addOverride(userId, { userId, eventId, updates: {}, isDeleted: true });
+        const date = reqDate || new Date().toISOString().split('T')[0];
+        const timeline = await dayPulseService.getDailyTimeline(userId, date);
+        
+        const block = timeline.blocks.find(b => b.eventId === eventId);
+        if (block) {
+            block.isDeleted = true;
+            block.isProposed = true;
         }
+
+        res.json({
+            ok: true,
+            data: { ...timeline, isProposed: true },
+            message: "Deletion proposed."
+        });
+    } catch (error) {
+        res.status(500).json({ ok: false, error: "Could not propose delete" });
+    }
+});
+
+router.post("/day-pulse/persist", async (req: Request, res: Response) => {
+    try {
+        const { userId: bodyUserId, deviceId, blocks } = req.body;
+        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "demo-user";
         
-        const date = new Date().toISOString().split('T')[0];
+        console.log(`[DayPulseRoute] Persisting all changes for user ${userId}`);
+
+        for (const block of blocks) {
+            if (block.isProposed) {
+                if (block.isDeleted) {
+                    // Permanently delete or add override
+                    await userEventsRepo.deleteManualEvent(userId, block.eventId);
+                    await userEventsRepo.addOverride(userId, { userId, eventId: block.eventId, updates: {}, isDeleted: true });
+                } else if (block.eventId.startsWith('manual_') || block.eventId.startsWith('charge_')) {
+                    // Add new manual event
+                    await userEventsRepo.addManualEvent(userId, {
+                        id: block.eventId,
+                        title: block.title,
+                        start_time: block.startTime,
+                        end_time: block.endTime,
+                        location_text: block.locationText,
+                        location: null,
+                        importance: 'medium'
+                    } as any);
+                } else {
+                    // Add override for existing event or routine
+                    await userEventsRepo.addOverride(userId, {
+                        userId,
+                        eventId: block.eventId,
+                        updates: {
+                            title: block.title,
+                            start_time: block.startTime,
+                            end_time: block.endTime,
+                            location_text: block.locationText
+                        }
+                    });
+                }
+            }
+        }
+
+        const date = req.body.date || new Date().toISOString().split('T')[0];
         const timeline = await dayPulseService.getDailyTimeline(userId, date);
         
         res.json({
             ok: true,
             data: timeline,
-            message: "Item removed from your pulse."
+            message: "All changes saved permanently."
+        });
+
+        runAgentPulseFlow({ userId }, broadcast).catch(err => {
+            console.error("[DayPulseRoute] Error triggering flow after persist:", err);
         });
     } catch (error) {
+        console.error("[DayPulseRoute] Persist error:", error);
+        res.status(500).json({ ok: false, error: "Could not save changes" });
+    }
+});
+
+router.post("/pulse/action", async (req: Request, res: Response) => {
+    try {
+        const { userId: bodyUserId, deviceId, action } = req.body;
+        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "demo-user";
+        const actionId = action.id;
+
+        console.log(`[DayPulseRoute] Action dispatched: user=${userId}, actionId=${actionId}`);
+
+        if (actionId.includes("ACTION_RECOMMEND_CHARGING_STOP")) {
+            const date = new Date().toISOString().split('T')[0];
+            const timeline = await dayPulseService.getDailyTimeline(userId, date);
+            
+            const targetEventId = action.appliesToEventId;
+            const targetBlock = timeline.blocks.find(b => b.eventId === targetEventId) || 
+                                timeline.blocks.find(b => new Date(b.startTime) > new Date());
+
+            if (targetBlock) {
+                const sortedBlocks = timeline.blocks.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+                const targetIndex = sortedBlocks.findIndex(b => b.eventId === targetBlock.eventId);
+                
+                let chargingStart: Date;
+                let chargingEnd: Date;
+                const duration = 20 * 60000; // 20 mins for a decent charge
+
+                // Intelligent placement logic
+                if (targetIndex > 0) {
+                    const prevBlock = sortedBlocks[targetIndex - 1];
+                    const gap = new Date(targetBlock.startTime).getTime() - new Date(prevBlock.endTime).getTime();
+                    
+                    if (gap >= duration) {
+                        // Case A: There is a natural gap. Place it right in the middle.
+                        console.log(`[DayPulseRoute] Found gap of ${Math.round(gap/60000)}m. Using it.`);
+                        chargingStart = new Date(new Date(prevBlock.endTime).getTime() + (gap - duration) / 2);
+                        chargingEnd = new Date(chargingStart.getTime() + duration);
+                    } else if (prevBlock.category === 'buffer' || prevBlock.category === 'sleep') {
+                        // Case B: Overlap with a low-priority buffer or sleep
+                        console.log(`[DayPulseRoute] No gap, but prev event is ${prevBlock.category}. Squeezing in.`);
+                        chargingStart = new Date(new Date(targetBlock.startTime).getTime() - duration);
+                        chargingEnd = new Date(targetBlock.startTime);
+                    } else {
+                        // Case C: Tight schedule. Place before target and push everything.
+                        console.log(`[DayPulseRoute] Tight schedule. Forcing stop before ${targetBlock.title}.`);
+                        chargingStart = new Date(new Date(targetBlock.startTime).getTime() - duration);
+                        chargingEnd = new Date(targetBlock.startTime);
+                    }
+                } else {
+                    chargingStart = new Date(new Date(targetBlock.startTime).getTime() - duration);
+                    chargingEnd = new Date(targetBlock.startTime);
+                }
+
+                console.log(`[DayPulseRoute] Intelligent charging stop for ${userId}: ${chargingStart.toLocaleTimeString()} - ${chargingEnd.toLocaleTimeString()}`);
+                
+                await userEventsRepo.addManualEvent(userId, {
+                    id: `charge_${Date.now()}`,
+                    title: "Charging Stop (Auto-Optimized)",
+                    start_time: chargingStart.toISOString(),
+                    end_time: chargingEnd.toISOString(),
+                    category: 'buffer',
+                    location_text: "Optimized Charging Point"
+                });
+
+                // Apply cascading shifts to ensure no conflicts remain
+                await dayPulseService.shiftEventsFollowing(userId, chargingEnd, date);
+            }
+        }
+
+        const date = (req.body.date as string) || new Date().toISOString().split('T')[0];
+        const timeline = await dayPulseService.getDailyTimeline(userId, date);
+
+        res.json({
+            ok: true,
+            data: timeline,
+            message: "Action processed and schedule updated."
+        });
+    } catch (error) {
+        console.error("[DayPulseRoute] Error processing action:", error);
         res.status(500).json({
             ok: false,
-            error: "Could not delete item"
+            error: "Could not process pulse action"
         });
     }
 });

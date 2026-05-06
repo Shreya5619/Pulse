@@ -36,17 +36,17 @@ async function testActRiskCharging() {
                     importance: 0.8
                 }
             }),
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
-                'X-User-Id': userId, 
-                'X-Device-Id': deviceId 
+                'X-User-Id': userId,
+                'X-Device-Id': deviceId
             }
         });
         const data = await res.json() as any;
-        
+
         const actBlock = data.data.blocks.find(b => b.eventId === "act-test-2");
         if (actBlock) {
-            console.log("\nFound ACT block in Day Pulse:");
+            console.log("\nFound ACT block in daily pulse:");
             const batteryRisk = actBlock.risks.find(r => r.type === 'battery');
             if (batteryRisk) {
                 // Expected: 35% + (20% * 1h) = 55%

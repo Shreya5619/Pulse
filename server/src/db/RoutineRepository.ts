@@ -8,7 +8,9 @@ export interface RoutineBlock {
     endTime: string;   // HH:mm
     category: 'sleep' | 'study' | 'commute' | 'buffer';
     days: number[]; // 0-6 (Sun-Sat)
-    startLocation?: { lat: number; lon: number; name?: string | null } | null;
+    startLocation?: { lat?: number | null; lon?: number | null; name?: string | null } | null;
+    destinationLocation?: { lat?: number | null; lon?: number | null; name?: string | null } | null;
+    eta?: number | null;
 }
 
 export class RoutineRepository {
@@ -23,7 +25,9 @@ export class RoutineRepository {
             endTime: row.end_time,
             category: row.category,
             days: row.days,
-            startLocation: row.start_location
+            startLocation: row.start_location,
+            destinationLocation: row.destination_location,
+            eta: row.eta
         }));
     }
 
@@ -36,8 +40,8 @@ export class RoutineRepository {
     async addRoutine(userId: string, routine: Omit<RoutineBlock, 'id' | 'userId'>): Promise<RoutineBlock> {
         const id = `routine_${Date.now()}`;
         const sql = `
-            INSERT INTO routines (id, user_id, title, start_time, end_time, category, days, start_location)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            INSERT INTO routines (id, user_id, title, start_time, end_time, category, days, start_location, destination_location, eta)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         `;
         await query(sql, [
             id, 
@@ -47,7 +51,9 @@ export class RoutineRepository {
             routine.endTime, 
             routine.category, 
             routine.days, 
-            routine.startLocation ? JSON.stringify(routine.startLocation) : null
+            routine.startLocation ? JSON.stringify(routine.startLocation) : null,
+            routine.destinationLocation ? JSON.stringify(routine.destinationLocation) : null,
+            routine.eta ?? null
         ]);
         return { ...routine, id, userId };
     }
@@ -59,8 +65,8 @@ export class RoutineRepository {
         const updated = { ...current, ...updates };
         const sql = `
             UPDATE routines 
-            SET title = $1, start_time = $2, end_time = $3, category = $4, days = $5, start_location = $6
-            WHERE id = $7 AND user_id = $8
+            SET title = $1, start_time = $2, end_time = $3, category = $4, days = $5, start_location = $6, destination_location = $7, eta = $8
+            WHERE id = $9 AND user_id = $10
         `;
         await query(sql, [
             updated.title, 
@@ -69,6 +75,8 @@ export class RoutineRepository {
             updated.category, 
             updated.days, 
             updated.startLocation ? JSON.stringify(updated.startLocation) : null,
+            updated.destinationLocation ? JSON.stringify(updated.destinationLocation) : null,
+            updated.eta ?? null,
             routineId, 
             userId
         ]);
@@ -92,7 +100,9 @@ export class RoutineRepository {
             endTime: row.end_time,
             category: row.category,
             days: row.days,
-            startLocation: row.start_location
+            startLocation: row.start_location,
+            destinationLocation: row.destination_location,
+            eta: row.eta
         };
     }
 }

@@ -121,6 +121,8 @@ CREATE TABLE IF NOT EXISTS routines (
     category TEXT NOT NULL,
     days INTEGER[] NOT NULL,
     start_location JSONB,
+    destination_location JSONB,
+    eta INTEGER,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

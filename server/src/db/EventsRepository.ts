@@ -29,9 +29,13 @@ export class ContextEventsRepository implements IEventsRepository {
         const endOfDay = new Date(date);
         endOfDay.setHours(23, 59, 59, 999);
 
+        // Account for timezone differences by expanding the window by 12 hours
+        const expandedStart = new Date(startOfDay.getTime() - 12 * 60 * 60 * 1000);
+        const expandedEnd = new Date(endOfDay.getTime() + 12 * 60 * 60 * 1000);
+
         const matches = latest.calendar.upcoming_events.filter(event => {
             const startTime = new Date(event.start_time);
-            return startTime >= startOfDay && startTime <= endOfDay;
+            return startTime >= expandedStart && startTime <= expandedEnd;
         });
 
         if (matches.length === 0 && latest.calendar.upcoming_events.length > 0) {

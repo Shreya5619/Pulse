@@ -5,7 +5,7 @@ import { plannerEngine } from "./PlannerEngine";
 import { assessLateness, assessBattery } from "./RiskEngine";
 import { GraphAdapter } from "./GraphAdapter";
 import { routingService } from "./RoutingService";
-import { geocodingService } from "./GeocodingService";
+import { geocodingService, GeocodingService } from "./GeocodingService";
 import { CalendarEvent } from "../../../shared/context_snapshot";
 import { routineRepo } from "../db/RoutineRepository";
 import { userEventsRepo } from "../db/UserEventsRepository";
@@ -22,8 +22,8 @@ export interface DayPulseBlock {
     batteryAtStart?: number;
     days?: number[];
     startLocation?: {
-        lat?: number;
-        lon?: number;
+        lat?: number | null;
+        lon?: number | null;
         name?: string | null;
     } | null;
     risks: {
@@ -32,6 +32,8 @@ export interface DayPulseBlock {
         score: number;
         explanation?: string;
     }[];
+    isProposed?: boolean;
+    isDeleted?: boolean;
     suggestion?: {
         title: string;
         actionId: string;
@@ -42,6 +44,7 @@ export interface DayPulse {
     userId: string;
     date: string;
     blocks: DayPulseBlock[];
+    isProposed?: boolean;
 }
 
 export class DayPulseService {
@@ -121,6 +124,8 @@ export class DayPulseService {
                     type: 'routine',
                     category: routine.category,
                     startLocation: routine.startLocation,
+                    locationText: routine.destinationLocation?.name ?? undefined,
+                    etaMinutes: routine.eta ?? undefined,
                     risks: []
                 });
             } catch (e) {
@@ -146,8 +151,8 @@ export class DayPulseService {
                 }
                 
                 // Fallback to current location if still no start coordinates
-                startLat = startLat ?? context.location.lat;
-                startLon = startLon ?? context.location.lon;
+                startLat = startLat ?? (context.location.lat ?? undefined);
+                startLon = startLon ?? (context.location.lon ?? undefined);
 
                 // Determine Destination Coordinates
                 let eventLat = event.location?.lat;
@@ -281,6 +286,7 @@ export class DayPulseService {
                     console.log(`[DayPulseService] Optimizing block ${block.title}: Shifting 30 mins later to reduce lateness risk.`);
                     block.startTime = newStart.toISOString();
                     block.endTime = newEnd.toISOString();
+                    block.isProposed = true;
                     // Re-simulating risks for the shifted block would be ideal, 
                     // but for now we'll just mark it as optimized.
                     block.risks = block.risks.filter(r => r.type !== 'lateness');
@@ -295,6 +301,7 @@ export class DayPulseService {
         return {
             userId,
             date: dateStr,
+            isProposed: optimizedBlocks.some(b => b.isProposed),
             blocks: optimizedBlocks.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
         };
     }
@@ -382,6 +389,46 @@ export class DayPulseService {
         }
 
         return risks;
+    }
+    async shiftEventsFollowing(userId: string, startTime: Date | string, dateStr: string): Promise<void> {
+        console.log(`[DayPulseService] Checking for events to shift after ${startTime}`);
+        const threshold = new Date(startTime);
+        const timeline = await this.getDailyTimeline(userId, dateStr);
+        
+        let currentBoundary = threshold;
+        
+        // We only care about blocks that end after our threshold
+        const sortedBlocks = timeline.blocks.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+        
+        for (const block of sortedBlocks) {
+            const blockStart = new Date(block.startTime);
+            const blockEnd = new Date(block.endTime);
+
+            // Skip the block that is effectively the one we just added (the charging stop)
+            if (block.title.includes("Charging Stop")) continue;
+            
+            // If the block starts before the boundary but ends after the threshold, it needs a shift
+            if (blockStart < currentBoundary && blockEnd > threshold) {
+                const duration = blockEnd.getTime() - blockStart.getTime();
+                const newStart = new Date(currentBoundary.getTime() + 2 * 60000); // 2 min gap
+                const newEnd = new Date(newStart.getTime() + duration);
+                
+                console.log(`[DayPulseService] Shifting "${block.title}" by ${Math.round((newStart.getTime() - blockStart.getTime())/60000)} mins`);
+                
+                await userEventsRepo.addOverride(userId, {
+                    eventId: block.eventId,
+                    updates: {
+                        start_time: newStart.toISOString(),
+                        end_time: newEnd.toISOString()
+                    }
+                });
+                
+                currentBoundary = newEnd;
+            } else if (blockStart >= currentBoundary) {
+                // If it's already after the boundary, we update the boundary to its end
+                currentBoundary = blockEnd;
+            }
+        }
     }
 }
 

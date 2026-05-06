@@ -22,6 +22,8 @@ void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
   bool isRecurring = existingBlock?.days != null;
   List<int> selectedDays =
       existingBlock?.days ?? [1, 2, 3, 4, 5]; // Default M-F
+  Map<String, dynamic>? currentStartLoc = existingBlock?.startLocation;
+  Map<String, dynamic>? currentDestLoc; // For destination coords if needed
 
   showDialog(
     context: context,
@@ -48,22 +50,64 @@ void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
               TextField(
                 controller: startLocationController,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: "Source Location (Optional)",
                   labelStyle: TextStyle(color: Colors.white54),
                   hintText: "e.g. Home",
                   hintStyle: TextStyle(color: Colors.white24, fontSize: 12),
+                  suffixIcon: IconButton(
+                    icon: const Icon(
+                      LucideIcons.mapPin,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                    onPressed: () {
+                      final loc = context
+                          .read<AppState>()
+                          .deviceContext
+                          .location;
+                      setDialogState(() {
+                        startLocationController.text = "Current Location";
+                        currentStartLoc = {
+                          'lat': loc.latitude,
+                          'lon': loc.longitude,
+                          'name': "Current Location",
+                        };
+                      });
+                    },
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: locationController,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: "Destination Location (Optional)",
                   labelStyle: TextStyle(color: Colors.white54),
                   hintText: "e.g. Office HQ",
                   hintStyle: TextStyle(color: Colors.white24, fontSize: 12),
+                  suffixIcon: IconButton(
+                    icon: const Icon(
+                      LucideIcons.mapPin,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                    onPressed: () {
+                      final loc = context
+                          .read<AppState>()
+                          .deviceContext
+                          .location;
+                      setDialogState(() {
+                        locationController.text = "Current Location";
+                        currentDestLoc = {
+                          'lat': loc.latitude,
+                          'lon': loc.longitude,
+                          'name': "Current Location",
+                        };
+                      });
+                    },
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -224,8 +268,21 @@ void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
             onPressed: () {
               if (titleController.text.isNotEmpty) {
                 final startLoc = startLocationController.text.isNotEmpty
-                    ? {'name': startLocationController.text}
+                    ? (currentStartLoc != null &&
+                              startLocationController.text == "Current Location"
+                          ? currentStartLoc
+                          : {'name': startLocationController.text})
                     : null;
+
+                final destLoc = locationController.text.isNotEmpty
+                    ? (currentDestLoc != null &&
+                              locationController.text == "Current Location"
+                          ? currentDestLoc
+                          : null) // Backend will geocode if it's just text
+                    : null;
+
+                // If destLoc is null but locationController has text, we pass the text as 'location'
+                // but the API also supports 'location_text' in the 'updates' map.
 
                 if (existingBlock == null) {
                   context.read<AppState>().addDayPulseEvent(
@@ -236,6 +293,7 @@ void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
                         ? locationController.text
                         : null,
                     startLocation: startLoc,
+                    destinationLocation: destLoc,
                     category: selectedCategory,
                     isRecurring: isRecurring,
                     days: isRecurring ? selectedDays : null,
@@ -249,6 +307,7 @@ void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
                         'endTime': endTime.toIso8601String(),
                         'location_text': locationController.text,
                         'start_location': startLoc,
+                        'destination_location': destLoc,
                         'category': selectedCategory,
                         'isRecurring': isRecurring,
                         'days': isRecurring ? selectedDays : null,
@@ -292,7 +351,7 @@ class _DayPulseScreenState extends State<DayPulseScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Day Pulse",
+              "daily pulse",
               style: GoogleFonts.outfit(
                 fontWeight: FontWeight.bold,
                 fontSize: 24,
@@ -337,22 +396,98 @@ class _DayPulseScreenState extends State<DayPulseScreen> {
       body: Consumer<AppState>(
         builder: (context, state, child) {
           final blocks = state.dayPulseBlocks;
-          if (blocks.isEmpty) {
-            return const Center(
-              child: Text("No activities detected for today."),
-            );
-          }
 
-          return ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            itemCount: blocks.length,
-            itemBuilder: (context, index) {
-              final block = blocks[index];
-              return _TimelineBlock(
-                block: block,
-                isLast: index == blocks.length - 1,
-              );
-            },
+          return Column(
+            children: [
+              if (state.isDayPulseProposed)
+                Container(
+                  margin: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.amber.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        LucideIcons.alertTriangle,
+                        color: Colors.amber,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          "Draft changes pending",
+                          style: GoogleFonts.outfit(
+                            color: Colors.amber,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          LucideIcons.x,
+                          color: Colors.white54,
+                          size: 18,
+                        ),
+                        onPressed: () => state.discardDayPulseProposed(),
+                        tooltip: "Discard",
+                      ),
+                      const SizedBox(width: 4),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          minimumSize: Size.zero,
+                        ),
+                        onPressed: () => state.persistDayPulse(),
+                        icon: const Icon(LucideIcons.check, size: 16),
+                        label: const Text(
+                          "Save All",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (blocks.isEmpty)
+                const Expanded(
+                  child: Center(
+                    child: Text("No activities detected for today."),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 20,
+                    ),
+                    itemCount: blocks.length,
+                    itemBuilder: (context, index) {
+                      final block = blocks[index];
+                      return _TimelineBlock(
+                        block: block,
+                        isLast: index == blocks.length - 1,
+                      );
+                    },
+                  ),
+                ),
+            ],
           );
         },
       ),
@@ -544,6 +679,8 @@ class _TimelineBlock extends StatelessWidget {
                                         ? Colors.white70
                                         : Colors.white,
                                   ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
                                 if (block.locationText != null &&
                                     block.locationText!.isNotEmpty) ...[
@@ -556,11 +693,15 @@ class _TimelineBlock extends StatelessWidget {
                                         color: Colors.white38,
                                       ),
                                       const SizedBox(width: 4),
-                                      Text(
-                                        block.locationText!,
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 10,
-                                          color: Colors.white38,
+                                      Expanded(
+                                        child: Text(
+                                          block.locationText!,
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 10,
+                                            color: Colors.white38,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
                                         ),
                                       ),
                                       if (block.etaMinutes != null) ...[
@@ -700,7 +841,8 @@ class _RiskBadges extends StatelessWidget {
       );
     }
 
-    return Row(
+    return Wrap(
+      spacing: 4,
       children: risks.map((risk) {
         IconData icon;
         Color color = risk.level == 'high' ? AppColors.danger : Colors.orange;
@@ -719,18 +861,15 @@ class _RiskBadges extends StatelessWidget {
             icon = LucideIcons.alertTriangle;
         }
 
-        return Padding(
-          padding: const EdgeInsets.only(left: 4),
-          child: Tooltip(
-            message: risk.explanation ?? risk.label,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 14, color: color),
+        return Tooltip(
+          message: risk.explanation ?? risk.label,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
             ),
+            child: Icon(icon, size: 14, color: color),
           ),
         );
       }).toList(),

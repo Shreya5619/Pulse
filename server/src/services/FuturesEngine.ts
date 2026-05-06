@@ -40,7 +40,7 @@ class FuturesEngine {
         userId,
         baseTime,
         horizonMinutes,
-        futures: this.buildIdleFutures(memory, 80) // Default to 80 if no context
+        futures: this.buildIdleFutures(memory, 80, false) // Default to 80, false if no context
       };
     }
 
@@ -93,6 +93,18 @@ class FuturesEngine {
     const route = await this.estimateRoute(context, nextEvent, memory, destLat, destLon);
     const baseBattery = context.battery.level * 100;
     const powerSaverOn = context.battery.power_saver_on;
+
+    // Ensure multiMode is always populated (derive from route if precise fetching failed)
+    if (!multiMode) {
+      console.log(`[FuturesEngine] Precise multi-mode routing skipped or failed. Deriving heuristic modes from estimated route.`);
+      multiMode = {
+        car: route,
+        auto: { durationSeconds: Math.round(route.durationSeconds * 1.1), distanceMeters: route.distanceMeters },
+        twoWheeler: { durationSeconds: Math.round(route.durationSeconds * 0.9), distanceMeters: route.distanceMeters },
+        walk: { durationSeconds: Math.round(route.durationSeconds * 4.0), distanceMeters: route.distanceMeters },
+        transit: { durationSeconds: Math.round(route.durationSeconds * 1.3) + 480, distanceMeters: route.distanceMeters }
+      };
+    }
 
     const futureParams = { userId, baseTime, nextEvent, route, baseBattery, powerSaverOn, memory, personality };
 
@@ -468,6 +480,7 @@ class FuturesEngine {
       route.durationSeconds / 60,
       memory.battery?.profile?.discharge_rates?.active ?? 8,
       false,
+      powerSaverOn,
       "BATTERY",
       [],
       personality

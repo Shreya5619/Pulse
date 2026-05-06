@@ -36,10 +36,10 @@ async function testActRisk() {
                     importance: 0.8
                 }
             }),
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
-                'X-User-Id': userId, 
-                'X-Device-Id': deviceId 
+                'X-User-Id': userId,
+                'X-Device-Id': deviceId
             }
         });
         const data = await res.json() as any;
@@ -52,15 +52,15 @@ async function testActRisk() {
         // 3. Verify risks in the returned timeline
         const actBlock = data.data.blocks.find(b => b.eventId === "act-test-1");
         if (actBlock) {
-            console.log("\nFound ACT block in Day Pulse:");
+            console.log("\nFound ACT block in daily pulse:");
             console.log("Title:", actBlock.title);
             console.log("Risks:", JSON.stringify(actBlock.risks, null, 2));
-            
+
             const batteryRisk = actBlock.risks.find(r => r.type === 'battery');
             if (batteryRisk && batteryRisk.explanation.includes("[ACT]")) {
                 console.log("\n✅ SUCCESS: Found [ACT] battery risk for event without location.");
                 console.log("Battery risk explanation:", batteryRisk.explanation);
-                
+
                 // Check if charging state is considered
                 // 35% - (8% * 0.5h) = 31%
                 if (batteryRisk.explanation.includes("31%")) {
@@ -70,7 +70,7 @@ async function testActRisk() {
                 console.log("\n❌ FAILURE: Could not find specific ACT battery risk.");
             }
         } else {
-            console.log("\n❌ FAILURE: Could not find the test event in Day Pulse.");
+            console.log("\n❌ FAILURE: Could not find the test event in daily pulse.");
         }
     } catch (err) {
         console.error("Error in test flow:", err.message);

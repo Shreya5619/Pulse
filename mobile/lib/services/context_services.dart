@@ -60,7 +60,12 @@ class ContextServices {
       Stream.periodic(const Duration(seconds: 2)),
     ]).asyncMap((_) async {
       final level = await _battery.batteryLevel;
-      final isSaveMode = await _battery.isInBatterySaveMode;
+      bool isSaveMode = false;
+      try {
+        isSaveMode = await _battery.isInBatterySaveMode;
+      } catch (_) {
+        // Handle unimplemented platforms
+      }
       final state = await _battery.batteryState;
       return BatteryInfo(
         level: level,

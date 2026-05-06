@@ -67,7 +67,8 @@ export function assessLateness(
   let score = latenessRisk(minutesToEvent, etaMinutes, buffer);
   
   // Apply preferences
-  const tolerance = preferences.find(p => p.category === 'LATENESS_TOLERANCE' && (p.scope === 'DEFAULT' || eventLabel.includes(p.scope)));
+  const prefs = Array.isArray(preferences) ? preferences : [];
+  const tolerance = prefs.find(p => p.category === 'LATENESS_TOLERANCE' && (p.scope === 'DEFAULT' || eventLabel.includes(p.scope)));
   if (tolerance) {
     if (tolerance.value === 'LOW') score = Math.min(1, score * 1.2);
     if (tolerance.value === 'HIGH') score = score * 0.8;
@@ -151,7 +152,8 @@ export function assessBattery(
   let score = batteryRisk(currentPct, horizonMinutes, dischargePerHour, isCharging, powerSaverOn);
 
   // Apply preferences
-  const tolerance = preferences.find(p => p.category === 'BATTERY_TOLERANCE');
+  const prefs = Array.isArray(preferences) ? preferences : [];
+  const tolerance = prefs.find(p => p.category === 'BATTERY_TOLERANCE');
   if (tolerance) {
     if (tolerance.value === 'HIGH') score = Math.min(1, score * 1.2); // Anxious about battery
   }

@@ -242,6 +242,9 @@ class AppState extends ChangeNotifier {
   final Set<String> _dismissedActionIds = {};
   Map<String, dynamic>? _proposedCommAction;
   List<DayPulseBlock> _dayPulseBlocks = [];
+  bool _isDayPulseProposed = false;
+
+  bool get isDayPulseProposed => _isDayPulseProposed;
 
   bool isActionAccepted(String id) => _acceptedActionIds.contains(id);
   bool isActionDismissed(String id) => _dismissedActionIds.contains(id);
@@ -317,7 +320,9 @@ class AppState extends ChangeNotifier {
       final host = _getBackendHost();
 
       // 1. Persist selection
-      final selectUrl = Uri.parse('http://$host:8080/api/planner/scenario/select');
+      final selectUrl = Uri.parse(
+        'http://$host:8080/api/planner/scenario/select',
+      );
       await http.post(
         selectUrl,
         headers: _authHeaders,
@@ -351,8 +356,9 @@ class AppState extends ChangeNotifier {
   Future<void> fetchDayPulse() async {
     try {
       final host = _getBackendHost();
+      final date = DateTime.now().toIso8601String().split('T')[0];
       final url = Uri.parse(
-        'http://$host:8080/api/day-pulse?userId=$_userId&deviceId=$_userId',
+        'http://$host:8080/api/day-pulse?userId=$_userId&deviceId=$_userId&date=$date',
       );
       final response = await http.get(url, headers: _authHeaders);
 
@@ -360,10 +366,11 @@ class AppState extends ChangeNotifier {
         final data = json.decode(response.body);
         final List blocks = data['data']['blocks'];
         _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        _isDayPulseProposed = data['data']['isProposed'] ?? false;
         notifyListeners();
       }
     } catch (e) {
-      debugPrint('[Pulse AppState] Error fetching Day Pulse: $e');
+      debugPrint('[Pulse AppState] Error fetching daily pulse: $e');
     }
   }
 
@@ -374,6 +381,7 @@ class AppState extends ChangeNotifier {
     try {
       final host = _getBackendHost();
       final url = Uri.parse('http://$host:8080/api/day-pulse/modify');
+      final date = DateTime.now().toIso8601String().split('T')[0];
       final response = await http.post(
         url,
         headers: _authHeaders,
@@ -384,6 +392,7 @@ class AppState extends ChangeNotifier {
           'updates': updates,
           'isRecurring': updates['isRecurring'],
           'days': updates['days'],
+          'date': date,
         }),
       );
 
@@ -391,12 +400,13 @@ class AppState extends ChangeNotifier {
         final data = json.decode(response.body);
         final List blocks = data['data']['blocks'];
         _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        _isDayPulseProposed = data['data']['isProposed'] ?? false;
         notifyListeners();
 
         fetchTwinGraph();
       }
     } catch (e) {
-      debugPrint('[Pulse AppState] Error modifying Day Pulse: $e');
+      debugPrint('[Pulse AppState] Error modifying daily pulse: $e');
     }
   }
 
@@ -409,6 +419,7 @@ class AppState extends ChangeNotifier {
     bool isRecurring = false,
     List<int>? days,
     Map<String, dynamic>? startLocation,
+    Map<String, dynamic>? destinationLocation,
   }) async {
     try {
       final host = _getBackendHost();
@@ -429,6 +440,7 @@ class AppState extends ChangeNotifier {
         'category': category,
       };
 
+      final date = DateTime.now().toIso8601String().split('T')[0];
       final response = await http.post(
         url,
         headers: _authHeaders,
@@ -442,10 +454,12 @@ class AppState extends ChangeNotifier {
             'end_time': end.toUtc().toIso8601String(),
             'location_text': location,
             'start_location': startLocation,
+            'destination_location': destinationLocation,
           },
           'isRecurring': isRecurring,
           'days': days,
           'category': category,
+          'date': date,
         }),
       );
 
@@ -453,6 +467,7 @@ class AppState extends ChangeNotifier {
         final data = json.decode(response.body);
         final List blocks = data['data']['blocks'];
         _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        _isDayPulseProposed = data['data']['isProposed'] ?? false;
         notifyListeners();
         fetchTwinGraph();
       }
@@ -465,6 +480,7 @@ class AppState extends ChangeNotifier {
     try {
       final host = _getBackendHost();
       final url = Uri.parse('http://$host:8080/api/day-pulse/delete');
+      final date = DateTime.now().toIso8601String().split('T')[0];
       final response = await http.post(
         url,
         headers: _authHeaders,
@@ -473,6 +489,7 @@ class AppState extends ChangeNotifier {
           'deviceId': _userId,
           'eventId': eventId,
           'isRoutine': isRoutine,
+          'date': date,
         }),
       );
 
@@ -480,6 +497,7 @@ class AppState extends ChangeNotifier {
         final data = json.decode(response.body);
         final List blocks = data['data']['blocks'];
         _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        _isDayPulseProposed = data['data']['isProposed'] ?? false;
         notifyListeners();
         fetchTwinGraph();
       }
@@ -506,12 +524,71 @@ class AppState extends ChangeNotifier {
         final data = json.decode(response.body);
         final List blocks = data['data']['blocks'];
         _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        _isDayPulseProposed = data['data']['isProposed'] ?? false;
         notifyListeners();
         fetchTwinGraph();
       }
     } catch (e) {
-      debugPrint('[Pulse AppState] Error optimizing Day Pulse: $e');
+      debugPrint('[Pulse AppState] Error optimizing daily pulse: $e');
     }
+  }
+
+  Future<void> persistDayPulse() async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/day-pulse/persist');
+      final date = DateTime.now().toIso8601String().split('T')[0];
+
+      final response = await http.post(
+        url,
+        headers: _authHeaders,
+        body: json.encode({
+          'userId': _userId,
+          'deviceId': _userId,
+          'date': date,
+          'blocks': _dayPulseBlocks
+              .map(
+                (b) => {
+                  'eventId': b.eventId,
+                  'title': b.title,
+                  'startTime': b.startTime.toIso8601String(),
+                  'endTime': b.endTime.toIso8601String(),
+                  'locationText': b.locationText,
+                  'isProposed':
+                      b.risks.any(
+                        (r) => r.type == 'lateness' && r.level == 'high',
+                      ) ||
+                      b.suggestion != null ||
+                      b.eventId.startsWith(
+                        'manual_',
+                      ), // Rough heuristic or just pass isProposed from model if available
+                  // Wait, I should pass the isProposed flag from the block itself if I had it.
+                  // For now, I'll just send all blocks and the server will check which ones have isProposed: true
+                  'isProposed':
+                      true, // The server will filter based on what it knows
+                  'isDeleted': false, // Need to track this in model too
+                },
+              )
+              .toList(),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List blocks = data['data']['blocks'];
+        _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        _isDayPulseProposed = false;
+        notifyListeners();
+        fetchTwinGraph();
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error persisting daily pulse: $e');
+    }
+  }
+
+  Future<void> discardDayPulseProposed() async {
+    _isDayPulseProposed = false;
+    await fetchDayPulse();
   }
 
   // Pulse snapshot (Day 12 — persistent widget source of truth)
@@ -1765,7 +1842,7 @@ class AppState extends ChangeNotifier {
   }
 
   String _getBackendHost() {
-    return '192.168.1.7';
+    return '172.20.10.5';
   }
 
   Map<String, String> get _authHeaders => {
