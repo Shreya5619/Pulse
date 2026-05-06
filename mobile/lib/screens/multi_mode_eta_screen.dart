@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -38,7 +37,7 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
   late TextEditingController _fromLonController;
 
   String _toLocationName = "Work (Indiranagar)";
-  String _fromLocationName = "Current Location";
+  final String _fromLocationName = "Current Location";
   String? _selectedPreset;
 
   final ScrollController _scrollController = ScrollController();

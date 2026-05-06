@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
-import '../theme/colors.dart';
 import 'glass_card.dart';
 import '../screens/graph_explanation_screen.dart';
-import '../screens/timeline_screen.dart';
 import '../models/risk_snapshot.dart';
 
 class RiskHeroCard extends StatelessWidget {

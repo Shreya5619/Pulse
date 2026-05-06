@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:flutter/foundation.dart';
 
 class LocalRepository {
   static final LocalRepository _instance = LocalRepository._internal();
@@ -55,46 +54,49 @@ class LocalRepository {
 
   // --- Persistence Methods ---
 
-  Future<void> saveSnapshot(String id, String timestamp, String type, Map<String, dynamic> payload) async {
+  Future<void> saveSnapshot(
+    String id,
+    String timestamp,
+    String type,
+    Map<String, dynamic> payload,
+  ) async {
     final db = await database;
-    await db.insert(
-      'context_snapshots',
-      {
-        'id': id,
-        'timestamp': timestamp,
-        'type': type,
-        'payload': jsonEncode(payload),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('context_snapshots', {
+      'id': id,
+      'timestamp': timestamp,
+      'type': type,
+      'payload': jsonEncode(payload),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
     await _pruneTable('context_snapshots', 100);
   }
 
-  Future<void> saveRisk(String timestamp, String level, Map<String, dynamic> payload) async {
+  Future<void> saveRisk(
+    String timestamp,
+    String level,
+    Map<String, dynamic> payload,
+  ) async {
     final db = await database;
-    await db.insert(
-      'risks',
-      {
-        'timestamp': timestamp,
-        'level': level,
-        'payload': jsonEncode(payload),
-      },
-    );
+    await db.insert('risks', {
+      'timestamp': timestamp,
+      'level': level,
+      'payload': jsonEncode(payload),
+    });
     await _pruneTable('risks', 50);
   }
 
-  Future<void> saveTimelineEvent(String id, String timestamp, String type, Map<String, dynamic> payload) async {
+  Future<void> saveTimelineEvent(
+    String id,
+    String timestamp,
+    String type,
+    Map<String, dynamic> payload,
+  ) async {
     final db = await database;
-    await db.insert(
-      'timeline_events',
-      {
-        'id': id,
-        'timestamp': timestamp,
-        'type': type,
-        'payload': jsonEncode(payload),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('timeline_events', {
+      'id': id,
+      'timestamp': timestamp,
+      'type': type,
+      'payload': jsonEncode(payload),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
     await _pruneTable('timeline_events', 200);
   }
 
@@ -112,7 +114,11 @@ class LocalRepository {
 
   Future<List<Map<String, dynamic>>> getLatestSnapshots(int limit) async {
     final db = await database;
-    return await db.query('context_snapshots', orderBy: 'timestamp DESC', limit: limit);
+    return await db.query(
+      'context_snapshots',
+      orderBy: 'timestamp DESC',
+      limit: limit,
+    );
   }
 
   Future<List<Map<String, dynamic>>> getLatestRisks(int limit) async {
@@ -130,30 +136,44 @@ class LocalRepository {
 
     final data = {
       'exported_at': DateTime.now().toIso8601String(),
-      'snapshots': snapshots.map((s) => {
-        'timestamp': s['timestamp'],
-        'type': s['type'],
-        'payload': jsonDecode(s['payload'] as String),
-      }).toList(),
-      'risks': risks.map((r) => {
-        'timestamp': r['timestamp'],
-        'level': r['level'],
-        'payload': jsonDecode(r['payload'] as String),
-      }).toList(),
-      'timeline': events.map((e) => {
-        'timestamp': e['timestamp'],
-        'type': e['type'],
-        'payload': jsonDecode(e['payload'] as String),
-      }).toList(),
+      'snapshots': snapshots
+          .map(
+            (s) => {
+              'timestamp': s['timestamp'],
+              'type': s['type'],
+              'payload': jsonDecode(s['payload'] as String),
+            },
+          )
+          .toList(),
+      'risks': risks
+          .map(
+            (r) => {
+              'timestamp': r['timestamp'],
+              'level': r['level'],
+              'payload': jsonDecode(r['payload'] as String),
+            },
+          )
+          .toList(),
+      'timeline': events
+          .map(
+            (e) => {
+              'timestamp': e['timestamp'],
+              'type': e['type'],
+              'payload': jsonDecode(e['payload'] as String),
+            },
+          )
+          .toList(),
     };
 
     final jsonString = jsonEncode(data);
-    
+
     // Save to a file in documents directory for sharing/access
     final directory = await getApplicationDocumentsDirectory();
-    final file = File('${directory.path}/pulse_trace_${DateTime.now().millisecondsSinceEpoch}.json');
+    final file = File(
+      '${directory.path}/pulse_trace_${DateTime.now().millisecondsSinceEpoch}.json',
+    );
     await file.writeAsString(jsonString);
-    
+
     return file.path;
   }
 
@@ -164,7 +184,7 @@ class LocalRepository {
     await db.transaction((txn) async {
       // Clear existing (or handle as separate replay table)
       // For now, let's treat this as a "load trace" into main tables
-      
+
       if (data['snapshots'] != null) {
         for (var s in data['snapshots']) {
           await txn.insert('context_snapshots', {
@@ -175,7 +195,7 @@ class LocalRepository {
           }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
       }
-      
+
       // Similar for risks and timeline...
     });
   }

@@ -6,18 +6,14 @@ import '../providers/app_state.dart';
 import '../widgets/glass_card.dart';
 import '../theme/colors.dart';
 import '../screens/context_debug_screen.dart';
-import '../screens/replay_screen.dart';
 import '../screens/scenario_player_screen.dart';
 import '../screens/gantt_screen.dart';
 import '../widgets/risk_hero_card.dart';
-import '../widgets/route_eta_strip.dart';
 
 import '../models/risk_snapshot.dart';
-import '../models/risk_state.dart' as legacy;
 import '../screens/graph_explanation_screen.dart';
 import '../screens/multi_mode_eta_screen.dart';
 import '../screens/twin_graph_screen.dart';
-import '../screens/day_pulse_screen.dart';
 import '../screens/timeline_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -48,12 +44,82 @@ class HomeScreen extends StatelessWidget {
                   _buildRiskStack(context, state),
                   const SizedBox(height: 24),
                   _buildContextChipsRow(context, state),
+                  const SizedBox(height: 24),
+                  _buildSystemIntegration(context, state),
                 ],
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSystemIntegration(BuildContext context, AppState state) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "System Integration",
+          style: GoogleFonts.outfit(
+            fontSize: 12,
+            color: Colors.white30,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 16),
+        GlassCard(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              _integrationButton(
+                icon: LucideIcons.bellRing,
+                label: "Notification Access",
+                onPressed: () => state.openNotificationSettings(),
+              ),
+              const SizedBox(height: 12),
+              _integrationButton(
+                icon: LucideIcons.battery,
+                label: "Disable Battery Optimization",
+                onPressed: () => state.requestBatteryOptimizationDisable(),
+              ),
+              const SizedBox(height: 12),
+              _integrationButton(
+                icon: LucideIcons.layers,
+                label: "System Overlay",
+                onPressed: () => state.requestOverlayPermission(),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _integrationButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 16),
+        label: Text(
+          label,
+          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white.withValues(alpha: 0.05),
+          foregroundColor: Colors.white70,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 0,
+        ),
+      ),
     );
   }
 
@@ -498,10 +564,7 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             label,
-            style: TextStyle(
-              color: color != null ? color : Colors.white70,
-              fontSize: 11,
-            ),
+            style: TextStyle(color: color ?? Colors.white70, fontSize: 11),
           ),
         ],
       ),

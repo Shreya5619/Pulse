@@ -4,7 +4,6 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../models/twin_graph.dart';
-import '../widgets/glass_card.dart';
 import '../theme/colors.dart';
 
 class TwinGraphScreen extends StatefulWidget {

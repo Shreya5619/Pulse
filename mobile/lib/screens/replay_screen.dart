@@ -102,9 +102,9 @@ class _ReplayScreenState extends State<ReplayScreen> {
               style: TextStyle(color: Colors.white70, fontSize: 14),
             ),
             const SizedBox(height: 12),
-            ..._scenarios.keys
-                .map((name) => _buildScenarioCard(name, appState))
-                .toList(),
+            ..._scenarios.keys.map(
+              (name) => _buildScenarioCard(name, appState),
+            ),
 
             const Spacer(),
 

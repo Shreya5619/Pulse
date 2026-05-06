@@ -3,7 +3,6 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/app_state.dart';
 import '../theme/colors.dart';
-import 'glass_card.dart';
 
 class RouteDetailBottomSheet extends StatelessWidget {
   final AppointmentEtaInfo eta;

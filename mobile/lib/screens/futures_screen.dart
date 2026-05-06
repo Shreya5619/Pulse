@@ -510,7 +510,7 @@ class _FuturesScreenState extends State<FuturesScreen> {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,

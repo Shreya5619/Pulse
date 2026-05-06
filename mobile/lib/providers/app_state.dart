@@ -15,6 +15,9 @@ import '../services/notification_service.dart';
 import '../models/risk_snapshot.dart';
 import '../models/twin_graph.dart';
 import '../services/storage_service.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import '../services/llm_service.dart';
 
 class TimelineEvent {
   final String id;
@@ -165,10 +168,65 @@ class DayPulseBlock {
 }
 
 class AppState extends ChangeNotifier {
+  static const _eventChannel = EventChannel('notifications_stream');
+  static const _methodChannel = MethodChannel('battery_optimization');
+
   final ContextServices _contextServices = ContextServices();
   final LocalRepository _localRepo = LocalRepository();
   DeviceContext _deviceContext = DeviceContext.initial();
   String _userId = "unknown";
+
+  final LlmService _llmService = LlmService();
+
+  // Notification getters
+  List<NotificationInfo> get notifications => _deviceContext.notifications;
+
+  List<NotificationInfo> get urgentNotifications => notifications
+      .where(
+        (n) =>
+            n.category == 'URGENT_OTP' ||
+            n.text.toLowerCase().contains('otp') ||
+            n.text.toLowerCase().contains('code'),
+      )
+      .toList();
+
+  List<NotificationInfo> get importantNotifications => notifications
+      .where(
+        (n) =>
+            n.category == 'IMPORTANT_SENDER' ||
+            n.appName.toLowerCase().contains('slack') ||
+            n.appName.toLowerCase().contains('whatsapp'),
+      )
+      .toList();
+
+  List<NotificationInfo> get noisyNotifications => notifications
+      .where(
+        (n) =>
+            !urgentNotifications.contains(n) &&
+            !importantNotifications.contains(n),
+      )
+      .toList();
+
+  // Surge detection window
+  final int _surgeWindowMs = 60000; // 60 seconds
+  final int _surgeThreshold = 5;
+  bool _isSurgeActive = false;
+  bool get isSurgeActive => _isSurgeActive;
+
+  Timer? _summaryTimer;
+  bool _isSummarizing = false;
+  bool get isSummarizing => _isSummarizing;
+
+  String _llmHighlight = '';
+  String _llmDigest = '';
+  List<String> _llmActionItems = [];
+  DateTime? _llmTimestamp;
+  DateTime? _lastSummarizedAt;
+
+  String get llmHighlight => _llmHighlight;
+  String get llmDigest => _llmDigest;
+  List<String> get llmActionItems => _llmActionItems;
+  DateTime? get llmTimestamp => _llmTimestamp;
 
   DeviceContext get deviceContext => _deviceContext;
   RiskState _currentRisk = RiskState(
@@ -616,8 +674,9 @@ class AppState extends ChangeNotifier {
   int get replayProgress {
     if (_scenarioStart == null ||
         _scenarioEnd == null ||
-        _simulatedTime == null)
+        _simulatedTime == null) {
       return 0;
+    }
     final total = _scenarioEnd!.difference(_scenarioStart!).inSeconds;
     final current = _simulatedTime!.difference(_scenarioStart!).inSeconds;
     return ((current / total) * 100).clamp(0, 100).toInt();
@@ -633,13 +692,13 @@ class AppState extends ChangeNotifier {
     _userId = await StorageService.getUserId();
     notifyListeners();
 
+    _startListeningNotifications();
     _initLocalData();
     _generateMockData();
     _initNotificationService();
     _connectWebSocket();
     _initContextIngestion();
-    // Keep internal simulation for fallback or UI stability
-    _startSimulatedStream();
+    _startPeriodicSummarization();
 
     // Initial ETA fetch
     fetchAppointmentEta();
@@ -722,7 +781,6 @@ class AppState extends ChangeNotifier {
     }
 
     _initCalendarIngestion();
-    _initNotificationIngestion();
   }
 
   void _initCalendarIngestion() async {
@@ -761,38 +819,185 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _initNotificationIngestion() async {
-    // Notifications
-    await _contextServices.initNotifications((data) {
-      final packageName = data['packageName'] ?? "unknown";
-      final title = data['title'] ?? "No Title";
-      final text = data['text'] ?? "";
+  void _startListeningNotifications() {
+    _eventChannel.receiveBroadcastStream().listen(
+      (event) {
+        try {
+          final data = Map<String, dynamic>.from(event);
+          final notif = NotificationInfo.fromMap(data);
 
-      debugPrint('[Pulse Context] Notification Received: $packageName');
+          // Ignore system UI updates
+          if (notif.packageName == 'com.android.systemui') return;
 
-      final category = _classifyNotification(title, text, packageName);
+          _deviceContext.notifications.insert(0, notif);
+          if (_deviceContext.notifications.length > 100) {
+            _deviceContext.notifications.removeLast();
+          }
 
-      final newNotif = NotificationInfo(
-        packageName: packageName,
-        title: title,
-        text: text,
-        category: category,
-        timestamp: DateTime.now(),
+          _checkForSurge();
+          notifyListeners();
+
+          // Also sync to backend if needed
+          _sendContextSnapshot("notification_received");
+        } catch (e) {
+          debugPrint('[Pulse AppState] Error parsing notification: $e');
+        }
+      },
+      onError: (error) {
+        debugPrint('[Pulse AppState] Notification stream error: $error');
+      },
+    );
+  }
+
+  // Permission handling methods from testing app
+  Future<void> requestOverlayPermission() async {
+    await FlutterOverlayWindow.requestPermission();
+  }
+
+  Future<void> requestBatteryOptimizationDisable() async {
+    try {
+      await _methodChannel.invokeMethod('requestDisable');
+    } catch (e) {
+      debugPrint(
+        '[Pulse AppState] Failed to request battery optimization disable: $e',
       );
+    }
+  }
 
-      final newList = [newNotif, ..._deviceContext.notifications];
-      if (newList.length > 50) newList.removeLast();
+  Future<void> openNotificationSettings() async {
+    try {
+      await _methodChannel.invokeMethod('openNotificationSettings');
+    } catch (e) {
+      debugPrint('[Pulse AppState] Failed to open notification settings: $e');
+    }
+  }
 
-      _deviceContext = DeviceContext(
-        battery: _deviceContext.battery,
-        location: _deviceContext.location,
-        upcomingEvents: _deviceContext.upcomingEvents,
-        notifications: newList,
-        timestamp: DateTime.now(),
-      );
-      notifyListeners();
-      _sendContextSnapshot("notification_received");
+  void _startPeriodicSummarization() {
+    _summaryTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      debugPrint('[Pulse AppState] 5-minute periodic summarization triggered.');
+      _triggerSummarization();
     });
+  }
+
+  void _checkForSurge() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final recentCount = notifications
+        .where(
+          (n) => (now - n.timestamp.millisecondsSinceEpoch) < _surgeWindowMs,
+        )
+        .length;
+
+    if (recentCount >= _surgeThreshold && !_isSurgeActive) {
+      _isSurgeActive = true;
+      notifyListeners();
+      _triggerSummarization(surgeOnly: true);
+    } else if (recentCount < _surgeThreshold && _isSurgeActive) {
+      _isSurgeActive = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> manualRequestSummary() async {
+    debugPrint(
+      '[Pulse AppState] Manual summarization requested (forcing all).',
+    );
+    await _triggerSummarization(forceAll: true);
+  }
+
+  Future<void> _triggerSummarization({
+    bool surgeOnly = false,
+    bool forceAll = false,
+  }) async {
+    if (_isSummarizing) return;
+    if (notifications.isEmpty) {
+      debugPrint('[Pulse AppState] No notifications to summarize.');
+      return;
+    }
+
+    _isSummarizing = true;
+    notifyListeners();
+
+    try {
+      final now = DateTime.now();
+      final nowMs = now.millisecondsSinceEpoch;
+
+      List<NotificationInfo> batchToSummarize;
+
+      if (forceAll) {
+        batchToSummarize = List.of(notifications);
+      } else if (surgeOnly) {
+        batchToSummarize = notifications
+            .where(
+              (n) =>
+                  (nowMs - n.timestamp.millisecondsSinceEpoch) < _surgeWindowMs,
+            )
+            .toList();
+      } else if (_lastSummarizedAt == null) {
+        batchToSummarize = List.of(notifications);
+      } else {
+        batchToSummarize = notifications
+            .where((n) => n.timestamp.isAfter(_lastSummarizedAt!))
+            .toList();
+      }
+
+      if (batchToSummarize.isEmpty) {
+        debugPrint('[Pulse AppState] No NEW notifications since last summary.');
+        _llmHighlight = 'No new notifications since last summary.';
+        _llmDigest = '';
+        _llmActionItems = [];
+        _llmTimestamp = now;
+        _isSummarizing = false;
+        notifyListeners();
+        return;
+      }
+
+      debugPrint(
+        '[Pulse AppState] Summarizing ${batchToSummarize.length} notifications (forceAll: $forceAll)',
+      );
+
+      final summary = await _llmService.summarizeSurge(batchToSummarize);
+
+      _llmHighlight = summary['highlight'] as String? ?? '';
+      _llmDigest = summary['digest'] as String? ?? '';
+      _llmActionItems =
+          (summary['actionItems'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [];
+      _llmTimestamp = now;
+      _lastSummarizedAt = now;
+
+      final bool isOverlayAllowed =
+          await FlutterOverlayWindow.isPermissionGranted();
+      if (isOverlayAllowed && (surgeOnly || _isSurgeActive)) {
+        await FlutterOverlayWindow.showOverlay(
+          enableDrag: true,
+          overlayTitle: "Pulse Digest",
+          overlayContent: _llmHighlight,
+          flag: OverlayFlag.focusPointer,
+          alignment: OverlayAlignment.center,
+          visibility: NotificationVisibility.visibilityPublic,
+          positionGravity: PositionGravity.none,
+          height: WindowSize.matchParent,
+          width: WindowSize.matchParent,
+          startPosition: const OverlayPosition(0, 0),
+        );
+
+        await FlutterOverlayWindow.shareData(
+          jsonEncode({
+            'highlight': _llmHighlight,
+            'actionItems': _llmActionItems,
+            'digest': _llmDigest,
+            'isSurge': surgeOnly || _isSurgeActive,
+          }),
+        );
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Summarization failed: $e');
+    } finally {
+      _isSummarizing = false;
+      notifyListeners();
+    }
   }
 
   String _classifyNotification(
@@ -1743,8 +1948,9 @@ class AppState extends ChangeNotifier {
   }
 
   void seekToProgress(double progress) {
-    if (!_isReplayMode || _scenarioStart == null || _scenarioEnd == null)
+    if (!_isReplayMode || _scenarioStart == null || _scenarioEnd == null) {
       return;
+    }
 
     _replayTimer?.cancel();
 

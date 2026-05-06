@@ -3,6 +3,7 @@ import { normalizeContext } from "../normalization/contextNormalizer";
 import { contextSnapshotRepo } from "../db/ContextSnapshotRepository";
 import { runAgentPulseFlow } from "../services/PulseOrchestrator";
 import { broadcast } from "../index";
+import { notificationSummarizer } from "../services/NotificationSummarizer";
 
 const router = Router();
 
@@ -88,5 +89,23 @@ router.get("/snapshots/latest", async (req: Request, res: Response) => {
     }
 });
 
+/**
+ * POST /api/summarize-notifications
+ * Get an AI summary of a batch of notifications.
+ */
+router.post("/summarize-notifications", async (req: Request, res: Response) => {
+    try {
+        const notifications = req.body.notifications || [];
+        const summary = await notificationSummarizer.summarize(notifications);
+        
+        res.json({
+            ok: true,
+            data: summary
+        });
+    } catch (error: any) {
+        console.error("[Pulse] Summarize notifications error:", error);
+        res.status(500).json({ ok: false, error: "Failed to summarize notifications" });
+    }
+});
 
 export default router;
