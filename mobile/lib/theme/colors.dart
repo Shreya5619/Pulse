@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const Color background = Color(0xFF060609);
-  static const Color surface = Color(0xFF12121A);
+  static const Color background = Color(0xFF0B0B0D);
+  static const Color surface = Color(0xFF16161D);
   static const Color surfaceVariant = Color(0xFF1E1E2A);
   
   static const Color primary = Color(0xFF00D2FF); // Electric Blue

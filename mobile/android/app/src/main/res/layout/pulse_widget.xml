@@ -10,8 +10,9 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="PULSE"
-        android:textColor="#FFFFFF"
-        android:textSize="12sp"
+        android:textColor="#00FFFF"
+        android:textSize="13sp"
+        android:letterSpacing="0.1"
         android:textStyle="bold" />
 
     <TextView
@@ -20,8 +21,9 @@
         android:layout_height="wrap_content"
         android:layout_alignParentEnd="true"
         android:text="NEXT 90M"
-        android:textColor="#80FFFFFF"
-        android:textSize="10sp" />
+        android:textColor="#60FFFFFF"
+        android:textSize="9sp"
+        android:letterSpacing="0.05" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -50,8 +52,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="NOMINAL"
-                android:textColor="#2ECC71"
-                android:textSize="10sp"
+                android:textColor="#00FF9D"
+                android:textSize="9sp"
+                android:letterSpacing="0.1"
                 android:textStyle="bold" />
         </LinearLayout>
 

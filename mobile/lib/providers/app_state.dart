@@ -201,9 +201,7 @@ class AppState extends ChangeNotifier {
 
   final LlmService _llmService = LlmService();
 
-  AppState() {
-    initDoomscrollMonitor();
-  }
+
 
   // Notification getters
   List<NotificationInfo> get notifications => _deviceContext.notifications;
@@ -1037,6 +1035,7 @@ class AppState extends ChangeNotifier {
 
   AppState() {
     _init();
+    initDoomscrollMonitor();
   }
 
   Future<void> _init() async {
