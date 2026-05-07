@@ -1932,6 +1932,10 @@ class AppState extends ChangeNotifier {
     final snap = _pulseSnapshot;
     final score = (snap['topRiskScore'] as num?)?.toDouble() ?? 0.0;
     final state = snap['state'] as String? ?? 'NOMINAL';
+    final nextRisks = (snap['risksNext90M'] as List<dynamic>?)
+            ?.map((e) => (e as Map<String, dynamic>)['label'] as String)
+            .toList() ??
+        [];
     final digest = snap['notificationDigest'] as Map<String, dynamic>?;
     final urgent =
         (digest?['urgent'] as List<dynamic>?)
@@ -1943,8 +1947,7 @@ class AppState extends ChangeNotifier {
             ?.map((e) => e.toString())
             .toList() ??
         [];
-
-    final allRisks = [...urgent, ...important];
+    final allRisks = [...urgent, ...important, ...nextRisks];
 
     HomeWidget.saveWidgetData<String>('risk_score', score.toStringAsFixed(2));
     HomeWidget.saveWidgetData<String>('risk_label', state);
@@ -1960,6 +1963,7 @@ class AppState extends ChangeNotifier {
       'risk_3',
       allRisks.length > 2 ? allRisks[2] : "",
     );
+    HomeWidget.saveWidgetData<String>('risk_count', "${allRisks.length}");
 
     HomeWidget.updateWidget(
       name: 'PulseWidgetProvider',

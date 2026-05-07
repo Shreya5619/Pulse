@@ -1,25 +1,91 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="16dp"
-    android:background="#0A0F2D"
-    android:orientation="vertical"
-    android:gravity="center">
+    android:padding="12dp"
+    android:background="@drawable/widget_background">
 
     <TextView
-        android:id="@+id/widget_risk_score"
+        android:id="@+id/widget_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="0.50"
+        android:text="PULSE"
         android:textColor="#FFFFFF"
-        android:textSize="32sp" />
+        android:textSize="12sp"
+        android:textStyle="bold" />
 
     <TextView
-        android:id="@+id/widget_risk_label"
+        android:id="@+id/widget_time"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="NOMINAL"
-        android:textColor="#2ECC71"
-        android:textSize="14sp" />
-</LinearLayout>
+        android:layout_alignParentEnd="true"
+        android:text="NEXT 90M"
+        android:textColor="#80FFFFFF"
+        android:textSize="10sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/widget_title"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_risk_score"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0.00"
+                android:textColor="#FFFFFF"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_risk_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="NOMINAL"
+                android:textColor="#2ECC71"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.5"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/risk_1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="• Monitoring..."
+                android:textColor="#B0FFFFFF"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/risk_2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text=""
+                android:textColor="#B0FFFFFF"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/risk_3"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text=""
+                android:textColor="#B0FFFFFF"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
+</RelativeLayout>
