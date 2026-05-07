@@ -56,7 +56,30 @@ export class DayPulseService {
         
         // 1. Fetch system events & manual events
         let events = await eventsRepo.getForDay(userId, date);
-        const manualEvents = await userEventsRepo.getManualEvents(userId);
+        const allManualEvents = await userEventsRepo.getManualEvents(userId);
+        
+        // Filter manual events for the specific day
+        const startOfDay = new Date(date);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(date);
+        endOfDay.setHours(23, 59, 59, 999);
+        
+        const manualEvents = allManualEvents.filter(ev => {
+            let evStart = new Date(ev.start_time);
+            
+            // If it's not a valid ISO date but looks like HH:mm
+            if (isNaN(evStart.getTime()) && ev.start_time.includes(':')) {
+                const [h, m] = ev.start_time.split(':').map(Number);
+                if (!isNaN(h) && !isNaN(m)) {
+                    evStart = new Date(date);
+                    evStart.setHours(h, m, 0, 0);
+                }
+            }
+
+            if (isNaN(evStart.getTime())) return false;
+            return evStart >= startOfDay && evStart <= endOfDay;
+        });
+
         events = [...events, ...manualEvents];
  
         // 2. Apply overrides

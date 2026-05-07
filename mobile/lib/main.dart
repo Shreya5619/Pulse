@@ -11,6 +11,7 @@ import 'screens/intervention_screen.dart';
 import 'screens/digest_screen.dart';
 import 'screens/day_pulse_screen.dart';
 import 'screens/overlay_screen.dart';
+import 'screens/chat_screen.dart';
 import 'theme/colors.dart';
 
 void main() async {
@@ -58,6 +59,7 @@ class _MainShellState extends State<MainShell> {
     const DayPulseScreen(),
     const FuturesScreen(),
     const InterventionScreen(),
+    const ChatScreen(),
     const DigestScreen(),
   ];
 
@@ -166,7 +168,8 @@ class _MainShellState extends State<MainShell> {
             _buildNavItem(context, 1, LucideIcons.activity, "Pulse"),
             _buildNavItem(context, 2, LucideIcons.trendingUp, "Futures"),
             _buildNavItem(context, 3, LucideIcons.zap, "Actions"),
-            _buildNavItem(context, 4, LucideIcons.layout, "Digest"),
+            _buildNavItem(context, 4, LucideIcons.messageSquare, "Ask"),
+            _buildNavItem(context, 5, LucideIcons.layout, "Digest"),
           ],
         ),
       ),

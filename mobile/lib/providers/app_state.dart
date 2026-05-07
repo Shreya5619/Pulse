@@ -20,6 +20,22 @@ import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:home_widget/home_widget.dart';
 import '../services/llm_service.dart';
 
+class ChatMessage {
+  final String text;
+  final bool isUser;
+  final DateTime timestamp;
+  final List<String> toolsUsed;
+  final List<Map<String, dynamic>> actions;
+
+  ChatMessage({
+    required this.text,
+    required this.isUser,
+    required this.timestamp,
+    this.toolsUsed = const [],
+    this.actions = const [],
+  });
+}
+
 class TimelineEvent {
   final String id;
   final DateTime timestamp;
@@ -313,6 +329,11 @@ class AppState extends ChangeNotifier {
   Map<String, dynamic>? _proposedCommAction;
   List<DayPulseBlock> _dayPulseBlocks = [];
   bool _isDayPulseProposed = false;
+
+  List<ChatMessage> _chatMessages = [];
+  List<ChatMessage> get chatMessages => _chatMessages;
+  bool _isChatLoading = false;
+  bool get isChatLoading => _isChatLoading;
 
   bool get isDayPulseProposed => _isDayPulseProposed;
 
@@ -705,6 +726,87 @@ class AppState extends ChangeNotifier {
   Future<void> discardDayPulseProposed() async {
     _isDayPulseProposed = false;
     await fetchDayPulse();
+  }
+
+  Future<void> sendChatMessage(String message) async {
+    if (message.trim().isEmpty) return;
+
+    final userMsg = ChatMessage(
+      text: message,
+      isUser: true,
+      timestamp: DateTime.now(),
+    );
+    _chatMessages.add(userMsg);
+    _isChatLoading = true;
+    notifyListeners();
+
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/chat/message');
+      
+      final history = _chatMessages.take(_chatMessages.length - 1).map((m) => {
+        'role': m.isUser ? 'user' : 'assistant',
+        'content': m.text,
+      }).toList();
+
+      final response = await http.post(
+        url,
+        headers: _authHeaders,
+        body: jsonEncode({
+          'userId': _userId,
+          'message': message,
+          'history': history,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body)['data'];
+        final rawText = data['text'] as String;
+        
+        // Parse actions: [Action: Title | ID]
+        final actionRegex = RegExp(r'\[Action: (.*?) \| (.*?)\]');
+        final matches = actionRegex.allMatches(rawText);
+        final actions = matches.map((m) => {
+          'title': m.group(1),
+          'id': m.group(2),
+        }).toList();
+        
+        final cleanText = rawText.replaceAll(actionRegex, '').trim();
+
+        final botMsg = ChatMessage(
+          text: cleanText,
+          isUser: false,
+          timestamp: DateTime.now(),
+          toolsUsed: List<String>.from(data['toolsUsed'] ?? []),
+          actions: actions,
+        );
+        _chatMessages.add(botMsg);
+
+        // Auto-refresh relevant data if agent modified state
+        if (botMsg.toolsUsed.contains('addDailyEvent') || botMsg.toolsUsed.contains('applyAction')) {
+          fetchDayPulse();
+        }
+        if (botMsg.toolsUsed.contains('updateTwinGraph')) {
+          fetchTwinGraph();
+        }
+      } else {
+        _chatMessages.add(ChatMessage(
+          text: "Sorry, I'm having trouble connecting right now.",
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Chat error: $e');
+      _chatMessages.add(ChatMessage(
+        text: "Error connecting to Pulse intelligence. Please check your connection.",
+        isUser: false,
+        timestamp: DateTime.now(),
+      ));
+    } finally {
+      _isChatLoading = false;
+      notifyListeners();
+    }
   }
 
   // Pulse snapshot (Day 12 — persistent widget source of truth)

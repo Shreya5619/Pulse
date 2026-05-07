@@ -1,3 +1,5 @@
+import { queryGroq } from "../utils/llm";
+
 // Safe JSON parser that strips markdown fences from LLM output
 function parseSafe<T>(text: string): T {
     try { return JSON.parse(text) as T; } catch (_) {}
@@ -8,28 +10,14 @@ function parseSafe<T>(text: string): T {
 
 // JSON-enforced LLM caller with strict system prompt
 async function queryLLM(systemSchema: string, userPrompt: string): Promise<string> {
-    const apiKey = process.env.GROQ_API_KEY || process.env.GROQ_API;
-    if (!apiKey) {
-        console.warn("[OpenClaw] No API key found. Returning mock.");
-        return "{}";
-    }
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-        body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
-            messages: [
-                {
-                    role: "system",
-                    content: `You are a strict JSON API. Output ONLY a valid JSON object matching this schema: ${systemSchema}. No markdown. No explanations. No extra keys. Start your response with { and end with }.`
-                },
-                { role: "user", content: userPrompt }
-            ]
-        })
-    });
-    if (!response.ok) throw new Error(`Groq error: ${response.statusText}`);
-    const data = await response.json() as any;
-    return data.choices?.[0]?.message?.content || "{}";
+    const messages = [
+        {
+            role: "system",
+            content: `You are a strict JSON API. Output ONLY a valid JSON object matching this schema: ${systemSchema}. No markdown. No explanations. No extra keys. Start your response with { and end with }.`
+        },
+        { role: "user", content: userPrompt }
+    ];
+    return await queryGroq(messages);
 }
 
 export class OpenClawOrchestrator {
