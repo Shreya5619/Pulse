@@ -11,8 +11,11 @@ import {
   batteryRisk,
   assessActBattery,
   responseDebtRisk,
-  overloadRisk
+  overloadRisk,
+  assessOverload
 } from "./RiskEngine";
+import { userEventsRepo } from "../db/UserEventsRepository";
+import { routineRepo } from "../db/RoutineRepository";
 
 export class GraphBuilder {
   private graphCache = new Map<string, { nodes: GraphNode[]; edges: GraphEdge[]; summary: GraphSummary; context: ContextSnapshot }>();
@@ -20,10 +23,36 @@ export class GraphBuilder {
   async buildForUser(userId: string): Promise<{ nodes: GraphNode[]; edges: GraphEdge[]; summary: GraphSummary; context: ContextSnapshot }> {
     const context = await contextSnapshotRepo.findLatestByUser(userId);
     const memory = await memoryStore.loadAll(userId);
-    const upcomingEvents = await eventsRepo.getUpcoming(userId, { withinMinutes: 240 });
+    
+    // 1. Fetch system events (from context)
+    let allEventsRaw: CalendarEvent[] = [];
+    if (context.calendar?.next_event) allEventsRaw.push(context.calendar.next_event);
+    if (context.calendar?.upcoming_events) allEventsRaw.push(...context.calendar.upcoming_events);
+
+    // 2. Fetch manual events & apply overrides
+    const manualEvents = await userEventsRepo.getManualEvents(userId);
+    const overrides = await userEventsRepo.getOverrides(userId);
+    
+    allEventsRaw = [...allEventsRaw, ...manualEvents];
+
+    // Apply overrides & filter deleted
+    const events = allEventsRaw.map(event => {
+        const override = overrides.find(o => o.eventId === event.id);
+        if (override) return { ...event, ...override.updates };
+        return event;
+    }).filter(event => {
+        const override = overrides.find(o => o.eventId === event.id);
+        return !override?.isDeleted;
+    });
+
+    // 3. Dedupe by ID
+    const eventMap = new Map();
+    for (const e of events) {
+      if (e.id) eventMap.set(e.id, e);
+    }
+    const allEvents = Array.from(eventMap.values()) as CalendarEvent[];
 
     if (!context) {
-      // Return a minimal stub context so callers don't need null-checks
       const stub = { timestamp: new Date().toISOString() } as ContextSnapshot;
       return { nodes: [], edges: [], summary: { totalRisksNext90Min: 0, risks: [] }, context: stub };
     }
@@ -31,7 +60,7 @@ export class GraphBuilder {
     const nodes: GraphNode[] = [];
     const edges: GraphEdge[] = [];
 
-    // 1. NOW Node
+    // 4. NOW Node
     const nowNode: GraphNode = {
       id: "NOW",
       type: "NOW",
@@ -40,25 +69,13 @@ export class GraphBuilder {
     };
     nodes.push(nowNode);
 
-    // 2. PLACE Nodes
+    // 5. PLACE Nodes
     const currentPlaceId = context.location.place_id || "current_loc";
     nodes.push({
       id: `PLACE_${currentPlaceId}`,
       type: "PLACE",
       label: currentPlaceId === "current_loc" ? "Unknown Location" : `Location: ${currentPlaceId}`
     });
-
-    // 3. APPOINTMENT Nodes & TRAVEL Edges
-    const allEventsRaw = [];
-    if (context.calendar.next_event) allEventsRaw.push(context.calendar.next_event);
-    if (context.calendar.upcoming_events) allEventsRaw.push(...context.calendar.upcoming_events);
-
-    // Dedupe by ID
-    const eventMap = new Map();
-    for (const e of allEventsRaw) {
-      if (e.id) eventMap.set(e.id, e);
-    }
-    const allEvents = Array.from(eventMap.values());
 
     for (const event of allEvents) {
       const hasLocation = !!(event.location?.lat || event.location_text);

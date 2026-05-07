@@ -35,10 +35,12 @@ function findNextPhysicalAppointment(
     .filter((n) => n.type === "APPOINTMENT" && n.timeWindow?.start)
     .map((n) => {
       const startMs = new Date(n.timeWindow!.start).getTime();
+      const endMs = n.timeWindow!.end ? new Date(n.timeWindow!.end).getTime() : startMs + 3600000;
       const minutesToEvent = (startMs - nowMs) / 60000;
-      return { node: n, minutesToEvent };
+      const isOver = nowMs > endMs;
+      return { node: n, minutesToEvent, isOver };
     })
-    .filter((a) => a.minutesToEvent > 0)
+    .filter((a) => !a.isOver)
     .sort((a, b) => a.minutesToEvent - b.minutesToEvent);
 
   if (appts.length === 0) return null;
@@ -60,10 +62,12 @@ function findNextActNode(
     .filter((n) => n.type === "ACT" && n.timeWindow?.start)
     .map((n) => {
       const startMs = new Date(n.timeWindow!.start).getTime();
+      const endMs = n.timeWindow!.end ? new Date(n.timeWindow!.end).getTime() : startMs + 3600000;
       const minutesToEvent = (startMs - nowMs) / 60000;
-      return { node: n, minutesToEvent };
+      const isOver = nowMs > endMs;
+      return { node: n, minutesToEvent, isOver };
     })
-    .filter((a) => a.minutesToEvent > 0)
+    .filter((a) => !a.isOver)
     .sort((a, b) => a.minutesToEvent - b.minutesToEvent);
 
   return acts.length > 0 ? acts[0] : null;

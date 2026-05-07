@@ -1150,11 +1150,19 @@ class AppState extends ChangeNotifier {
       highlight = "${digestData['total_count']} notifications summarized";
     }
 
+    // Get real risks from the current snapshot if available
+    final nextRisks = _currentRiskSnapshot?.risks.map((r) => {
+      'type': r.type.name,
+      'label': r.summary, // Use summary as the label for the widget
+      'score': r.score,
+    }).toList() ?? [];
+
     _pulseSnapshot = {
       'state': _currentRisk.score >= 0.7
           ? 'CRITICAL'
           : (_currentRisk.score >= 0.4 ? 'RISK_FORMING' : 'NOMINAL'),
       'topRiskScore': _currentRisk.score,
+      'risksNext90M': nextRisks, // Added this back
       'notificationContent': {
         'title': _currentRisk.score >= 0.7 ? 'Urgent Risk' : 'Pulse Active',
         'subtitle': _currentRisk.reasons.isNotEmpty
@@ -1424,8 +1432,20 @@ class AppState extends ChangeNotifier {
       );
       _lastHeartbeatTime = timestamp;
       final hData = data['data'];
-      if (hData != null && hData['risksNext90Min'] != null) {
-        _risksNext90Min = (hData['risksNext90Min'] as num).toInt();
+      if (hData != null) {
+        if (hData['risksNext90Min'] != null) {
+          _risksNext90Min = (hData['risksNext90Min'] as num).toInt();
+        }
+        if (hData['score'] != null) {
+          final newScore = (hData['score'] as num).toDouble();
+          _currentRisk = RiskState(
+            score: newScore,
+            level: _parseRiskLevel(hData['state'] as String?),
+            timestamp: timestamp,
+            reasons: _currentRisk.reasons,
+            history: _currentRisk.history,
+          );
+        }
       }
     } else if (type == 'graph.updated') {
       if (data['userId'] != null && data['userId'] != _userId) return;
@@ -1448,6 +1468,7 @@ class AppState extends ChangeNotifier {
 
     notifyListeners();
     _syncPulseSnapshot();
+    _updateNativeNotification();
   }
 
   void _generateMockData() {
@@ -1932,7 +1953,8 @@ class AppState extends ChangeNotifier {
     final snap = _pulseSnapshot;
     final score = (snap['topRiskScore'] as num?)?.toDouble() ?? 0.0;
     final state = snap['state'] as String? ?? 'NOMINAL';
-    final nextRisks = (snap['risksNext90M'] as List<dynamic>?)
+    final nextRisks =
+        (snap['risksNext90M'] as List<dynamic>?)
             ?.map((e) => (e as Map<String, dynamic>)['label'] as String)
             .toList() ??
         [];
@@ -1972,7 +1994,7 @@ class AppState extends ChangeNotifier {
   }
 
   String _getBackendHost() {
-    return '10.123.31.141';
+    return '10.166.208.141';
   }
 
   Map<String, String> get _authHeaders => {
