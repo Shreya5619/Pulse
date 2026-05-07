@@ -59,21 +59,22 @@ export class DayPulseService {
         const allManualEvents = await userEventsRepo.getManualEvents(userId);
         
         // Filter manual events for the specific day
+        // Filter manual events for the specific day (assuming IST for hackathon consistency)
         const startOfDay = new Date(date);
-        startOfDay.setHours(0, 0, 0, 0);
+        startOfDay.setUTCHours(0 - 5, 0 - 30, 0, 0); // IST 00:00
         const endOfDay = new Date(date);
-        endOfDay.setHours(23, 59, 59, 999);
+        endOfDay.setUTCHours(23 - 5, 59 - 30, 59, 999); // IST 23:59
         
         const manualEvents = allManualEvents.filter(ev => {
             let evStart = new Date(ev.start_time);
             
             // If it's not a valid ISO date but looks like HH:mm
             if (isNaN(evStart.getTime()) && ev.start_time.includes(':')) {
-                const [h, m] = ev.start_time.split(':').map(Number);
-                if (!isNaN(h) && !isNaN(m)) {
-                    evStart = new Date(date);
-                    evStart.setHours(h, m, 0, 0);
-                }
+                const parts = ev.start_time.split(':').map(Number);
+                const h = parts[0];
+                const m = parts[1] || 0;
+                evStart = new Date(date);
+                evStart.setUTCHours(h - 5, m - 30, 0, 0);
             }
 
             if (isNaN(evStart.getTime())) return false;
@@ -157,6 +158,28 @@ export class DayPulseService {
 
         // 4. Add Event Blocks
         for (const event of events) {
+            // Ensure times are ISO for the Flutter client
+            let isoStart = event.start_time;
+            let isoEnd = event.end_time;
+
+            const parseToIso = (timeStr: string) => {
+                const d = new Date(timeStr);
+                if (!isNaN(d.getTime())) return d.toISOString();
+                if (timeStr && timeStr.includes(':')) {
+                    const parts = timeStr.split(':').map(Number);
+                    const h = parts[0];
+                    const m = parts[1] || 0;
+                    const dateObj = new Date(date);
+                    // Hackathon IST offset: subtract 5:30 to get UTC from IST
+                    dateObj.setUTCHours(h - 5, m - 30, 0, 0);
+                    return dateObj.toISOString();
+                }
+                return new Date(date).toISOString(); // Fallback
+            };
+
+            if (!isoStart.includes('T')) isoStart = parseToIso(isoStart);
+            if (!isoEnd.includes('T')) isoEnd = parseToIso(isoEnd);
+
             let etaMinutes: number | undefined;
             if (context) {
                 let startLat = event.start_location?.lat;
@@ -197,8 +220,8 @@ export class DayPulseService {
             blocks.push({
                 eventId: event.id || `event_${(event.title as any).hashCode}`,
                 title: event.title,
-                startTime: event.start_time,
-                endTime: event.end_time,
+                startTime: isoStart,
+                endTime: isoEnd,
                 type: (event.location?.lat || event.location_text) ? 'event' : 'act',
                 locationText: event.location_text ?? undefined,
                 etaMinutes,

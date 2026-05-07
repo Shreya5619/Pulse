@@ -11,7 +11,7 @@ const router = Router();
 
 router.get("/day-pulse", async (req: Request, res: Response) => {
     try {
-        const userId = req.header("X-User-Id") || req.query.userId as string || req.query.deviceId as string || "demo-user";
+        const userId = req.header("X-User-Id") || req.query.userId as string || req.query.deviceId as string || "user1";
         const date = req.query.date as string || new Date().toISOString().split('T')[0];
         
         const timeline = await dayPulseService.getDailyTimeline(userId, date);
@@ -73,7 +73,7 @@ async function resolveLocationAndEta(startLocation: any, locationText: string | 
 router.post("/day-pulse/modify", async (req: Request, res: Response) => {
     try {
         const { userId: bodyUserId, deviceId, eventId, updates, isRecurring, days, date: reqDate } = req.body;
-        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "demo-user";
+        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "user1";
         console.log(`[DayPulseRoute] Proposing modification for event ${eventId} for user ${userId}`);
 
         const date = reqDate || new Date().toISOString().split('T')[0];
@@ -109,7 +109,7 @@ router.post("/day-pulse/modify", async (req: Request, res: Response) => {
 router.post("/day-pulse/add", async (req: Request, res: Response) => {
     try {
         const { userId: bodyUserId, deviceId, event, category, date: reqDate } = req.body;
-        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "demo-user";
+        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "user1";
         
         const date = reqDate || new Date().toISOString().split('T')[0];
         const timeline = await dayPulseService.getDailyTimeline(userId, date);
@@ -149,7 +149,7 @@ router.post("/day-pulse/add", async (req: Request, res: Response) => {
 router.post("/day-pulse/delete", async (req: Request, res: Response) => {
     try {
         const { userId: bodyUserId, deviceId, eventId, date: reqDate } = req.body;
-        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "demo-user";
+        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "user1";
         
         const date = reqDate || new Date().toISOString().split('T')[0];
         const timeline = await dayPulseService.getDailyTimeline(userId, date);
@@ -173,7 +173,7 @@ router.post("/day-pulse/delete", async (req: Request, res: Response) => {
 router.post("/day-pulse/persist", async (req: Request, res: Response) => {
     try {
         const { userId: bodyUserId, deviceId, blocks } = req.body;
-        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "demo-user";
+        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "user1";
         
         console.log(`[DayPulseRoute] Persisting all changes for user ${userId}`);
 
@@ -231,7 +231,7 @@ router.post("/day-pulse/persist", async (req: Request, res: Response) => {
 router.post("/pulse/action", async (req: Request, res: Response) => {
     try {
         const { userId: bodyUserId, deviceId, action } = req.body;
-        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "demo-user";
+        const userId = req.header("X-User-Id") || bodyUserId || deviceId || "user1";
         const actionId = action.id;
 
         console.log(`[DayPulseRoute] Action dispatched: user=${userId}, actionId=${actionId}`);

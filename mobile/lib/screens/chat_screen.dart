@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../providers/app_state.dart';
 import '../theme/colors.dart';
+import '../widgets/action_cards.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -159,7 +160,8 @@ class _ChatScreenState extends State<ChatScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
-        crossAxisAlignment: msg.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment:
+            msg.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           if (!msg.isUser && msg.toolsUsed.isNotEmpty)
             Padding(
@@ -172,10 +174,12 @@ class _ChatScreenState extends State<ChatScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.75,
+              maxWidth: MediaQuery.of(context).size.width * 0.85,
             ),
             decoration: BoxDecoration(
-              color: msg.isUser ? AppColors.primary : Colors.white.withValues(alpha: 0.08),
+              color: msg.isUser
+                  ? AppColors.primary
+                  : Colors.white.withValues(alpha: 0.08),
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(20),
                 topRight: const Radius.circular(20),
@@ -194,10 +198,16 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           if (msg.actions.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Wrap(
-                spacing: 8,
-                children: msg.actions.map((a) => _buildActionCard(a)).toList(),
+              padding: const EdgeInsets.only(top: 12),
+              child: Column(
+                children: msg.actions
+                    .map(
+                      (a) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: UnifiedActionCard(action: a),
+                      ),
+                    )
+                    .toList(),
               ),
             ),
         ],
@@ -241,59 +251,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildActionCard(Map<String, dynamic> action) {
-    return Container(
-      width: 180,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            action['title'] ?? 'Action',
-            style: GoogleFonts.outfit(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 10),
-          GestureDetector(
-            onTap: () {
-              Provider.of<AppState>(context, listen: false).acceptAction({
-                'id': action['id'],
-                'title': action['title'],
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("Action confirmed: ${action['title']}")),
-              );
-            },
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                "Confirm",
-                style: GoogleFonts.outfit(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildLoadingIndicator() {
     return Padding(

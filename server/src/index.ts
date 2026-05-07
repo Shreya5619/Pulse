@@ -148,7 +148,7 @@ app.post("/demo/trigger", async (_req: Request, res: Response) => {
         return res.status(500).json({ ok: false, error: "Missing demo scenario file" });
     }
     const scenario = readJson(scenarioPath) as any;
-    const userId = scenario.context?.userId || "demo-user";
+    const userId = scenario.context?.userId || "user1";
 
     if (isPulseRunning) {
         return res.status(429).json({
@@ -173,7 +173,7 @@ app.post("/demo/trigger", async (_req: Request, res: Response) => {
 });
 
 app.post("/heartbeat/manual", async (req: Request, res: Response) => {
-    const userId = req.body?.userId || "demo-user";
+    const userId = req.body?.userId || "user1";
     console.log(`[Pulse] Manual heartbeat requested for ${userId}`);
 
     if (isPulseRunning) {

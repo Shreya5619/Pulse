@@ -20,8 +20,9 @@ function parseSafe<T>(text: string): T {
 
 export class ChatAgentService {
 
-    async handleMessage(userId: string, userMessage: string, history: any[] = []): Promise<any> {
+    async handleMessage(userId: string, userMessage: string, history: any[] = [], currentTime?: string): Promise<any> {
         console.log(`[ChatAgent] Handling message for ${userId}: "${userMessage}"`);
+        const userTime = currentTime || new Date().toISOString();
 
         const personality = await GraphAdapter.getUserPersonality(userId);
         const preferences = await GraphAdapter.getUserPreferences(userId);
@@ -31,7 +32,8 @@ You are the Pulse Digital Twin — the front door to the user's digital self.
 You are NOT a generic assistant. You are "Pulse", an AI that understands the user's live graph, risks, and day.
 
 CONTEXT:
-- Current Time: ${new Date().toLocaleString()}
+- Current Time: ${userTime} (Planning base)
+- Today is: ${userTime.split('T')[0]}
 - User ID: ${userId}
 
 PERSONALITY:
@@ -58,13 +60,23 @@ TOOLS AVAILABLE:
 - getNotificationSummary(): Summarizes recent alerts.
 - simulateWhatIf(): Returns 3 future scenarios (Do Nothing, Recommended, Focus).
 - updateTwinGraph(data): Update traits, interests, or sentiment. Data: { traits?: string[], interests?: string[], sentiment?: string }.
-- addDailyEvent(event): Add a manual event. Event: { title, startTime, endTime, locationText? }. Use FULL ISO 8601 strings for times (e.g., "${new Date().toISOString()}").
+- addDailyEvent(event): Add a manual event. Event: { title, startTime, endTime, locationText? }. Use FULL ISO 8601 strings for times relative to current time (e.g., "${userTime}").
 - applyAction(actionId): Executes a specific intervention (e.g. 'ACTION_ENABLE_BATTERY_SAVER').
 
 RESPONSE FORMAT:
 - Tool call: {"tool": "toolName", "args": {}}
 - Final answer: Your message to the user.
-- Suggested actions: [Action: Title | ID]
+- Suggested actions: Use this for ANY proactive recommendation. 
+  Format: [Action: Title | ID | Description? | Impact?]
+  Common IDs: 
+    - ACTION_ENABLE_BATTERY_SAVER (Battery optimization)
+    - ACTION_SUPPRESS_NOISY_NOTIFICATIONS (Mute notifications)
+    - ACTION_RECOMMEND_CHARGING_STOP (Add charging to schedule)
+    - ACTION_SEND_LATE_MESSAGE (Triggers smart message drafting)
+    - ACTION_OPEN_SETTINGS (General app settings)
+  Example: [Action: Mute Social Apps | ACTION_SUPPRESS_NOISY_NOTIFICATIONS | Stay focused during study | Reduces noise by 80%]
+- If the user needs to send a message, suggest ACTION_SEND_LATE_MESSAGE. It will show a rich card with role-based drafting.
+- ALWAYS suggest at least one relevant action if a risk is detected or an intervention is available.
 `;
 
         const messages = [
@@ -131,15 +143,18 @@ RESPONSE FORMAT:
                 });
                 return "Twin graph updated.";
             case "addDailyEvent":
+                console.log(`[ChatAgent] Adding manual event for ${userId}:`, args);
                 const event = {
                     id: `manual_${Date.now()}`,
                     title: args.title,
                     start_time: args.startTime,
                     end_time: args.endTime,
-                    location_text: args.locationText,
-                    importance: 1
+                    location_text: args.locationText || "",
+                    is_all_day: false,
+                    importance: "normal"
                 };
                 await userEventsRepo.addManualEvent(userId, event as any);
+                console.log(`[ChatAgent] Event added successfully for ${userId}`);
                 return "Event added to Daily Pulse.";
             case "applyAction":
                 console.log(`[ChatAgent] Applying action ${args.actionId} for ${userId}`);

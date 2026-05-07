@@ -743,11 +743,13 @@ class AppState extends ChangeNotifier {
     try {
       final host = _getBackendHost();
       final url = Uri.parse('http://$host:8080/api/chat/message');
-      
-      final history = _chatMessages.take(_chatMessages.length - 1).map((m) => {
-        'role': m.isUser ? 'user' : 'assistant',
-        'content': m.text,
-      }).toList();
+
+      final history = _chatMessages
+          .take(_chatMessages.length - 1)
+          .map(
+            (m) => {'role': m.isUser ? 'user' : 'assistant', 'content': m.text},
+          )
+          .toList();
 
       final response = await http.post(
         url,
@@ -756,21 +758,27 @@ class AppState extends ChangeNotifier {
           'userId': _userId,
           'message': message,
           'history': history,
+          'currentTime': DateTime.now().toIso8601String(),
         }),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body)['data'];
         final rawText = data['text'] as String;
-        
-        // Parse actions: [Action: Title | ID]
-        final actionRegex = RegExp(r'\[Action: (.*?) \| (.*?)\]');
+
+        // Parse actions: [Action: Title | ID | Description? | Impact?]
+        final actionRegex = RegExp(r'\[Action: (.*?)\]');
         final matches = actionRegex.allMatches(rawText);
-        final actions = matches.map((m) => {
-          'title': m.group(1),
-          'id': m.group(2),
+        final actions = matches.map((m) {
+          final parts = m.group(1)!.split('|').map((s) => s.trim()).toList();
+          return {
+            'title': parts.isNotEmpty ? parts[0] : '',
+            'id': parts.length > 1 ? parts[1] : '',
+            'description': parts.length > 2 ? parts[2] : '',
+            'impact': parts.length > 3 ? parts[3] : '',
+          };
         }).toList();
-        
+
         final cleanText = rawText.replaceAll(actionRegex, '').trim();
 
         final botMsg = ChatMessage(
@@ -783,26 +791,32 @@ class AppState extends ChangeNotifier {
         _chatMessages.add(botMsg);
 
         // Auto-refresh relevant data if agent modified state
-        if (botMsg.toolsUsed.contains('addDailyEvent') || botMsg.toolsUsed.contains('applyAction')) {
+        if (botMsg.toolsUsed.contains('addDailyEvent') ||
+            botMsg.toolsUsed.contains('applyAction')) {
           fetchDayPulse();
         }
         if (botMsg.toolsUsed.contains('updateTwinGraph')) {
           fetchTwinGraph();
         }
       } else {
-        _chatMessages.add(ChatMessage(
-          text: "Sorry, I'm having trouble connecting right now.",
-          isUser: false,
-          timestamp: DateTime.now(),
-        ));
+        _chatMessages.add(
+          ChatMessage(
+            text: "Sorry, I'm having trouble connecting right now.",
+            isUser: false,
+            timestamp: DateTime.now(),
+          ),
+        );
       }
     } catch (e) {
       debugPrint('[Pulse AppState] Chat error: $e');
-      _chatMessages.add(ChatMessage(
-        text: "Error connecting to Pulse intelligence. Please check your connection.",
-        isUser: false,
-        timestamp: DateTime.now(),
-      ));
+      _chatMessages.add(
+        ChatMessage(
+          text:
+              "Error connecting to Pulse intelligence. Please check your connection.",
+          isUser: false,
+          timestamp: DateTime.now(),
+        ),
+      );
     } finally {
       _isChatLoading = false;
       notifyListeners();
@@ -1253,11 +1267,17 @@ class AppState extends ChangeNotifier {
     }
 
     // Get real risks from the current snapshot if available
-    final nextRisks = _currentRiskSnapshot?.risks.map((r) => {
-      'type': r.type.name,
-      'label': r.summary, // Use summary as the label for the widget
-      'score': r.score,
-    }).toList() ?? [];
+    final nextRisks =
+        _currentRiskSnapshot?.risks
+            .map(
+              (r) => {
+                'type': r.type.name,
+                'label': r.summary, // Use summary as the label for the widget
+                'score': r.score,
+              },
+            )
+            .toList() ??
+        [];
 
     _pulseSnapshot = {
       'state': _currentRisk.score >= 0.7
@@ -2096,7 +2116,7 @@ class AppState extends ChangeNotifier {
   }
 
   String _getBackendHost() {
-    return '10.166.208.141';
+    return '172.20.10.5';
   }
 
   Map<String, String> get _authHeaders => {

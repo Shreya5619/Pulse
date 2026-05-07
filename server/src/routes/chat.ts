@@ -13,14 +13,14 @@ const router = Router();
 router.post("/message", async (req: Request, res: Response) => {
     try {
         const userId = req.header("X-User-Id") || req.body.userId || "user1";
-        const { message, history } = req.body;
+        const { message, history, currentTime } = req.body;
 
         if (!message) {
             return res.status(400).json({ ok: false, error: "Missing 'message' in request body." });
         }
 
         console.log(`[Chat Route] Incoming message from ${userId}`);
-        const result = await chatAgentService.handleMessage(userId, message, history || []);
+        const result = await chatAgentService.handleMessage(userId, message, history || [], currentTime);
 
         res.json({
             ok: true,

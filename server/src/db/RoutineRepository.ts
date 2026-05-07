@@ -15,7 +15,7 @@ export interface RoutineBlock {
 
 export class RoutineRepository {
     async getForUser(userId: string): Promise<RoutineBlock[]> {
-        const sql = `SELECT * FROM routines WHERE user_id = $1 OR user_id = 'demo-user'`;
+        const sql = `SELECT * FROM routines WHERE user_id = $1 OR user_id = 'user1'`;
         const res = await query(sql, [userId]);
         return res.rows.map(row => ({
             id: row.id,
@@ -88,7 +88,7 @@ export class RoutineRepository {
     }
 
     private async getRoutine(userId: string, routineId: string): Promise<RoutineBlock | null> {
-        const sql = `SELECT * FROM routines WHERE id = $1 AND (user_id = $2 OR user_id = 'demo-user')`;
+        const sql = `SELECT * FROM routines WHERE id = $1 AND (user_id = $2 OR user_id = 'user1')`;
         const res = await query(sql, [routineId, userId]);
         if (res.rows.length === 0) return null;
         const row = res.rows[0];

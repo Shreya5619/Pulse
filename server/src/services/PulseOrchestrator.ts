@@ -5,7 +5,7 @@ const runningUsers = new Set<string>();
 let lastInterventionText = "";
 
 export async function runAgentPulseFlow(initialContext: any, broadcast: (message: any) => void) {
-    const userId = initialContext.user_id || initialContext.userId || "demo-user";
+    const userId = initialContext.user_id || initialContext.userId || "user1";
     if (runningUsers.has(userId)) {
         console.log(`[Pulse] Run already in progress for user ${userId}, skipping.`);
         return;
