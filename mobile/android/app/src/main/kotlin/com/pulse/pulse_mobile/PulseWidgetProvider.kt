@@ -4,8 +4,10 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Color
+import android.net.Uri
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetProvider
+import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import com.pulse.pulse_mobile.R
 
 class PulseWidgetProvider : HomeWidgetProvider() {
@@ -39,6 +41,10 @@ class PulseWidgetProvider : HomeWidgetProvider() {
                     setTextViewText(R.id.risk_1, if (risk1?.isNotEmpty() == true) "• $risk1" else "")
                     setTextViewText(R.id.risk_2, if (risk2?.isNotEmpty() == true) "• $risk2" else "")
                     setTextViewText(R.id.risk_3, if (risk3?.isNotEmpty() == true) "• $risk3" else "")
+
+                    // Quick access to chat
+                    val pendingIntent = HomeWidgetLaunchIntent.getActivity(context, MainActivity::class.java, Uri.parse("pulse://ask_pulse"))
+                    setOnClickPendingIntent(R.id.widget_ask_bar, pendingIntent)
                 }
                 appWidgetManager.updateAppWidget(appWidgetId, views)
             } catch (e: Exception) {

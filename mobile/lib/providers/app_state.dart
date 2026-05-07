@@ -18,6 +18,9 @@ import '../services/storage_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:home_widget/home_widget.dart';
+import 'package:record/record.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:http_parser/http_parser.dart';
 import '../services/llm_service.dart';
 
 class ChatMessage {
@@ -334,6 +337,86 @@ class AppState extends ChangeNotifier {
   List<ChatMessage> get chatMessages => _chatMessages;
   bool _isChatLoading = false;
   bool get isChatLoading => _isChatLoading;
+
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  bool _isRecording = false;
+  bool get isRecording => _isRecording;
+
+  Future<void> startRecording() async {
+    try {
+      if (await _audioRecorder.hasPermission()) {
+        final dir = await getTemporaryDirectory();
+        final path =
+            '${dir.path}/recording_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+        const config = RecordConfig(encoder: AudioEncoder.aacLc);
+
+        await _audioRecorder.start(config, path: path);
+        _isRecording = true;
+        notifyListeners();
+        debugPrint('[Pulse AppState] Recording started: $path');
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error starting recording: $e');
+    }
+  }
+
+  Future<void> stopRecordingAndSend() async {
+    try {
+      final path = await _audioRecorder.stop();
+      _isRecording = false;
+      notifyListeners();
+
+      if (path != null) {
+        debugPrint('[Pulse AppState] Recording stopped: $path');
+        await _transcribeAndSend(path);
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error stopping recording: $e');
+      _isRecording = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _transcribeAndSend(String path) async {
+    _isChatLoading = true;
+    notifyListeners();
+
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/chat/transcribe');
+
+      final request = http.MultipartRequest('POST', url);
+      request.headers.addAll(_authHeaders);
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'audio',
+          path,
+          contentType: MediaType('audio', 'mpeg'),
+        ),
+      );
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final text = data['data']['text'] as String;
+        debugPrint('[Pulse AppState] Transcription success: $text');
+
+        if (text.trim().isNotEmpty) {
+          await sendChatMessage(text);
+        }
+      } else {
+        debugPrint('[Pulse AppState] Transcription failed: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error transcribing audio: $e');
+    } finally {
+      _isChatLoading = false;
+      notifyListeners();
+    }
+  }
 
   bool get isDayPulseProposed => _isDayPulseProposed;
 
@@ -758,7 +841,7 @@ class AppState extends ChangeNotifier {
           'userId': _userId,
           'message': message,
           'history': history,
-          'currentTime': DateTime.now().toIso8601String(),
+          'currentTime': DateTime.now().toUtc().toIso8601String(),
         }),
       );
 
@@ -821,6 +904,12 @@ class AppState extends ChangeNotifier {
       _isChatLoading = false;
       notifyListeners();
     }
+  }
+
+  void initiateChat(String message) {
+    _currentTabIndex = 4; // Chat screen index
+    notifyListeners();
+    sendChatMessage(message);
   }
 
   // Pulse snapshot (Day 12 — persistent widget source of truth)
@@ -2116,7 +2205,7 @@ class AppState extends ChangeNotifier {
   }
 
   String _getBackendHost() {
-    return '172.20.10.5';
+    return '10.166.208.141';
   }
 
   Map<String, String> get _authHeaders => {

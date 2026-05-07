@@ -1,14 +1,16 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import '../providers/app_state.dart';
 import '../theme/colors.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class ActionExecutor {
-  static void execute(BuildContext context, AppState state, Map<String, dynamic> action) {
+  static void execute(
+    BuildContext context,
+    AppState state,
+    Map<String, dynamic> action,
+  ) {
     state.acceptAction(action);
     final id = action['id'] as String;
     String message = "Action accepted: ${action['title']}";

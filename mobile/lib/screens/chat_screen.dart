@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import '../providers/app_state.dart';
 import '../theme/colors.dart';
 import '../widgets/action_cards.dart';
@@ -47,7 +46,11 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(LucideIcons.settings2, color: Colors.white70, size: 20),
+            icon: const Icon(
+              LucideIcons.settings2,
+              color: Colors.white70,
+              size: 20,
+            ),
             onPressed: () {},
           ),
         ],
@@ -63,8 +66,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 _scrollToBottom();
                 return ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                  itemCount: appState.chatMessages.length + (appState.isChatLoading ? 1 : 0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 20,
+                  ),
+                  itemCount:
+                      appState.chatMessages.length +
+                      (appState.isChatLoading ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (index == appState.chatMessages.length) {
                       return _buildLoadingIndicator();
@@ -93,7 +101,11 @@ class _ChatScreenState extends State<ChatScreen> {
               color: AppColors.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(LucideIcons.sparkles, color: AppColors.primary, size: 40),
+            child: Icon(
+              LucideIcons.sparkles,
+              color: AppColors.primary,
+              size: 40,
+            ),
           ),
           const SizedBox(height: 20),
           Text(
@@ -108,10 +120,7 @@ class _ChatScreenState extends State<ChatScreen> {
           Text(
             "I'm your digital twin. Ask me about your\nrisks, day plan, or to take an action.",
             textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(
-              fontSize: 16,
-              color: AppColors.textMuted,
-            ),
+            style: GoogleFonts.outfit(fontSize: 16, color: AppColors.textMuted),
           ),
           const SizedBox(height: 40),
           _buildQuickActions(),
@@ -125,7 +134,7 @@ class _ChatScreenState extends State<ChatScreen> {
       "Why is my risk high?",
       "What if I leave 15m later?",
       "Mute social notifications",
-      "I prefer studying late"
+      "I prefer studying late",
     ];
     return Wrap(
       spacing: 10,
@@ -160,8 +169,9 @@ class _ChatScreenState extends State<ChatScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
-        crossAxisAlignment:
-            msg.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: msg.isUser
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           if (!msg.isUser && msg.toolsUsed.isNotEmpty)
             Padding(
@@ -218,14 +228,35 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildToolBadge(String tool) {
     String label = tool;
     IconData icon = LucideIcons.wrench;
-    
-    if (tool == 'getCurrentRisks') { label = "checked risks"; icon = LucideIcons.shieldAlert; }
-    if (tool == 'getDailyPulse') { label = "analyzed day"; icon = LucideIcons.calendar; }
-    if (tool == 'simulateWhatIf') { label = "ran futures"; icon = LucideIcons.trendingUp; }
-    if (tool == 'getNotificationSummary') { label = "read alerts"; icon = LucideIcons.layout; }
-    if (tool == 'getGuardianActions') { label = "found solutions"; icon = LucideIcons.zap; }
-    if (tool == 'updateTwinGraph') { label = "learned preference"; icon = LucideIcons.brainCircuit; }
-    if (tool == 'addDailyEvent') { label = "updated schedule"; icon = LucideIcons.plusCircle; }
+
+    if (tool == 'getCurrentRisks') {
+      label = "checked risks";
+      icon = LucideIcons.shieldAlert;
+    }
+    if (tool == 'getDailyPulse') {
+      label = "analyzed day";
+      icon = LucideIcons.calendar;
+    }
+    if (tool == 'simulateWhatIf') {
+      label = "ran futures";
+      icon = LucideIcons.trendingUp;
+    }
+    if (tool == 'getNotificationSummary') {
+      label = "read alerts";
+      icon = LucideIcons.layout;
+    }
+    if (tool == 'getGuardianActions') {
+      label = "found solutions";
+      icon = LucideIcons.zap;
+    }
+    if (tool == 'updateTwinGraph') {
+      label = "learned preference";
+      icon = LucideIcons.brainCircuit;
+    }
+    if (tool == 'addDailyEvent') {
+      label = "updated schedule";
+      icon = LucideIcons.plusCircle;
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -251,7 +282,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-
   Widget _buildLoadingIndicator() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -271,13 +301,18 @@ class _ChatScreenState extends State<ChatScreen> {
                   height: 12,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.primary,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Text(
                   "Pulse is thinking...",
-                  style: GoogleFonts.outfit(color: Colors.white60, fontSize: 13),
+                  style: GoogleFonts.outfit(
+                    color: Colors.white60,
+                    fontSize: 13,
+                  ),
                 ),
               ],
             ),
@@ -288,11 +323,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildInputArea() {
+    final appState = Provider.of<AppState>(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       decoration: BoxDecoration(
         color: AppColors.background,
-        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+        ),
       ),
       child: Row(
         children: [
@@ -317,6 +355,34 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           const SizedBox(width: 12),
           GestureDetector(
+            onLongPressStart: (_) => appState.startRecording(),
+            onLongPressEnd: (_) => appState.stopRecordingAndSend(),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: appState.isRecording
+                    ? Colors.red
+                    : Colors.white.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+                boxShadow: appState.isRecording
+                    ? [
+                        BoxShadow(
+                          color: Colors.red.withValues(alpha: 0.4),
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Icon(
+                appState.isRecording ? LucideIcons.mic : LucideIcons.mic,
+                color: appState.isRecording ? Colors.white : Colors.white70,
+                size: 20,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          GestureDetector(
             onTap: _handleSend,
             child: Container(
               padding: const EdgeInsets.all(12),
@@ -324,7 +390,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 color: AppColors.primary,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(LucideIcons.send, color: Colors.black, size: 20),
+              child: const Icon(
+                LucideIcons.send,
+                color: Colors.black,
+                size: 20,
+              ),
             ),
           ),
         ],
@@ -334,7 +404,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _handleSend() {
     if (_controller.text.trim().isEmpty) return;
-    Provider.of<AppState>(context, listen: false).sendChatMessage(_controller.text);
+    Provider.of<AppState>(
+      context,
+      listen: false,
+    ).sendChatMessage(_controller.text);
     _controller.clear();
     _scrollToBottom();
   }

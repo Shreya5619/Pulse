@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:home_widget/home_widget.dart';
 import 'theme/app_theme.dart';
 import 'providers/app_state.dart';
 import 'screens/home_screen.dart';
@@ -62,6 +63,24 @@ class _MainShellState extends State<MainShell> {
     const ChatScreen(),
     const DigestScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _checkWidgetLaunch();
+  }
+
+  void _checkWidgetLaunch() {
+    HomeWidget.initiallyLaunchedFromHomeWidget().then(_handleWidgetAction);
+    HomeWidget.widgetClicked.listen(_handleWidgetAction);
+  }
+
+  void _handleWidgetAction(Uri? uri) {
+    if (uri?.host == 'ask_pulse') {
+      final appState = Provider.of<AppState>(context, listen: false);
+      appState.setTabIndex(4); // Chat Screen
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

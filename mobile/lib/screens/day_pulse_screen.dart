@@ -170,10 +170,11 @@ void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
                     final isSelected = selectedDays.contains(index);
                     return GestureDetector(
                       onTap: () => setDialogState(() {
-                        if (isSelected)
+                        if (isSelected) {
                           selectedDays.remove(index);
-                        else
+                        } else {
                           selectedDays.add(index);
+                        }
                       }),
                       child: Container(
                         width: 32,

@@ -15,8 +15,22 @@ import '../screens/multi_mode_eta_screen.dart';
 import '../screens/twin_graph_screen.dart';
 import '../screens/timeline_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final TextEditingController _quickAskController = TextEditingController();
+
+  @override
+  void dispose() {
+    _quickAskController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AppState>(
@@ -35,6 +49,8 @@ class HomeScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildHeaderStrip(context, state),
+                  const SizedBox(height: 16),
+                  _buildQuickAskAgent(context, state),
                   const SizedBox(height: 16),
                   _buildFuturesPathLabel(state),
                   const SizedBox(height: 24),
@@ -92,6 +108,64 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildQuickAskAgent(BuildContext context, AppState state) {
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          const Icon(LucideIcons.sparkles, size: 16, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextField(
+              controller: _quickAskController,
+              style: GoogleFonts.outfit(fontSize: 13, color: Colors.white),
+              decoration: InputDecoration(
+                hintText: "Ask Pulse about your day...",
+                hintStyle: GoogleFonts.outfit(
+                  fontSize: 13,
+                  color: Colors.white24,
+                ),
+                border: InputBorder.none,
+                isDense: true,
+              ),
+              onSubmitted: (val) {
+                if (val.trim().isNotEmpty) {
+                  state.initiateChat(val.trim());
+                  _quickAskController.clear();
+                }
+              },
+            ),
+          ),
+          GestureDetector(
+            onLongPressStart: (_) => state.startRecording(),
+            onLongPressEnd: (_) => state.stopRecordingAndSend(),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              child: Icon(
+                state.isRecording ? LucideIcons.mic : LucideIcons.mic,
+                size: 18,
+                color: state.isRecording ? Colors.red : AppColors.primary,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(
+              LucideIcons.arrowRight,
+              size: 16,
+              color: AppColors.primary,
+            ),
+            onPressed: () {
+              if (_quickAskController.text.trim().isNotEmpty) {
+                state.initiateChat(_quickAskController.text.trim());
+                _quickAskController.clear();
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 

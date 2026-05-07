@@ -1,7 +1,36 @@
 import { Router, Request, Response } from "express";
 import { chatAgentService } from "../services/ChatAgentService";
+import { upload } from "../utils/multer";
+import { transcribeAudio } from "../utils/llm";
+import * as fs from 'fs';
 
 const router = Router();
+
+router.post("/transcribe", upload.single("audio"), async (req: Request, res: Response) => {
+    try {
+        const file = (req as any).file;
+        if (!file) {
+            return res.status(400).json({ ok: false, error: "No audio file provided." });
+        }
+
+        const transcription = await transcribeAudio(file.path);
+
+        // Clean up the file after transcription
+        fs.unlinkSync(file.path);
+
+        res.json({
+            ok: true,
+            data: { text: transcription }
+        });
+    } catch (error: any) {
+        console.error("[Chat Route] Transcription error:", error);
+        res.status(500).json({
+            ok: false,
+            error: "Transcription failed",
+            details: error.message
+        });
+    }
+});
 
 /**
  * POST /api/chat/message

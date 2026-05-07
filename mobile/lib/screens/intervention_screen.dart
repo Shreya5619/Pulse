@@ -4,9 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../theme/colors.dart';
-import '../widgets/glass_card.dart';
 import '../widgets/action_cards.dart';
-import '../services/action_executor.dart';
 
 class InterventionScreen extends StatelessWidget {
   const InterventionScreen({super.key});

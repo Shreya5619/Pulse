@@ -17,7 +17,7 @@ class RiskHeroCard extends StatelessWidget {
         final risks = state.currentRiskSnapshot?.risks ?? [];
 
         // Filter high risks (score >= 0.4) for count and main tags
-        final highRisks = risks.where((r) => (r.score ?? 0) >= 0.4).toList();
+        final highRisks = risks.where((r) => (r.score) >= 0.4).toList();
         final count = highRisks.length;
 
         debugPrint(
