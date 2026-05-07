@@ -52,6 +52,27 @@ app.use("/api/guardian", guardianRouter);
 import chatRouter from "./routes/chat";
 app.use("/api/chat", chatRouter);
 
+import { heartbeatConfig } from "./config/heartbeatConfig";
+console.log(`[Config] Loaded Heartbeat Policy: Interval=${heartbeatConfig.heartbeatIntervalMs}ms, Night=${heartbeatConfig.nightHeartbeatIntervalMs}ms, MaxAuto=${heartbeatConfig.maxAutoActionsPerHour}`);
+
+app.get("/api/control/heartbeat-config", (_req: Request, res: Response) => {
+    res.json({ ok: true, data: heartbeatConfig });
+});
+
+app.get("/api/control/user-profile-text", (_req: Request, res: Response) => {
+    try {
+        const userMdPath = path.resolve(__dirname, "../../memory/USER.md");
+        if (fs.existsSync(userMdPath)) {
+            const content = fs.readFileSync(userMdPath, "utf8");
+            res.json({ ok: true, data: { content } });
+        } else {
+            res.status(404).json({ ok: false, error: "USER.md not found" });
+        }
+    } catch (error) {
+        res.status(500).json({ ok: false, error: "Failed to read USER.md" });
+    }
+});
+
 
 const httpServer = createServer(app);
 const wss = new WebSocketServer({ server: httpServer, path: "/ws" });

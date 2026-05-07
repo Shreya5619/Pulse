@@ -14,12 +14,12 @@ import { memoryAgent } from "./MemoryAgent";
 import { GraphAdapter } from "./GraphAdapter";
 import { personalityAnalyzer } from "./PersonalityAnalyzer";
 import { broadcast } from "../index";
+import { heartbeatConfig } from "../config/heartbeatConfig";
 
 export class HeartbeatOrchestrator {
   async runOnce(userId: string) {
     const t0 = new Date().toISOString();
-    const heartbeatRules = workspaceService.getHeartbeat();
-    console.log(`[HB] Start heartbeat for ${userId} @ ${t0} (Rules: ${heartbeatRules.length} bytes)`);
+    console.log(`[HB] Triggered heartbeat for ${userId} @ ${t0}`);
 
     // 1. Load context + memory
     const context = await contextSnapshotRepo.findLatestByUser(userId);
@@ -108,7 +108,7 @@ export class HeartbeatOrchestrator {
     });
 
     // 6. Guardian
-    const guardian = await guardianAgent(decision.chosen);
+    const guardian = await guardianAgent(decision.chosen, heartbeatConfig);
     logEvent({
       ts: new Date().toISOString(),
       userId,
@@ -133,9 +133,9 @@ export class HeartbeatOrchestrator {
       guardianDecision: guardian
     });
 
-    // 8. Policy Check
+    // 9. Policy Check
     const nextDelay = computeNextHeartbeatDelay(context);
-    console.log(`[HB] Policy: Next heartbeat recommended in ${nextDelay / 1000}s`);
+    console.log(`[HB] Heartbeat tick using interval ${nextDelay / 1000}s (Base config: ${heartbeatConfig.heartbeatIntervalMs / 1000}s)`);
 
     return { 
       context, 

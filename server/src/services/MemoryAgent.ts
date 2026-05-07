@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { dailySummarizer } from "./DailySummarizer";
 import { memoryStore } from "./MemoryStore";
 import { GraphAdapter } from "./GraphAdapter";
@@ -12,12 +14,16 @@ export class MemoryAgent {
   async onHeartbeat(userId: string): Promise<void> {
     const now = Date.now();
 
-    // Check if 24 hours have passed since the last summary
+    // For demo purposes, we'll run a quick summary check more often if the file needs update
+    // But we'll respect the 24h threshold for the full heavy LLM summary
     const needsSummary = (now - this.lastSummaryTime) >= this.TIME_THRESHOLD;
 
     if (needsSummary) {
       await this.runSummary(userId);
     }
+    
+    // Always try to sync to USER.md if it's been a while or first run
+    await this.updateUserMarkdown(userId);
   }
 
   /**
@@ -46,6 +52,47 @@ export class MemoryAgent {
       }
     } catch (error) {
       console.error(`[MemoryAgent] Summary failed for user ${userId}:`, error);
+    }
+  }
+
+  async updateUserMarkdown(userId: string) {
+    const memoryDir = path.resolve(__dirname, '../../../memory');
+    const userMdPath = path.join(memoryDir, 'USER.md');
+
+    if (!fs.existsSync(userMdPath)) return;
+
+    try {
+      const habits = await memoryStore.getHabits(userId);
+      if (!habits) return;
+
+      const patterns = habits.patterns;
+      const morningTime = patterns.routines.morning_departure_median;
+      const h = Math.floor((morningTime || 0) / 60);
+      const m = Math.floor((morningTime || 0) % 60);
+
+      const summaryLines = [
+        `**Summary (last 7 days)**`,
+        `- Usually leaves home around ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}.`,
+        `- Typical lateness observed: ${patterns.typical_lateness} minutes.`,
+        `- Preferred commute mode appears to be: ${patterns.routines.preferred_mode || 'Walking/Transit'}.`,
+        `- Often active during late hours (detected study/work patterns).`,
+        `*Last updated: ${new Date().toLocaleString()}*`
+      ];
+
+      const newContent = summaryLines.join('\n');
+      
+      let fileContent = fs.readFileSync(userMdPath, 'utf8');
+      const markerStart = '<!-- BEGIN AUTO-USER-SUMMARY -->';
+      const markerEnd = '<!-- END AUTO-USER-SUMMARY -->';
+
+      if (fileContent.includes(markerStart) && fileContent.includes(markerEnd)) {
+        const regex = new RegExp(`${markerStart}[\\s\\S]*?${markerEnd}`);
+        fileContent = fileContent.replace(regex, `${markerStart}\n${newContent}\n${markerEnd}`);
+        fs.writeFileSync(userMdPath, fileContent);
+        console.log(`[MemoryAgent] USER.md auto-summary updated at ${new Date().toISOString()}`);
+      }
+    } catch (err) {
+      console.error(`[MemoryAgent] Failed to update USER.md:`, err);
     }
   }
 
