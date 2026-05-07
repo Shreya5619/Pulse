@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/app_state.dart';
 
 class GanttScreen extends StatelessWidget {
   const GanttScreen({super.key});
@@ -42,41 +44,28 @@ const Map<String, Color> appColorMap = {
   'Twitter': Color(0xFF90CAF9),
   'Notes': Color(0xFFFFD54F),
   'Camera': Color(0xFFFF8A65),
+  'Other': Color(0xFF94A3B8),
 };
 
-List<ScreenSession> generateRawSessions() {
-  return [
-    ScreenSession(8.0, 9.5, [
-      AppActivity('Messages', 8.0, 8.4, appColorMap['Messages']!),
-      AppActivity('Chrome', 8.4, 9.5, appColorMap['Chrome']!),
-    ]),
-    ScreenSession(9.7, 11.0, [
-      AppActivity('WhatsApp', 9.7, 10.2, appColorMap['WhatsApp']!),
-      AppActivity('Instagram', 10.2, 11.0, appColorMap['Instagram']!),
-    ]),
-    ScreenSession(11.3, 13.0, [
-      AppActivity('Chrome', 11.3, 12.3, appColorMap['Chrome']!),
-      AppActivity('YouTube', 12.3, 13.0, appColorMap['YouTube']!),
-    ]),
-    ScreenSession(13.3, 15.0, [
-      AppActivity('Spotify', 13.3, 14.0, appColorMap['Spotify']!),
-      AppActivity('Twitter', 14.0, 15.0, appColorMap['Twitter']!),
-    ]),
-    ScreenSession(15.3, 17.0, [
-      AppActivity('Maps', 15.3, 16.0, appColorMap['Maps']!),
-      AppActivity('Messages', 16.0, 17.0, appColorMap['Messages']!),
-    ]),
-    ScreenSession(17.3, 19.0, [
-      AppActivity('Instagram', 17.3, 18.2, appColorMap['Instagram']!),
-      AppActivity('YouTube', 18.2, 19.0, appColorMap['YouTube']!),
-    ]),
-    ScreenSession(19.3, 22.0, [
-      AppActivity('WhatsApp', 19.3, 20.0, appColorMap['WhatsApp']!),
-      AppActivity('Chrome', 20.0, 21.0, appColorMap['Chrome']!),
-      AppActivity('Spotify', 21.0, 22.0, appColorMap['Spotify']!),
-    ]),
-  ];
-}
+const Map<String, String> packageToName = {
+  'com.whatsapp': 'WhatsApp',
+  'com.instagram.android': 'Instagram',
+  'com.android.chrome': 'Chrome',
+  'com.google.android.apps.maps': 'Maps',
+  'com.google.android.youtube': 'YouTube',
+  'com.spotify.music': 'Spotify',
+  'com.twitter.android': 'Twitter',
+  'com.google.android.apps.messaging': 'Messages',
+  'com.google.android.keep': 'Notes',
+  'com.android.camera': 'Camera',
+  'com.google.android.calendar': 'Calendar',
+  'com.android.settings': 'Settings',
+  'com.google.android.gm': 'Gmail',
+  'com.slack': 'Slack',
+  'com.microsoft.teams': 'Teams',
+};
+
+// List<ScreenSession> generateRawSessions() { ... } // Removed as we use real data
 
 // ------------------------- MAIN WIDGET -------------------------
 
@@ -98,66 +87,82 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
   static const double baseHoursPerScreen = 6.0; // at scale=1, visible range ~6h
   double _baseWidth = 1200.0; // base width at scale=1
 
-  late List<String> appOrder;
-  late Map<String, List<AppActivity>> appActivities;
+  late List<String> appOrder = [];
+  late Map<String, List<AppActivity>> appActivities = {};
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    rawSessions = generateRawSessions();
-
-    // Collect unique app names
-    final Set<String> apps = {};
-    for (final session in rawSessions) {
-      for (final activity in session.activities) {
-        apps.add(activity.appName);
-      }
-    }
-    appOrder = ['Screen', ...apps.toList()..sort()];
-
-    // Build per‑app activity lists
-    appActivities = {};
-    for (final app in appOrder) {
-      if (app == 'Screen') {
-        final List<AppActivity> screenActs = [];
-        for (final session in rawSessions) {
-          screenActs.add(
-            AppActivity(
-              'Screen',
-              session.startHours,
-              session.endHours,
-              Colors.cyanAccent,
-            ),
-          );
-        }
-        appActivities[app] = screenActs;
-      } else {
-        appActivities[app] = _activitiesForApp(app, rawSessions);
-      }
-    }
+    _loadRealData();
   }
 
-  List<AppActivity> _activitiesForApp(
-    String appName,
-    List<ScreenSession> sessions,
-  ) {
-    final result = <AppActivity>[];
-    for (final session in sessions) {
-      for (final activity in session.activities) {
-        if (activity.appName == appName) {
-          result.add(
-            AppActivity(
-              appName,
-              activity.startHours,
-              activity.endHours,
-              activity.color,
-            ),
-          );
-        }
+  Future<void> _loadRealData() async {
+    setState(() => isLoading = true);
+
+    final appState = Provider.of<AppState>(context, listen: false);
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+
+    final usageData = await appState.getAppUsage(startOfDay, now);
+
+    final List<ScreenSession> sessions = [];
+    final Map<String, List<AppActivity>> activitiesByApp = {};
+    final Set<String> activeApps = {};
+
+    for (var data in usageData) {
+      final String pkg = data['packageName'];
+      final String name = packageToName[pkg] ?? pkg.split('.').last;
+      final int startMs = data['startTime'];
+      final int endMs = data['endTime'];
+
+      final double startHour = _msToHour(startMs);
+      final double endHour = _msToHour(endMs);
+
+      final Color color = appColorMap[name] ?? appColorMap['Other']!;
+
+      final activity = AppActivity(name, startHour, endHour, color);
+
+      if (!activitiesByApp.containsKey(name)) {
+        activitiesByApp[name] = [];
       }
+      activitiesByApp[name]!.add(activity);
+      activeApps.add(name);
+
+      // Also build sessions for the 'Screen' track
+      // (Simplification: treat each app foreground period as a screen session)
+      sessions.add(ScreenSession(startHour, endHour, [activity]));
     }
-    return result;
+
+    setState(() {
+      rawSessions = sessions;
+      appActivities = activitiesByApp;
+
+      // Add 'Screen' track
+      final List<AppActivity> screenActs = [];
+      for (final session in sessions) {
+        screenActs.add(
+          AppActivity(
+            'Screen',
+            session.startHours,
+            session.endHours,
+            Colors.cyanAccent,
+          ),
+        );
+      }
+      appActivities['Screen'] = screenActs;
+
+      appOrder = ['Screen', ...activeApps.toList()..sort()];
+      isLoading = false;
+    });
   }
+
+  double _msToHour(int ms) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(ms).toLocal();
+    return dt.hour + (dt.minute / 60.0) + (dt.second / 3600.0);
+  }
+
+  // List<AppActivity> _activitiesForApp(...) { ... } // Removed
 
   @override
   void didChangeDependencies() {
@@ -219,8 +224,15 @@ class _PremiumTimelineState extends State<PremiumTimeline> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildHeader(),
-                  SizedBox(
-                    height: containerHeight - 60,
+                  if (isLoading)
+                    const Expanded(
+                      child: Center(
+                        child: CircularProgressIndicator(color: Colors.cyanAccent),
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      height: containerHeight - 60,
                     child: InteractiveViewer(
                       minScale: 0.1, // zoom out very far
                       maxScale: double.infinity, // no upper limit

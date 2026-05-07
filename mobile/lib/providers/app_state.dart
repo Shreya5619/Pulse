@@ -342,6 +342,13 @@ class AppState extends ChangeNotifier {
   bool _isChatLoading = false;
   bool get isChatLoading => _isChatLoading;
 
+  Future<List<Map<String, dynamic>>> getAppUsage(
+    DateTime start,
+    DateTime end,
+  ) async {
+    return _contextServices.getAppUsage(start, end);
+  }
+
   final AudioRecorder _audioRecorder = AudioRecorder();
   bool _isRecording = false;
   bool get isRecording => _isRecording;

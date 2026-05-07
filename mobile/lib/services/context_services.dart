@@ -9,6 +9,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:device_calendar/device_calendar.dart';
 import 'package:flutter_notification_listener/flutter_notification_listener.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:usage_stats/usage_stats.dart';
 import '../models/device_context.dart';
 
 @pragma('vm:entry-point')
@@ -163,6 +164,56 @@ class ContextServices {
     }
 
     // Return empty list if no events found
+    return [];
+  }
+
+  // App Usage
+  Future<List<Map<String, dynamic>>> getAppUsage(
+    DateTime start,
+    DateTime end,
+  ) async {
+    try {
+      bool? isPermissionGranted = await UsageStats.checkUsagePermission();
+      if (isPermissionGranted == false) {
+        await UsageStats.grantUsagePermission();
+        // Wait a bit for user to potentially grant permission and come back
+        await Future.delayed(const Duration(seconds: 2));
+        isPermissionGranted = await UsageStats.checkUsagePermission();
+      }
+
+      if (isPermissionGranted == true) {
+        List<EventUsageInfo> events = await UsageStats.queryEvents(start, end);
+        // Sort events by timestamp
+        events.sort((a, b) => a.timeStamp!.compareTo(b.timeStamp!));
+
+        List<Map<String, dynamic>> usageData = [];
+        Map<String, int?> lastStartTimes = {};
+
+        for (var event in events) {
+          // 1: MOVE_TO_FOREGROUND, 2: MOVE_TO_BACKGROUND
+          if (event.eventType == '1') {
+            lastStartTimes[event.packageName!] = int.tryParse(event.timeStamp!);
+          } else if (event.eventType == '2') {
+            if (lastStartTimes.containsKey(event.packageName)) {
+              int startTime = lastStartTimes[event.packageName]!;
+              int endTime = int.tryParse(event.timeStamp!) ?? startTime;
+
+              if (endTime > startTime) {
+                usageData.add({
+                  'packageName': event.packageName,
+                  'startTime': startTime,
+                  'endTime': endTime,
+                });
+              }
+              lastStartTimes.remove(event.packageName);
+            }
+          }
+        }
+        return usageData;
+      }
+    } catch (e) {
+      debugPrint("Usage Stats Error: $e");
+    }
     return [];
   }
 
