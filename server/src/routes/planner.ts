@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { plannerEngine } from "../services/PlannerEngine";
+import { query } from "../db/db";
 
 const router = Router();
 
@@ -108,11 +109,26 @@ router.get("/suggested-actions", async (req: Request, res: Response) => {
 });
 
 router.post("/interventions/status", async (req: Request, res: Response) => {
-  const { userId: bodyUserId, deviceId, actionId, status } = req.body;
-  const userId = req.header("X-User-Id") || bodyUserId || deviceId;
-  console.log(`[Planner] Action status updated: user=${userId}, action=${actionId}, status=${status}`);
-  // In a real app, we'd persist this to an AuditLog or UserActions table
-  res.json({ ok: true });
+  try {
+    const { userId: bodyUserId, deviceId, actionId, status } = req.body;
+    const userId = req.header("X-User-Id") || bodyUserId || deviceId;
+    
+    if (!userId || !actionId || !status) {
+      return res.status(400).json({ ok: false, error: "Missing required fields" });
+    }
+
+    console.log(`[Planner] Action status updated: user=${userId}, action=${actionId}, status=${status}`);
+    
+    await query(
+      "INSERT INTO user_feedback (user_id, action_id, status) VALUES ($1, $2, $3)",
+      [userId, actionId, status]
+    );
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[Planner] /interventions/status error:", err);
+    res.status(500).json({ ok: false, error: "Failed to update intervention status" });
+  }
 });
 
 import { memoryStore } from "../services/MemoryStore";

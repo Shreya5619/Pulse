@@ -1954,6 +1954,26 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<void> triggerSelfReflection() async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/twin/reflect');
+      final response = await http.post(
+        url,
+        headers: _authHeaders,
+        body: json.encode({'userId': _userId}),
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint('[Pulse AppState] Self-reflection triggered successfully');
+        await fetchTwinGraph();
+        await fetchTwinSummary();
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error triggering self-reflection: $e');
+    }
+  }
+
   Future<Map<String, dynamic>?> fetchGraphExplanation(String nodeId) async {
     try {
       final host = _getBackendHost();

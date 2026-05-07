@@ -149,3 +149,16 @@ CREATE TABLE IF NOT EXISTS event_overrides (
 );
 
 CREATE INDEX IF NOT EXISTS idx_overrides_user ON event_overrides(user_id);
+
+-- User Feedback — Log of how users reacted to interventions
+CREATE TABLE IF NOT EXISTS user_feedback (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT NOT NULL,
+    action_id TEXT NOT NULL,
+    status TEXT NOT NULL, -- e.g., 'ACCEPTED', 'DISMISSED', 'IGNORED'
+    timestamp TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_feedback_user ON user_feedback(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_feedback_user_ts ON user_feedback(user_id, timestamp DESC);
+

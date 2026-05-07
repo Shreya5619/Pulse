@@ -7,7 +7,9 @@
   // Max auto actions per hour
   "max_auto_actions_per_hour": 3,
   // Whether guardian is allowed to auto-act on safe actions
-  "allow_auto_safe_actions": true
+  "allow_auto_safe_actions": true,
+  // Hour (0-23) to trigger the nightly self-reflection loop
+  "reflection_trigger_hour": 3
 }
 ```
 

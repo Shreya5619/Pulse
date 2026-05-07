@@ -6,13 +6,15 @@ export interface HeartbeatConfig {
   nightHeartbeatIntervalMs: number;
   maxAutoActionsPerHour: number;
   allowAutoSafeActions: boolean;
+  reflectionTriggerHour: number;
 }
 
 const DEFAULT_CONFIG: HeartbeatConfig = {
   heartbeatIntervalMs: 300000,
   nightHeartbeatIntervalMs: 900000,
   maxAutoActionsPerHour: 3,
-  allowAutoSafeActions: true
+  allowAutoSafeActions: true,
+  reflectionTriggerHour: 3
 };
 
 const MEMORY_DIR = path.resolve(__dirname, '../../../memory');
@@ -40,7 +42,8 @@ export function loadHeartbeatConfig(): HeartbeatConfig {
       heartbeatIntervalMs: config.heartbeat_interval_ms ?? DEFAULT_CONFIG.heartbeatIntervalMs,
       nightHeartbeatIntervalMs: config.night_heartbeat_interval_ms ?? DEFAULT_CONFIG.nightHeartbeatIntervalMs,
       maxAutoActionsPerHour: config.max_auto_actions_per_hour ?? DEFAULT_CONFIG.maxAutoActionsPerHour,
-      allowAutoSafeActions: config.allow_auto_safe_actions ?? DEFAULT_CONFIG.allowAutoSafeActions
+      allowAutoSafeActions: config.allow_auto_safe_actions ?? DEFAULT_CONFIG.allowAutoSafeActions,
+      reflectionTriggerHour: config.reflection_trigger_hour ?? DEFAULT_CONFIG.reflectionTriggerHour
     };
   } catch (error) {
     console.error(`[Config] Failed to parse HEARTBEAT.md:`, error);

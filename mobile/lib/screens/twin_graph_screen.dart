@@ -35,6 +35,16 @@ class _TwinGraphScreenState extends State<TwinGraphScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(LucideIcons.brain, color: Colors.purpleAccent),
+            tooltip: "Trigger Self-Reflection",
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Chrona is reflecting on your day...")),
+              );
+              context.read<AppState>().triggerSelfReflection();
+            },
+          ),
+          IconButton(
             icon: const Icon(LucideIcons.sparkles, color: AppColors.primary),
             onPressed: () => _showSummary(context),
           ),

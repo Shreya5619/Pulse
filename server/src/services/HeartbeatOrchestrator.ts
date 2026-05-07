@@ -15,11 +15,27 @@ import { GraphAdapter } from "./GraphAdapter";
 import { personalityAnalyzer } from "./PersonalityAnalyzer";
 import { broadcast } from "../index";
 import { heartbeatConfig } from "../config/heartbeatConfig";
+import { selfReflectionService } from "./SelfReflectionService";
 
 export class HeartbeatOrchestrator {
+  private lastReflectionDate: string = "";
+
   async runOnce(userId: string) {
     const t0 = new Date().toISOString();
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    
     console.log(`[HB] Triggered heartbeat for ${userId} @ ${t0}`);
+
+    // Check for nightly self-reflection trigger
+    if (now.getHours() === heartbeatConfig.reflectionTriggerHour && this.lastReflectionDate !== todayStr) {
+      console.log(`[HB] Nightly self-reflection hour reached (${now.getHours()}:00). Starting reflection...`);
+      this.lastReflectionDate = todayStr;
+      // Trigger in background to not block the current heartbeat cycle
+      selfReflectionService.reflect(userId).catch(err => {
+        console.error("[HB] Nightly reflection failed:", err);
+      });
+    }
 
     // 1. Load context + memory
     const context = await contextSnapshotRepo.findLatestByUser(userId);

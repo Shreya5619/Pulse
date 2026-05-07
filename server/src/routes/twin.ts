@@ -59,4 +59,22 @@ router.get('/summary', async (req, res) => {
   }
 });
 
+import { selfReflectionService } from '../services/SelfReflectionService';
+
+/**
+ * POST /api/twin/reflect
+ * Triggers a self-reflection loop for the digital twin.
+ */
+router.post('/reflect', async (req, res) => {
+  const userId = req.header("X-User-Id") || req.body.userId || 'user1';
+  
+  try {
+    const result = await selfReflectionService.reflect(userId);
+    res.json({ ok: true, data: result });
+  } catch (error) {
+    console.error('[Twin Route] Error during reflection:', error);
+    res.status(500).json({ error: 'Failed to perform self-reflection' });
+  }
+});
+
 export default router;
