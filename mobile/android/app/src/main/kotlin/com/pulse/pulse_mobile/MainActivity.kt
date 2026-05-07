@@ -54,7 +54,8 @@ class MainActivity : FlutterActivity() {
                         result.success(pm.isIgnoringBatteryOptimizations(packageName))
                     }
                     "openNotificationSettings" -> {
-                        val intent = Intent(Settings.ACTION_NOTIFICATION_SETTINGS)
+                        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        intent.putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
                         startActivity(intent)
                         result.success(true)
                     }

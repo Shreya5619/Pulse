@@ -252,10 +252,12 @@ class InterventionScreen extends StatelessWidget {
 
         if (comms.isNotEmpty)
           _buildCategoryHeader("Communication", LucideIcons.messageSquare),
-        ...comms.map((a) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: CommActionCard(action: a),
-            )),
+        ...comms.map(
+          (a) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: CommActionCard(action: a),
+          ),
+        ),
 
         if (general.isNotEmpty)
           _buildCategoryHeader("Other", LucideIcons.moreHorizontal),
@@ -449,12 +451,15 @@ class InterventionScreen extends StatelessWidget {
         );
         intent.launch();
       } else {
-        // Fallback for iOS or other platforms
         AppSettings.openAppSettings(type: AppSettingsType.batteryOptimization);
       }
     } else if (id.contains("MESSAGE")) {
       _showDraftSheet(context, action);
       return;
+    } else if (id.contains("CHARGING")) {
+      message = "Planning charging stop and updating risks...";
+      state.planBriefChargingStop();
+      state.setTabIndex(1); // Navigate to Daily Pulse
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -623,9 +628,10 @@ class InterventionScreen extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: TextButton.icon(
-              onPressed: () =>
-                  Provider.of<AppState>(context, listen: false)
-                      .openNotificationSettings(),
+              onPressed: () => Provider.of<AppState>(
+                context,
+                listen: false,
+              ).openNotificationSettings(),
               icon: const Icon(LucideIcons.settings, size: 12),
               label: const Text(
                 "OPEN GENERAL NOTIFICATION SETTINGS",
@@ -715,6 +721,7 @@ class _CommActionCardState extends State<CommActionCard> {
       await launchUrl(smsUri);
       state.completeCommAction(widget.action['id']);
     } else {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Could not launch messaging app")),
       );

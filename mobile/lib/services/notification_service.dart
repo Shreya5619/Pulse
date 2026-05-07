@@ -42,6 +42,7 @@ class NotificationService {
 
     // Map state to importance and visibility
     final isCritical = state == 'CRITICAL';
+    // ignore: unused_local_variable
     final isAction = state == 'ACTION_NEEDED';
 
     final androidPlatformChannelSpecifics = AndroidNotificationDetails(
@@ -58,8 +59,9 @@ class NotificationService {
       styleInformation: BigTextStyleInformation(body),
     );
 
-    final platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
+    final platformChannelSpecifics = NotificationDetails(
+      android: androidPlatformChannelSpecifics,
+    );
 
     await _flutterLocalNotificationsPlugin.show(
       0, // Using same ID will update the existing notification
@@ -86,7 +88,8 @@ class NotificationService {
   Future<void> requestPermissions() async {
     await _flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.requestNotificationsPermission();
   }
 }

@@ -208,7 +208,7 @@ class _DigestScreenState extends State<DigestScreen> {
                         if (llmHighlight.isEmpty && llmDigest.isEmpty)
                           Text(
                             totalNotifs == 0
-                                ? 'No notifications yet. Run the simulation to get started.'
+                                ? 'No notifications yet.'
                                 : 'Press Summarize to generate an AI summary of your $totalNotifs notification${totalNotifs == 1 ? '' : 's'}.',
                             style: GoogleFonts.outfit(
                               fontSize: 13,

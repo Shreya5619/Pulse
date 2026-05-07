@@ -158,7 +158,7 @@ void _showAddEventDialog(BuildContext context, {DayPulseBlock? existingBlock}) {
                   ),
                 ),
                 value: isRecurring,
-                activeColor: AppColors.primary,
+                activeThumbColor: AppColors.primary,
                 onChanged: (val) => setDialogState(() => isRecurring = val),
               ),
               if (isRecurring) ...[
@@ -555,20 +555,25 @@ class _TimelineBlock extends StatelessWidget {
         : Colors.white.withValues(alpha: 0.05);
 
     // Specified palette
-    if (block.category == 'sleep')
+    if (block.category == 'sleep') {
       blockColor = const Color(
         0xFF3F51B5,
       ).withValues(alpha: 0.15); // Deep Indigo
-    if (block.category == 'study')
+    }
+    if (block.category == 'study') {
       blockColor = const Color(0xFF2ECC71).withValues(alpha: 0.15); // Emerald
-    if (block.category == 'commute')
+    }
+    if (block.category == 'commute') {
       blockColor = const Color(0xFFF1C40F).withValues(alpha: 0.15); // Amber
-    if (block.category == 'buffer')
+    }
+    if (block.category == 'buffer') {
       blockColor = const Color(0xFF1ABC9C).withValues(alpha: 0.15); // Teal
-    if (block.locationText != null && block.locationText!.isNotEmpty)
+    }
+    if (block.locationText != null && block.locationText!.isNotEmpty) {
       blockColor = const Color(
         0xFF673AB7,
       ).withValues(alpha: 0.15); // Royal Purple
+    }
 
     return IntrinsicHeight(
       child: Row(

@@ -53,8 +53,6 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> {
-  int _selectedIndex = 0;
-
   final List<Widget> _screens = [
     const HomeScreen(),
     const DayPulseScreen(),
@@ -72,7 +70,10 @@ class _MainShellState extends State<MainShell> {
           return Column(
             children: [
               Expanded(
-                child: IndexedStack(index: _selectedIndex, children: _screens),
+                child: IndexedStack(
+                  index: appState.currentTabIndex,
+                  children: _screens,
+                ),
               ),
               if (appState.isReplayMode)
                 Container(
@@ -161,21 +162,27 @@ class _MainShellState extends State<MainShell> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildNavItem(0, LucideIcons.home, "Home"),
-            _buildNavItem(1, LucideIcons.activity, "Pulse"),
-            _buildNavItem(2, LucideIcons.trendingUp, "Futures"),
-            _buildNavItem(3, LucideIcons.zap, "Actions"),
-            _buildNavItem(4, LucideIcons.layout, "Digest"),
+            _buildNavItem(context, 0, LucideIcons.home, "Home"),
+            _buildNavItem(context, 1, LucideIcons.activity, "Pulse"),
+            _buildNavItem(context, 2, LucideIcons.trendingUp, "Futures"),
+            _buildNavItem(context, 3, LucideIcons.zap, "Actions"),
+            _buildNavItem(context, 4, LucideIcons.layout, "Digest"),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label) {
-    final isSelected = _selectedIndex == index;
+  Widget _buildNavItem(
+    BuildContext context,
+    int index,
+    IconData icon,
+    String label,
+  ) {
+    final appState = Provider.of<AppState>(context);
+    final isSelected = appState.currentTabIndex == index;
     return GestureDetector(
-      onTap: () => setState(() => _selectedIndex = index),
+      onTap: () => appState.setTabIndex(index),
       behavior: HitTestBehavior.opaque,
       child: Column(
         mainAxisSize: MainAxisSize.min,

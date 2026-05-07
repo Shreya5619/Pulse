@@ -9,20 +9,15 @@ class StorageService {
   /// Gets the stored user ID or generates a new one if it doesn't exist.
   static Future<String> getUserId() async {
     String? userId = await _storage.read(key: _keyUserId);
-    
+
     if (userId == null) {
       userId = const Uuid().v4();
       await _storage.write(key: _keyUserId, value: userId);
       debugPrint('Generated new local UUID: $userId');
-      // Also print to terminal as requested
-      print('========================================');
-      print('NEW DEVICE ID GENERATED: $userId');
-      print('========================================');
     } else {
       debugPrint('Loaded existing local UUID: $userId');
-      print('DEVICE ID: $userId');
     }
-    
+
     return userId;
   }
 

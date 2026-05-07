@@ -285,6 +285,14 @@ class AppState extends ChangeNotifier {
   Map<String, dynamic>? _lastPlannerDecision;
   TwinGraph? _twinGraph;
 
+  int _currentTabIndex = 0;
+  int get currentTabIndex => _currentTabIndex;
+
+  void setTabIndex(int index) {
+    _currentTabIndex = index;
+    notifyListeners();
+  }
+
   int get risksNext90Min => _risksNext90Min;
   List<String> get activeRiskTypes => _activeRiskTypes;
   DateTime? get lastHeartbeatTime => _lastHeartbeatTime;
@@ -483,21 +491,6 @@ class AppState extends ChangeNotifier {
       final host = _getBackendHost();
       final url = Uri.parse('http://$host:8080/api/day-pulse/add');
 
-      final payload = {
-        'userId': _userId,
-        'event': {
-          'id': 'manual_${DateTime.now().millisecondsSinceEpoch}',
-          'title': title,
-          'start_time': start.toUtc().toIso8601String(),
-          'end_time': end.toUtc().toIso8601String(),
-          'location_text': location,
-          'start_location': startLocation,
-        },
-        'isRecurring': isRecurring,
-        'days': days,
-        'category': category,
-      };
-
       final date = DateTime.now().toIso8601String().split('T')[0];
       final response = await http.post(
         url,
@@ -533,6 +526,67 @@ class AppState extends ChangeNotifier {
       debugPrint('[Pulse AppState] Error adding event: $e');
     }
   }
+
+  Future<void> planBriefChargingStop() async {
+    // 1. Find gap after current time
+    DateTime now = _isReplayMode ? (_simulatedTime ?? DateTime.now()) : DateTime.now();
+    
+    // Sort blocks by start time to be safe
+    final sortedBlocks = List<DayPulseBlock>.from(_dayPulseBlocks);
+    sortedBlocks.sort((a, b) => a.startTime.compareTo(b.startTime));
+
+    DateTime? gapStart;
+    DateTime? gapEnd;
+
+    // We want a gap after 'now'
+    DateTime lastEnd = now;
+    
+    for (var block in sortedBlocks) {
+      if (block.endTime.isBefore(now)) {
+        lastEnd = block.endTime;
+        continue;
+      }
+      
+      if (block.startTime.isAfter(lastEnd.add(const Duration(minutes: 10)))) {
+        // Found a gap!
+        // The gap starts at either lastEnd or now, whichever is later.
+        DateTime potentialStart = lastEnd.isAfter(now) ? lastEnd : now;
+        if (block.startTime.difference(potentialStart).inMinutes >= 20) {
+          gapStart = potentialStart.add(const Duration(minutes: 2)); // Small buffer
+          gapEnd = gapStart.add(const Duration(minutes: 30));
+          break;
+        }
+      }
+      lastEnd = block.endTime;
+    }
+
+    // If no gap found between events, add it after the last event
+    if (gapStart == null) {
+      gapStart = lastEnd.isAfter(now) ? lastEnd : now;
+      gapStart = gapStart.add(const Duration(minutes: 5));
+      gapEnd = gapStart.add(const Duration(minutes: 30));
+    }
+
+    // 2. Add event
+    await addDayPulseEvent(
+      "Brief Charging Stop",
+      gapStart!,
+      gapEnd!,
+      category: "commute", // Using commute category for charging for now
+      location: "Nearby Supercharger",
+    );
+    
+    // 3. Update Risk
+    await fetchTwinGraph();
+  }
+
+  void stopReplay() {
+    _replayTimer?.cancel();
+    _isReplayMode = false;
+    _simulatedTime = null;
+    notifyListeners();
+  }
+
 
   Future<void> deleteDayPulseItem(String eventId, bool isRoutine) async {
     try {
@@ -612,19 +666,8 @@ class AppState extends ChangeNotifier {
                   'startTime': b.startTime.toIso8601String(),
                   'endTime': b.endTime.toIso8601String(),
                   'locationText': b.locationText,
-                  'isProposed':
-                      b.risks.any(
-                        (r) => r.type == 'lateness' && r.level == 'high',
-                      ) ||
-                      b.suggestion != null ||
-                      b.eventId.startsWith(
-                        'manual_',
-                      ), // Rough heuristic or just pass isProposed from model if available
-                  // Wait, I should pass the isProposed flag from the block itself if I had it.
-                  // For now, I'll just send all blocks and the server will check which ones have isProposed: true
-                  'isProposed':
-                      true, // The server will filter based on what it knows
-                  'isDeleted': false, // Need to track this in model too
+                  'isProposed': true,
+                  'isDeleted': false,
                 },
               )
               .toList(),
@@ -671,16 +714,6 @@ class AppState extends ChangeNotifier {
 
   Map<String, dynamic> get pulseSnapshot => _pulseSnapshot;
 
-  int get replayProgress {
-    if (_scenarioStart == null ||
-        _scenarioEnd == null ||
-        _simulatedTime == null) {
-      return 0;
-    }
-    final total = _scenarioEnd!.difference(_scenarioStart!).inSeconds;
-    final current = _simulatedTime!.difference(_scenarioStart!).inSeconds;
-    return ((current / total) * 100).clamp(0, 100).toInt();
-  }
 
   String get userId => _userId;
 
@@ -705,7 +738,7 @@ class AppState extends ChangeNotifier {
 
     // Periodic ETA refresh
     Timer.periodic(const Duration(minutes: 2), (timer) {
-      if (!_isReplayMode) fetchAppointmentEta();
+    fetchAppointmentEta();
     });
   }
 
@@ -1173,7 +1206,6 @@ class AppState extends ChangeNotifier {
 
     try {
       final data = jsonDecode(text);
-      if (_isReplayMode) return; // Ignore live messages during replay
 
       debugPrint('[Pulse] Received: ${data['type']}');
       _processPulseEvent(data);
@@ -1184,46 +1216,17 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _processPulseEvent(Map<String, dynamic> data, {bool isReplay = false}) {
+  void _processPulseEvent(Map<String, dynamic> data) {
     final type = data['type'] as String?;
     final timestampStr = data['timestamp'] as String?;
     final timestamp = timestampStr != null
         ? DateTime.parse(timestampStr)
         : DateTime.now();
 
-    // Event capture for Timeline (for both live and replay)
+    // Event capture for Timeline
     if (type == 'context.updated') {
       final cData = data['data'];
       if (cData != null) {
-        // Update local state for UI immediately
-        if (isReplay) {
-          final loc = cData['location'];
-          _deviceContext = DeviceContext(
-            battery: BatteryInfo(
-              level: cData['batteryPercent'] ?? _deviceContext.battery.level,
-              isCharging:
-                  cData['isCharging'] ?? _deviceContext.battery.isCharging,
-              isInBatterySaveMode:
-                  cData['isInBatterySaveMode'] ??
-                  _deviceContext.battery.isInBatterySaveMode,
-              trend: _deviceContext.battery.trend,
-            ),
-            location: loc != null
-                ? LocationInfo(
-                    latitude: loc['lat'],
-                    longitude: loc['lon'],
-                    status: cData['locationLabel'] ?? "Replay",
-                  )
-                : _deviceContext.location,
-            upcomingEvents: _deviceContext.upcomingEvents,
-            notifications: _deviceContext.notifications,
-            timestamp: timestamp,
-          );
-
-          // CRITICAL: Push simulated context to server so server-side routing works
-          _sendContextSnapshot("replay_sync");
-        }
-
         _timelineEvents.insert(
           0,
           TimelineEvent(
@@ -1290,13 +1293,11 @@ class AppState extends ChangeNotifier {
         );
       }
 
-      if (!isReplay) {
-        _localRepo.saveRisk(
-          timestamp.toIso8601String(),
-          data['data']?['level'] ?? 'unknown',
-          data,
-        );
-      }
+      _localRepo.saveRisk(
+        timestamp.toIso8601String(),
+        data['data']?['level'] ?? 'unknown',
+        data,
+      );
     } else if (type == 'COMM_ACTION_PROPOSED') {
       _proposedCommAction = data['data'];
       _timelineEvents.insert(
@@ -1373,14 +1374,12 @@ class AppState extends ChangeNotifier {
           ),
         );
 
-        if (!isReplay) {
-          _localRepo.saveTimelineEvent(
-            intvId,
-            timestamp.toIso8601String(),
-            type ?? 'unknown',
-            data,
-          );
-        }
+        _localRepo.saveTimelineEvent(
+          intvId,
+          timestamp.toIso8601String(),
+          type ?? 'unknown',
+          data,
+        );
       }
     } else if (type == 'pulse.snapshot') {
       // Dedup by version — ignore older or duplicate snapshots
@@ -1678,6 +1677,43 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>?> fetchGraphExplanation(String nodeId) async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse('http://$host:8080/api/graph/explain/$nodeId');
+      final response = await http.get(url, headers: _authHeaders);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['data'];
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error fetching graph explanation: $e');
+    }
+    return null;
+  }
+
+  Future<List<dynamic>> fetchSuggestedActions(
+    String riskType, {
+    required String nodeId,
+  }) async {
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse(
+        'http://$host:8080/api/planner/suggested-actions?riskType=$riskType&nodeId=$nodeId',
+      );
+      final response = await http.get(url, headers: _authHeaders);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['data'] ?? [];
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error fetching suggested actions: $e');
+    }
+    return [];
+  }
+
   void setSimulatedLocation(double lat, double lon, String label) {
     _deviceContext = DeviceContext(
       battery: _deviceContext.battery,
@@ -1834,176 +1870,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- Replay Mode Engine ---
-
-  void startReplay(String name, List<dynamic> trace, {double speed = 1.0}) {
-    stopReplay(); // Clear existing
-
-    // Backup live state
-    _liveRisk = _currentRisk;
-    _liveInterventions = List.from(_interventions);
-
-    _isReplayMode = true;
-    _currentScenarioName = name;
-    _currentTrace = trace;
-    _replaySpeed = speed;
-    _replayIndex = 0;
-
-    if (_currentTrace.isEmpty) return;
-
-    // Determine bounds
-    _scenarioStart = DateTime.parse(_currentTrace.first['timestamp']);
-    _scenarioEnd = DateTime.parse(_currentTrace.last['timestamp']);
-    _simulatedTime = _scenarioStart;
-
-    debugPrint('[Pulse Replay] Starting "$name" at ${speed}x');
-
-    _resumeTimer();
-    notifyListeners();
-  }
-
-  Future<List<dynamic>> fetchSuggestedActions(
-    String riskType, {
-    String? nodeId,
-  }) async {
-    try {
-      final host = _getBackendHost();
-      final url = Uri.parse(
-        'http://$host:8080/api/planner/suggested-actions?userId=$_userId&deviceId=$_userId&riskType=$riskType&nodeId=${nodeId ?? ""}',
-      );
-      final response = await http.get(url, headers: _authHeaders);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['data'] as List<dynamic>;
-      }
-    } catch (e) {
-      debugPrint('[Pulse AppState] Error fetching suggested actions: $e');
-    }
-    return [];
-  }
-
-  Future<Map<String, dynamic>?> fetchGraphExplanation(String nodeId) async {
-    try {
-      final host = _getBackendHost();
-      final url = Uri.parse(
-        'http://$host:8080/api/graph/explain/$nodeId?X-User-Id=$_userId',
-      );
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['data'];
-      }
-    } catch (e) {
-      debugPrint('[Pulse AppState] Error fetching graph explanation: $e');
-    }
-    return null;
-  }
-
-  void _resumeTimer() {
-    _replayTimer?.cancel();
-    _replayTimer = Timer.periodic(
-      const Duration(
-        milliseconds: 100,
-      ), // High frequency update for smooth clock
-      (timer) {
-        if (!_isReplayMode) {
-          timer.cancel();
-          return;
-        }
-
-        // Advance simulated time based on speed (100ms * speed)
-        _simulatedTime = _simulatedTime!.add(
-          Duration(milliseconds: (100 * _replaySpeed).toInt()),
-        );
-
-        // Process all events that have occurred up to this simulated time
-        bool stateChanged = false;
-        while (_replayIndex < _currentTrace.length) {
-          final event = _currentTrace[_replayIndex];
-          final eventTime = DateTime.parse(event['timestamp']);
-
-          if (eventTime.isBefore(_simulatedTime!) ||
-              eventTime.isAtSameMomentAs(_simulatedTime!)) {
-            _processPulseEvent(
-              Map<String, dynamic>.from(event),
-              isReplay: true,
-            );
-            _replayIndex++;
-            stateChanged = true;
-          } else {
-            break;
-          }
-        }
-
-        if (_simulatedTime!.isAfter(_scenarioEnd!) ||
-            _simulatedTime!.isAtSameMomentAs(_scenarioEnd!)) {
-          _replayTimer?.cancel();
-        }
-
-        notifyListeners();
-      },
-    );
-  }
-
-  void seekToProgress(double progress) {
-    if (!_isReplayMode || _scenarioStart == null || _scenarioEnd == null) {
-      return;
-    }
-
-    _replayTimer?.cancel();
-
-    final totalSeconds = _scenarioEnd!.difference(_scenarioStart!).inSeconds;
-    final targetSeconds = (totalSeconds * (progress / 100)).toInt();
-    _simulatedTime = _scenarioStart!.add(Duration(seconds: targetSeconds));
-
-    // Reset simulation state
-    _interventions = [];
-    _timelineEvents = [];
-    _currentRiskSnapshot = null;
-    _currentFutures = null;
-    _replayIndex = 0;
-
-    // Replay all events up to the target time instantly
-    for (var i = 0; i < _currentTrace.length; i++) {
-      final event = _currentTrace[i];
-      final eventTime = DateTime.parse(event['timestamp']);
-      if (eventTime.isBefore(_simulatedTime!) ||
-          eventTime.isAtSameMomentAs(_simulatedTime!)) {
-        _processPulseEvent(Map<String, dynamic>.from(event), isReplay: true);
-        _replayIndex = i + 1;
-      } else {
-        break;
-      }
-    }
-
-    _resumeTimer();
-    notifyListeners();
-  }
-
-  void stopReplay() {
-    _replayTimer?.cancel();
-    _isReplayMode = false;
-    _simulatedTime = null;
-    _scenarioStart = null;
-    _scenarioEnd = null;
-    _replayIndex = 0;
-
-    // Restore live state
-    if (_liveRisk != null) _currentRisk = _liveRisk!;
-    if (_liveInterventions != null) _interventions = _liveInterventions!;
-
-    notifyListeners();
-  }
-
-  void setReplaySpeed(double speed) {
-    _replaySpeed = speed;
-    if (_isReplayMode) {
-      _resumeTimer();
-    }
-    notifyListeners();
-  }
 
   RiskLevel _parseRiskLevel(String? level) {
     switch (level?.toLowerCase()) {

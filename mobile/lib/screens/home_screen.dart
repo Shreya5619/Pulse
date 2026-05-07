@@ -6,7 +6,6 @@ import '../providers/app_state.dart';
 import '../widgets/glass_card.dart';
 import '../theme/colors.dart';
 import '../screens/context_debug_screen.dart';
-import '../screens/scenario_player_screen.dart';
 import '../screens/gantt_screen.dart';
 import '../widgets/risk_hero_card.dart';
 
@@ -159,33 +158,6 @@ class HomeScreen extends StatelessWidget {
                     color: batteryColor,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                const Icon(
-                  LucideIcons.playCircle,
-                  size: 14,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: 6),
-                GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ScenarioPlayerScreen(),
-                    ),
-                  ),
-                  child: const Text(
-                    "Simulation Mode",
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
                   ),
                 ),
               ],

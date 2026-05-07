@@ -42,6 +42,7 @@ class RiskHeroCard extends StatelessWidget {
           'response_debt': 'Response Debt',
         };
 
+        // ignore: unused_local_variable
         final summaryLine = highRiskTypes.isEmpty
             ? "Everything looks nominal for now."
             : highRiskTypes.map((t) => typeMap[t] ?? t).join(" + ");

@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:async';
 import 'dart:ui';
 import 'dart:isolate';
@@ -29,8 +31,10 @@ Future<void> onNotificationEvent(NotificationEvent event) async {
         attempts++;
       }
     }
-    
-    debugPrint('[Pulse Native] Port lookup finished after $attempts attempts. Found: ${uiPort != null}');
+
+    debugPrint(
+      '[Pulse Native] Port lookup finished after $attempts attempts. Found: ${uiPort != null}',
+    );
 
     if (uiPort != null) {
       uiPort.send({
@@ -58,27 +62,30 @@ class ContextServices {
   Stream<BatteryInfo> get batteryStream {
     // Combine state change stream with a periodic timer to detect battery saver mode toggles
     return StreamGroup.merge([
-      _battery.onBatteryStateChanged,
-      Stream.periodic(const Duration(seconds: 2)),
-    ]).asyncMap((_) async {
-      final level = await _battery.batteryLevel;
-      bool isSaveMode = false;
-      try {
-        isSaveMode = await _battery.isInBatterySaveMode;
-      } catch (_) {
-        // Handle unimplemented platforms
-      }
-      final state = await _battery.batteryState;
-      return BatteryInfo(
-        level: level,
-        isCharging: state == BatteryState.charging,
-        isInBatterySaveMode: isSaveMode,
-      );
-    }).distinct((prev, curr) => 
-        prev.level == curr.level && 
-        prev.isCharging == curr.isCharging && 
-        prev.isInBatterySaveMode == curr.isInBatterySaveMode
-    );
+          _battery.onBatteryStateChanged,
+          Stream.periodic(const Duration(seconds: 2)),
+        ])
+        .asyncMap((_) async {
+          final level = await _battery.batteryLevel;
+          bool isSaveMode = false;
+          try {
+            isSaveMode = await _battery.isInBatterySaveMode;
+          } catch (_) {
+            // Handle unimplemented platforms
+          }
+          final state = await _battery.batteryState;
+          return BatteryInfo(
+            level: level,
+            isCharging: state == BatteryState.charging,
+            isInBatterySaveMode: isSaveMode,
+          );
+        })
+        .distinct(
+          (prev, curr) =>
+              prev.level == curr.level &&
+              prev.isCharging == curr.isCharging &&
+              prev.isInBatterySaveMode == curr.isInBatterySaveMode,
+        );
   }
 
   // Location Stream
@@ -135,7 +142,9 @@ class ContextServices {
             RetrieveEventsParams(startDate: now, endDate: end),
           );
 
-          if (events.isSuccess && events.data != null && events.data!.isNotEmpty) {
+          if (events.isSuccess &&
+              events.data != null &&
+              events.data!.isNotEmpty) {
             return events.data!
                 .map(
                   (e) => CalendarEvent(
@@ -169,7 +178,10 @@ class ContextServices {
       // Register the port so the background isolate can find it
       IsolateNameServer.removePortNameMapping(portName);
       final ReceivePort uiReceivePort = ReceivePort();
-      bool registered = IsolateNameServer.registerPortWithName(uiReceivePort.sendPort, portName);
+      bool registered = IsolateNameServer.registerPortWithName(
+        uiReceivePort.sendPort,
+        portName,
+      );
       debugPrint('[Pulse Context] Port registration status: $registered');
 
       uiReceivePort.listen((data) {
