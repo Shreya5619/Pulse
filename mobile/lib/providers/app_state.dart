@@ -17,6 +17,7 @@ import '../models/twin_graph.dart';
 import '../services/storage_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'package:home_widget/home_widget.dart';
 import '../services/llm_service.dart';
 
 class TimelineEvent {
@@ -129,6 +130,7 @@ class DayPulseBlock {
   final List<DayPulseRisk> risks;
   final Map<String, dynamic>? suggestion;
   final Map<String, dynamic>? startLocation;
+  final bool isDeleted;
 
   DayPulseBlock({
     required this.eventId,
@@ -144,6 +146,7 @@ class DayPulseBlock {
     required this.risks,
     this.suggestion,
     this.startLocation,
+    this.isDeleted = false,
   });
 
   factory DayPulseBlock.fromJson(Map<String, dynamic> json) {
@@ -163,6 +166,7 @@ class DayPulseBlock {
           .toList(),
       suggestion: json['suggestion'],
       startLocation: json['startLocation'],
+      isDeleted: json['isDeleted'] ?? false,
     );
   }
 }
@@ -431,7 +435,10 @@ class AppState extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List blocks = data['data']['blocks'];
-        _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        _dayPulseBlocks = blocks
+            .map((b) => DayPulseBlock.fromJson(b))
+            .where((b) => !b.isDeleted)
+            .toList();
         _isDayPulseProposed = data['data']['isProposed'] ?? false;
         notifyListeners();
       }
@@ -465,7 +472,10 @@ class AppState extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List blocks = data['data']['blocks'];
-        _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        _dayPulseBlocks = blocks
+            .map((b) => DayPulseBlock.fromJson(b))
+            .where((b) => !b.isDeleted)
+            .toList();
         _isDayPulseProposed = data['data']['isProposed'] ?? false;
         notifyListeners();
 
@@ -529,8 +539,10 @@ class AppState extends ChangeNotifier {
 
   Future<void> planBriefChargingStop() async {
     // 1. Find gap after current time
-    DateTime now = _isReplayMode ? (_simulatedTime ?? DateTime.now()) : DateTime.now();
-    
+    DateTime now = _isReplayMode
+        ? (_simulatedTime ?? DateTime.now())
+        : DateTime.now();
+
     // Sort blocks by start time to be safe
     final sortedBlocks = List<DayPulseBlock>.from(_dayPulseBlocks);
     sortedBlocks.sort((a, b) => a.startTime.compareTo(b.startTime));
@@ -540,19 +552,21 @@ class AppState extends ChangeNotifier {
 
     // We want a gap after 'now'
     DateTime lastEnd = now;
-    
+
     for (var block in sortedBlocks) {
       if (block.endTime.isBefore(now)) {
         lastEnd = block.endTime;
         continue;
       }
-      
+
       if (block.startTime.isAfter(lastEnd.add(const Duration(minutes: 10)))) {
         // Found a gap!
         // The gap starts at either lastEnd or now, whichever is later.
         DateTime potentialStart = lastEnd.isAfter(now) ? lastEnd : now;
         if (block.startTime.difference(potentialStart).inMinutes >= 20) {
-          gapStart = potentialStart.add(const Duration(minutes: 2)); // Small buffer
+          gapStart = potentialStart.add(
+            const Duration(minutes: 2),
+          ); // Small buffer
           gapEnd = gapStart.add(const Duration(minutes: 30));
           break;
         }
@@ -572,10 +586,9 @@ class AppState extends ChangeNotifier {
       "Brief Charging Stop",
       gapStart!,
       gapEnd!,
-      category: "commute", // Using commute category for charging for now
-      location: "Nearby Supercharger",
+      category: "commute",
     );
-    
+
     // 3. Update Risk
     await fetchTwinGraph();
   }
@@ -586,7 +599,6 @@ class AppState extends ChangeNotifier {
     _simulatedTime = null;
     notifyListeners();
   }
-
 
   Future<void> deleteDayPulseItem(String eventId, bool isRoutine) async {
     try {
@@ -608,7 +620,10 @@ class AppState extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final List blocks = data['data']['blocks'];
-        _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
+        _dayPulseBlocks = blocks
+            .map((b) => DayPulseBlock.fromJson(b))
+            .where((b) => !b.isDeleted)
+            .toList();
         _isDayPulseProposed = data['data']['isProposed'] ?? false;
         notifyListeners();
         fetchTwinGraph();
@@ -714,7 +729,6 @@ class AppState extends ChangeNotifier {
 
   Map<String, dynamic> get pulseSnapshot => _pulseSnapshot;
 
-
   String get userId => _userId;
 
   AppState() {
@@ -738,7 +752,7 @@ class AppState extends ChangeNotifier {
 
     // Periodic ETA refresh
     Timer.periodic(const Duration(minutes: 2), (timer) {
-    fetchAppointmentEta();
+      fetchAppointmentEta();
     });
   }
 
@@ -1870,7 +1884,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-
   RiskLevel _parseRiskLevel(String? level) {
     switch (level?.toLowerCase()) {
       case 'safe':
@@ -1911,10 +1924,51 @@ class AppState extends ChangeNotifier {
       body: body,
       state: pulseState,
     );
+
+    _updateHomeScreenWidget();
+  }
+
+  void _updateHomeScreenWidget() {
+    final snap = _pulseSnapshot;
+    final score = (snap['topRiskScore'] as num?)?.toDouble() ?? 0.0;
+    final state = snap['state'] as String? ?? 'NOMINAL';
+    final digest = snap['notificationDigest'] as Map<String, dynamic>?;
+    final urgent =
+        (digest?['urgent'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
+    final important =
+        (digest?['important'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
+
+    final allRisks = [...urgent, ...important];
+
+    HomeWidget.saveWidgetData<String>('risk_score', score.toStringAsFixed(2));
+    HomeWidget.saveWidgetData<String>('risk_label', state);
+    HomeWidget.saveWidgetData<String>(
+      'risk_1',
+      allRisks.isNotEmpty ? allRisks[0] : "Monitoring...",
+    );
+    HomeWidget.saveWidgetData<String>(
+      'risk_2',
+      allRisks.length > 1 ? allRisks[1] : "",
+    );
+    HomeWidget.saveWidgetData<String>(
+      'risk_3',
+      allRisks.length > 2 ? allRisks[2] : "",
+    );
+
+    HomeWidget.updateWidget(
+      name: 'PulseWidgetProvider',
+      androidName: 'PulseWidgetProvider',
+    );
   }
 
   String _getBackendHost() {
-    return '172.20.10.5';
+    return '10.123.31.141';
   }
 
   Map<String, String> get _authHeaders => {
