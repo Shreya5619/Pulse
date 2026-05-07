@@ -201,6 +201,10 @@ class AppState extends ChangeNotifier {
 
   final LlmService _llmService = LlmService();
 
+  AppState() {
+    initDoomscrollMonitor();
+  }
+
   // Notification getters
   List<NotificationInfo> get notifications => _deviceContext.notifications;
 
@@ -229,6 +233,75 @@ class AppState extends ChangeNotifier {
             !importantNotifications.contains(n),
       )
       .toList();
+
+  void initDoomscrollMonitor() {
+    _doomscrollCheckTimer?.cancel();
+    _doomscrollCheckTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      _checkDoomscrolling();
+    });
+  }
+
+  Future<void> _checkDoomscrolling() async {
+    // 1. Check if there's an active scheduled activity
+    final now = DateTime.now();
+    DayPulseBlock? currentActivity;
+    try {
+      currentActivity = _dayPulseBlocks.firstWhere(
+        (b) =>
+            b.startTime.isBefore(now) &&
+            b.endTime.isAfter(now) &&
+            b.type != 'buffer' &&
+            !b.title.toLowerCase().contains('sleep'),
+      );
+    } catch (_) {
+      // No active activity
+      _lastSocialStartTime = null;
+      _hasSentDoomscrollAlert = false;
+      return;
+    }
+
+    // 2. Check current foreground app
+    final startCheck = now.subtract(const Duration(minutes: 2));
+    final usage = await getAppUsage(startCheck, now);
+
+    if (usage.isNotEmpty) {
+      final latest = usage.last;
+      final packageName = latest['packageName'] as String;
+
+      if (doomscrollApps.contains(packageName)) {
+        if (_lastSocialStartTime == null) {
+          _lastSocialStartTime = now;
+        } else {
+          final duration = now.difference(_lastSocialStartTime!);
+          if (duration.inMinutes >= 5 && !_hasSentDoomscrollAlert) {
+            NotificationService().showPulseNotification(
+              title: "🚨 Doomscroll Alert",
+              body:
+                  "You're currently scheduled for '${currentActivity.title}', but you've been on ${packageName.split('.').last} for ${duration.inMinutes} mins. Focus up!",
+              state: "CRITICAL",
+            );
+            _hasSentDoomscrollAlert = true;
+
+            _timelineEvents.insert(
+              0,
+              TimelineEvent(
+                id: const Uuid().v4(),
+                timestamp: now,
+                type: 'Intervention',
+                agent: 'Pulse Guardian',
+                text: 'Doomscroll alert sent for ${currentActivity.title}',
+                data: {'app': packageName, 'duration': duration.inMinutes},
+              ),
+            );
+            notifyListeners();
+          }
+        }
+      } else {
+        _lastSocialStartTime = null;
+        _hasSentDoomscrollAlert = false;
+      }
+    }
+  }
 
   // Surge detection window
   final int _surgeWindowMs = 60000; // 60 seconds
@@ -352,6 +425,21 @@ class AppState extends ChangeNotifier {
   final AudioRecorder _audioRecorder = AudioRecorder();
   bool _isRecording = false;
   bool get isRecording => _isRecording;
+
+  Timer? _doomscrollCheckTimer;
+  String? _currentForegroundApp;
+  DateTime? _lastSocialStartTime;
+  bool _hasSentDoomscrollAlert = false;
+
+  static const List<String> doomscrollApps = [
+    'com.instagram.android',
+    'com.twitter.android',
+    'com.zhiliaoapp.musically', // TikTok
+    'com.reddit.frontpage',
+    'com.facebook.katana',
+    'com.google.android.youtube',
+    'com.snapchat.android',
+  ];
 
   Future<void> startRecording() async {
     try {
