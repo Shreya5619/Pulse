@@ -197,7 +197,7 @@ class AppState extends ChangeNotifier {
   final ContextServices _contextServices = ContextServices();
   final LocalRepository _localRepo = LocalRepository();
   DeviceContext _deviceContext = DeviceContext.initial();
-  String _userId = "unknown";
+  String _userId = "31d1ff89-6b28-44e0-bea3-7c61debfd1b6";
 
   final LlmService _llmService = LlmService();
 
@@ -307,6 +307,8 @@ class AppState extends ChangeNotifier {
   String _selectedScenarioId = "RECOMMENDED";
   Map<String, dynamic>? _lastPlannerDecision;
   TwinGraph? _twinGraph;
+  String? _twinSummary;
+  bool _isTwinSummarizing = false;
 
   int _currentTabIndex = 0;
   int get currentTabIndex => _currentTabIndex;
@@ -324,6 +326,8 @@ class AppState extends ChangeNotifier {
   String get selectedScenarioId => _selectedScenarioId;
   Map<String, dynamic>? get lastPlannerDecision => _lastPlannerDecision;
   TwinGraph? get twinGraph => _twinGraph;
+  String? get twinSummary => _twinSummary;
+  bool get isTwinSummarizing => _isTwinSummarizing;
   Map<String, dynamic>? get proposedCommAction => _proposedCommAction;
   List<DayPulseBlock> get dayPulseBlocks => _dayPulseBlocks;
 
@@ -941,7 +945,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _init() async {
-    _userId = await StorageService.getUserId();
+    _userId = "31d1ff89-6b28-44e0-bea3-7c61debfd1b6";
     notifyListeners();
 
     _startListeningNotifications();
@@ -1920,6 +1924,33 @@ class AppState extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('[Pulse AppState] Error fetching twin graph: $e');
+    }
+  }
+
+  Future<void> fetchTwinSummary() async {
+    _isTwinSummarizing = true;
+    _twinSummary = null;
+    notifyListeners();
+
+    try {
+      final host = _getBackendHost();
+      final url = Uri.parse(
+        'http://$host:8080/api/twin/summary?userId=$_userId&deviceId=$_userId',
+      );
+      final response = await http.get(url, headers: _authHeaders);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _twinSummary = data['data']['summary'];
+      } else {
+        _twinSummary = "Failed to generate summary. (Error: ${response.statusCode})";
+      }
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error fetching twin summary: $e');
+      _twinSummary = "Connection error. Could not reach Pulse backend.";
+    } finally {
+      _isTwinSummarizing = false;
+      notifyListeners();
     }
   }
 

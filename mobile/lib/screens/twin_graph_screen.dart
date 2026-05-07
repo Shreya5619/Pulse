@@ -35,6 +35,10 @@ class _TwinGraphScreenState extends State<TwinGraphScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(LucideIcons.sparkles, color: AppColors.primary),
+            onPressed: () => _showSummary(context),
+          ),
+          IconButton(
             icon: const Icon(LucideIcons.refreshCw),
             onPressed: () => context.read<AppState>().fetchTwinGraph(),
           ),
@@ -63,6 +67,102 @@ class _TwinGraphScreenState extends State<TwinGraphScreen> {
                     left: node.x,
                     top: node.y,
                     child: TwinNodeWidget(node: node),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showSummary(BuildContext context) {
+    context.read<AppState>().fetchTwinSummary();
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Consumer<AppState>(
+        builder: (context, state, child) {
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.6,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.surface.withValues(alpha: 0.95),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    const Icon(LucideIcons.sparkles, color: AppColors.primary, size: 24),
+                    const SizedBox(width: 12),
+                    Text(
+                      "Digital Twin Summary",
+                      style: GoogleFonts.outfit(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: state.isTwinSummarizing
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.only(top: 100),
+                              child: Column(
+                                children: [
+                                  CircularProgressIndicator(),
+                                  SizedBox(height: 16),
+                                  Text("Synthesizing your digital identity...",
+                                      style: TextStyle(color: Colors.white54)),
+                                ],
+                              ),
+                            ),
+                          )
+                        : Text(
+                            state.twinSummary ?? "No summary available.",
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              color: Colors.white.withValues(alpha: 0.8),
+                              height: 1.6,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Close"),
                   ),
                 ),
               ],

@@ -11,7 +11,7 @@ class StorageService {
     String? userId = await _storage.read(key: _keyUserId);
 
     if (userId == null) {
-      userId = const Uuid().v4();
+      userId = "31d1ff89-6b28-44e0-bea3-7c61debfd1b6";
       await _storage.write(key: _keyUserId, value: userId);
       debugPrint('Generated new local UUID: $userId');
     } else {

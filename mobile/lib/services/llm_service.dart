@@ -17,7 +17,7 @@ class LlmService {
     try {
       debugPrint('[LlmService] Summarizing ${notifications.length} notifications via API...');
       
-      final url = Uri.parse('http://172.20.10.5:8080/api/summarize-notifications');
+      final url = Uri.parse('http://10.166.208.141:8080/api/summarize-notifications');
       
       // Convert NotificationInfo objects to maps for the JSON body
       final body = jsonEncode({
