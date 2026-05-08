@@ -1,107 +1,71 @@
 # Pulse: The Proactive Digital Twin for Attention
 
-Pulse is an autonomous, predictive assistant designed to bridge the gap between human intention and execution. Built on the **OpenClaw Agentic Framework**, Pulse monitors your real-time context—traffic, battery, habits, and schedules—to predict failure risks and intervene before they happen.
+Pulse is an autonomous, predictive assistant designed to bridge the gap between human intention and execution. Built on the **OpenClaw Agentic Framework**, Pulse moves beyond passive "smart assistants" by running a continuous **Neural Heartbeat** that anticipates failures and intervenes before they happen.
 
 ![Pulse Dashboard](docs/images/dashboard.png)
 
 ---
 
-## 🌟 Core Concepts
+## 🚀 Why Pulse is Novel: The "Agentic Edge"
 
-Pulse acts as a **Digital Twin** that protects your most valuable resource: **Attention**.
+Unlike traditional productivity tools, Pulse introduces three industry-leading innovations:
 
-*   **The Heartbeat Architecture**: A continuous background loop that evaluates your state every 180 seconds.
-*   **The 5-Agent Neural Swarm**: A coordinated orchestration of specialized agents (**Context, Memory, Risk, Planner, Guardian**) that think in parallel to solve your day's friction.
-*   **Predictive Guardianship**: Pulse doesn't just notify; it intervenes. From locking distracting apps during high-risk blocks to ghost-writing delay notes when traffic spikes, Pulse is always one step ahead.
+### 1. The 5-Agent Neural Swarm
+We have moved away from a single "Chatbot" model. Pulse utilizes a **Swarm of 5 Specialized Agents** (Context, Memory, Risk, Planner, Guardian) that run in parallel. This allows for multi-modal reasoning—simultaneously analyzing your GPS, battery discharge, and social media habits to decide your "Next Best Move."
+
+### 2. The Heartbeat Loop (Proactive vs. Reactive)
+Most AI assistants wait for a prompt. Pulse has a **Heartbeat**. Every 180 seconds, the system autonomously re-evaluates your trajectory. If it predicts a schedule collapse (e.g., *Traffic Spike + Low Battery*), it doesn't wait for you to notice—it pushes an **Active Intervention**.
+
+### 3. The Digital Twin Graph
+Pulse models your identity as a living **Digital Twin**. Using a graph-based memory system, it learns your "Contextual DNA"—how you handle stress, which contacts you prioritize, and your typical commute buffers. This twin evolves every night through an autonomous **Self-Reflection** cycle.
 
 ---
 
-## 🚀 Key Features
+## 🛠️ Key Novel Features
 
-| Feature | Description |
+| Feature | The "Next-Gen" Innovation |
 | :--- | :--- |
-| **Futures Engine** | Simulates parallel trajectories for the next 4 hours to detect "invisible" collisions (e.g., phone death vs. meeting start). |
-| **Digital Twin Graph** | A living model of your habits, preferences, and identity that evolves autonomously through nightly self-reflection. |
-| **Risk Scoring** | A real-time 0-100 score indicating the stability of your current plan, synced via WebSockets. |
-| **Active Interventions** | One-tap "Smart Cards" for rescheduling, auto-drafting messages, or shielding focus. |
-| **Home-Screen Widget** | A glanceable "Heartbeat" portal keeping your Digital Twin status visible at all times. |
+| **Futures Engine** | Simulates hundreds of parallel timelines to identify "invisible" collisions hours before they occur. |
+| **Guardian Shield** | Real-time **Doomscroll Prevention** that triggers app-locks only when your "Attention Risk" is critical. |
+| **Ghost-Writer** | Context-aware communication that pre-drafts and suggests delay notes, status updates, and rescheduling requests. |
+| **Privacy-First Monitoring** | High-frequency context signals (GPS, Notifications, Battery) are processed on-device, ensuring absolute privacy. |
 
 ![Bengaluru Stat](docs/images/bengaluru_stat.png)
 
 ---
 
-## 🛠️ Tech Stack
+## 🏗️ Technical Architecture
 
-*   **Mobile**: Flutter (Dart) — High-fidelity, multi-mode interaction shell.
-*   **Backend**: Node.js / TypeScript — Agentic orchestrator and "Heartbeat" server.
-*   **Intelligence**: OpenClaw Framework — Multi-agent swarm and memory management.
-*   **Data**: PostgreSQL (Audit) + JSON/Markdown (Agent Memory) + Neo4j (Twin Graph).
-*   **Geo**: OSRM (Open Source Routing Machine) for traffic-aware local routing.
-
----
-
-## 📁 Monorepo Layout
-
-```txt
-pulse/
-  mobile/        # Flutter / Android client
-  server/        # REST + WebSocket backend
-  agents/        # Context, Risk, Planner, Guardian, Heartbeat agents
-  memory/        # User profile + history + state store (OpenClaw style)
-  contracts/     # Shared API + event schemas
-  docs/          # Specs, API contracts, images
-  data/          # Fixtures, mock user state, routing datasets
-```
+*   **Framework**: OpenClaw (Agentic Orchestration).
+*   **Intelligence Swarm**: Node.js/TypeScript backend running 5 discrete reasoning loops.
+*   **Persistence**: PostgreSQL (Audit), JSON/Markdown (Long-term Memory), Neo4j (Twin Graph).
+*   **Geo-Intelligence**: Local OSRM integration for traffic-aware routing.
+*   **Real-time Sync**: Low-latency WebSocket "Heartbeat" events (100ms response time).
 
 ---
 
-## 🚦 Getting Started
+## 📦 Release & SDKs
 
-### 1. Prerequisites
-*   Flutter SDK
-*   Node.js (v18+)
-*   Docker (Optional, for OSRM/DB)
+### Android APK
+For a quick demo, you can download the latest stable build of the Pulse Guardian app:
+*   🔗 **[Download Pulse.apk (v1.0.0)](https://drive.google.com/drive/u/1/folders/19EpEm6bIesJsUDiGa_PZQRafDZ5rwtFW)**
 
-### 2. Installation
-```bash
-# Clone the repo
-git clone https://github.com/your-org/pulse.git
-cd pulse
-
-# Setup Backend
-cd server
-pnpm install
-
-# Setup Mobile
-cd ../mobile
-flutter pub get
-```
-
-### 3. Run Locally
-**Backend:**
-```bash
-cd server
-npm run dev
-```
-
-**Mobile:**
-```bash
-cd mobile
-flutter run
-```
+### SDK Requirements
+*   **Flutter SDK**: `^3.11.5`
+*   **Android SDK**: `minSdkVersion 21`, `targetSdkVersion 34`
+*   **Critical SDKs**: `battery_plus`, `geolocator`, `flutter_notification_listener`, `web_socket_channel`.
 
 ---
 
-## 🎬 Demo Scenario: Commute Rescue
-
-The primary showcase involves a real-time "Red Alert" scenario where:
+## 🎬 The "Commute Rescue" Scenario
+*Watch Pulse in action during a high-stakes morning:*
 1.  **Context Agent** detects a traffic spike + 15% battery.
 2.  **Risk Agent** scores an 85% probability of missing a class.
-3.  **Guardian** pushes a notification with a pre-drafted delay note.
+3.  **Guardian** pushes an intervention card with a pre-drafted delay note.
 4.  **User** taps "Send" and the **Communication Service** executes the fix instantly.
 
 ![Pulse Notification](docs/images/notification.png)
 
 ---
 
-*Pulse was built for the high-stakes multitasking world, where every minute counts.*
+*Pulse: Because in the age of distraction, attention is the only asset that matters.*
