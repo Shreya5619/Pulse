@@ -144,7 +144,7 @@ Traditional apps forget. Pulse has a **digital twin**.
 
 ## 👥 Team
 
-Built by students from RVCE, PES University, and MSRIT for Samsung Prism 2026.
+Built by students from RVCE for Samsung Prism Openclaw hackathon 2026.
 
 **Tech Stack**: Flutter • Node.js • OpenClaw • Neo4j • PostgreSQL • OSRM
 
