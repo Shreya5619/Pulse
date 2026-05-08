@@ -26,7 +26,7 @@ subprojects {
                 useVersion("1.8.0")
             }
             if (requested.group == "androidx.core" && (requested.name == "core" || requested.name == "core-ktx")) {
-                useVersion("1.13.1")
+                useVersion("1.6.0")
             }
         }
     }
