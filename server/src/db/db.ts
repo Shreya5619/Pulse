@@ -1,17 +1,42 @@
 import { Pool } from "pg";
 import dotenv from "dotenv";
 
-// Only load .env file in local development
-// Railway provides environment variables directly
-dotenv.config();
+import path from "path";
 
-const pool = new Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: Number(process.env.DB_PORT),
+// Load .env from project root if it exists
+dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+
+const useDatabaseUrl = !!process.env.DATABASE_URL;
+
+const poolConfig: any = useDatabaseUrl
+    ? { connectionString: process.env.DATABASE_URL }
+    : {
+        user: process.env.DB_USER,
+        host: process.env.DB_HOST,
+        database: process.env.DB_NAME,
+        password: process.env.DB_PASSWORD,
+        port: Number(process.env.DB_PORT || 5432),
+    };
+
+// Railway managed DBs often require SSL if connecting from outside, 
+// though internal networking usually doesn't. 
+// Adding this for robustness when DATABASE_URL is used.
+if (useDatabaseUrl && process.env.NODE_ENV === "production") {
+    poolConfig.ssl = {
+        rejectUnauthorized: false
+    };
+}
+
+const pool = new Pool(poolConfig);
+
+// Debug log for connection attempts (host only)
+const hostInfo = useDatabaseUrl ? "DATABASE_URL" : process.env.DB_HOST;
+console.log(`[DB] Initializing connection pool to: ${hostInfo}`);
+
+pool.on('error', (err) => {
+    console.error('[DB] Unexpected error on idle client', err);
 });
+
 
 export const query = (text: string, params?: any[]) => pool.query(text, params);
 
