@@ -287,7 +287,7 @@ router.post("/pulse/action", async (req: Request, res: Response) => {
                     end_time: chargingEnd.toISOString(),
                     category: 'buffer',
                     location_text: "Optimized Charging Point"
-                });
+                } as any);
 
                 // Apply cascading shifts to ensure no conflicts remain
                 await dayPulseService.shiftEventsFollowing(userId, chargingEnd, date);

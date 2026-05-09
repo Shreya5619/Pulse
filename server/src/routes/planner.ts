@@ -6,8 +6,8 @@ const router = Router();
 
 router.get("/decision", async (req: Request, res: Response) => {
   try {
-    const userId = req.header("X-User-Id") || req.query.userId as string || req.query.deviceId as string;
-    const scenarioId = req.query.scenarioId as string || "RECOMMENDED";
+    const userId = String(req.header("X-User-Id") || req.query.userId || req.query.deviceId || "");
+    const scenarioId = String(req.query.scenarioId || "RECOMMENDED");
     
     if (!userId) {
       return res.status(400).json({ ok: false, error: "Missing userId or deviceId" });
@@ -27,12 +27,12 @@ router.get("/decision", async (req: Request, res: Response) => {
 router.get("/decision/:scenarioId", async (req: Request, res: Response) => {
   try {
     const { scenarioId } = req.params;
-    const userId = req.header("X-User-Id") || req.query.userId as string || req.query.deviceId as string;
+    const userId = String(req.header("X-User-Id") || req.query.userId || req.query.deviceId || "");
     
-    if (!userId) {
+    if (!userId || userId === "") {
       return res.status(400).json({ ok: false, error: "Missing userId or deviceId" });
     }
-    const decision = await plannerEngine.decideForUser(userId, scenarioId);
+    const decision = await plannerEngine.decideForUser(userId, scenarioId as string);
     res.json({ ok: true, data: decision });
   } catch (err) {
     console.error("[Planner] /planner/decision/:scenarioId error:", err);
@@ -53,12 +53,12 @@ router.get("/scenario/:scenarioId", async (req: Request, res: Response) => {
     if (scenarioId === 'B') mappedId = 'RECOMMENDED';
     if (scenarioId === 'C') mappedId = 'ALTERNATE';
 
-    const userId = req.header("X-User-Id") || req.query.userId as string || req.query.deviceId as string;
+    const userId = String(req.header("X-User-Id") || req.query.userId || req.query.deviceId || "");
     
-    if (!userId) {
+    if (!userId || userId === "") {
       return res.status(400).json({ ok: false, error: "Missing userId or deviceId" });
     }
-    const decision = await plannerEngine.decideForUser(userId, mappedId);
+    const decision = await plannerEngine.decideForUser(userId, mappedId as string);
     res.json({ ok: true, data: decision });
   } catch (err) {
     console.error("[Planner] /planner/scenario/:scenarioId error:", err);

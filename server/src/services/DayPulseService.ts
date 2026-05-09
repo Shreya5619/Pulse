@@ -16,7 +16,7 @@ export interface DayPulseBlock {
     startTime: string;
     endTime: string;
     type: 'event' | 'routine' | 'act';
-    category?: 'sleep' | 'study' | 'commute' | 'buffer' | 'charging';
+    category?: 'sleep' | 'study' | 'commute' | 'buffer' | 'charging' | 'charge';
     locationText?: string;
     etaMinutes?: number;
     batteryAtStart?: number;
@@ -386,7 +386,7 @@ export class DayPulseService {
                 const duration = blockEnd.getTime() - blockStart.getTime();
                 const newStart = new Date(currentBoundary.getTime() + 2 * 60000);
                 const newEnd = new Date(newStart.getTime() + duration);
-                await userEventsRepo.addOverride(userId, { eventId: block.eventId, updates: { start_time: newStart.toISOString(), end_time: newEnd.toISOString() } });
+                await userEventsRepo.addOverride(userId, { userId, eventId: block.eventId, updates: { start_time: newStart.toISOString(), end_time: newEnd.toISOString() } });
                 currentBoundary = newEnd;
             } else if (blockStart >= currentBoundary) {
                 currentBoundary = blockEnd;

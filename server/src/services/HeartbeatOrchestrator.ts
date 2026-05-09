@@ -62,7 +62,7 @@ export class HeartbeatOrchestrator {
           logEvent({
             ts: new Date().toISOString(),
             userId,
-            phase: "PERSONALITY",
+            phase: "PERSONALITY" as any,
             summary: `Personality analyzed: ${analysis.traits.length} traits, ${analysis.interests.length} interests extracted`,
             details: analysis
           });

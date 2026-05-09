@@ -42,8 +42,8 @@ export class MemoryAgent {
 
       // Log the update with specific metrics
       const habits = await memoryStore.getHabits(userId);
-      if (habits && habits.patterns.routines.morning_departure_median) {
-        const departureMinutes = habits.patterns.routines.morning_departure_median;
+      if (habits && (habits.patterns.routines as any).morning_departure_median) {
+        const departureMinutes = (habits.patterns.routines as any).morning_departure_median;
         const hours = Math.floor(departureMinutes / 60);
         const mins = Math.floor(departureMinutes % 60);
         const timeStr = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
@@ -66,7 +66,7 @@ export class MemoryAgent {
       if (!habits) return;
 
       const patterns = habits.patterns;
-      const morningTime = patterns.routines.morning_departure_median;
+      const morningTime = (patterns.routines as any).morning_departure_median;
       const h = Math.floor((morningTime || 0) / 60);
       const m = Math.floor((morningTime || 0) % 60);
 
@@ -74,7 +74,7 @@ export class MemoryAgent {
         `**Summary (last 7 days)**`,
         `- Usually leaves home around ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}.`,
         `- Typical lateness observed: ${patterns.typical_lateness} minutes.`,
-        `- Preferred commute mode appears to be: ${patterns.routines.preferred_mode || 'Walking/Transit'}.`,
+        `- Preferred commute mode appears to be: ${(patterns.routines as any).preferred_mode || 'Walking/Transit'}.`,
         `- Often active during late hours (detected study/work patterns).`,
         `*Last updated: ${new Date().toLocaleString()}*`
       ];

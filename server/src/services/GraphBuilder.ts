@@ -23,7 +23,12 @@ export class GraphBuilder {
   async buildForUser(userId: string): Promise<{ nodes: GraphNode[]; edges: GraphEdge[]; summary: GraphSummary; context: ContextSnapshot }> {
     const context = await contextSnapshotRepo.findLatestByUser(userId);
     const memory = await memoryStore.loadAll(userId);
-    
+
+    if (!context) {
+      const stub = { timestamp: new Date().toISOString() } as ContextSnapshot;
+      return { nodes: [], edges: [], summary: { totalRisksNext90Min: 0, risks: [] }, context: stub };
+    }
+
     // 1. Fetch system events (from context)
     let allEventsRaw: CalendarEvent[] = [];
     if (context.calendar?.next_event) allEventsRaw.push(context.calendar.next_event);
@@ -51,11 +56,6 @@ export class GraphBuilder {
       if (e.id) eventMap.set(e.id, e);
     }
     const allEvents = Array.from(eventMap.values()) as CalendarEvent[];
-
-    if (!context) {
-      const stub = { timestamp: new Date().toISOString() } as ContextSnapshot;
-      return { nodes: [], edges: [], summary: { totalRisksNext90Min: 0, risks: [] }, context: stub };
-    }
 
     const nodes: GraphNode[] = [];
     const edges: GraphEdge[] = [];

@@ -109,7 +109,7 @@ RESPONSE FORMAT:
                         continue;
                     }
                 } catch (e) {
-                    console.warn("[ChatAgent] Tool call parse failed:", e.message);
+                    console.warn("[ChatAgent] Tool call parse failed:", (e as any).message);
                 }
             }
 

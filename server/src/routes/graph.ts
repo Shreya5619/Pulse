@@ -132,15 +132,10 @@ router.get("/risk/history", async (req: Request, res: Response) => {
  */
 router.get("/explain/:nodeId", async (req: Request, res: Response) => {
     try {
-        const userId = (
-            req.header("X-User-Id") || 
-            req.query.userId || 
-            req.query["X-User-Id"] || 
-            "lifecanvas_studios"
-        ) as string;
+        const userId = String(req.header("X-User-Id") || req.query.userId || req.query["X-User-Id"] || "lifecanvas_studios");
         const { nodeId } = req.params;
 
-        const explanation = graphBuilder.getExplanation(userId, nodeId);
+        const explanation = graphBuilder.getExplanation(userId, nodeId as string);
         if (!explanation) {
             return res.status(404).json({ ok: false, error: "Node or graph not found" });
         }
