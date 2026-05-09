@@ -29,13 +29,25 @@ if (useDatabaseUrl && process.env.NODE_ENV === "production") {
 
 const pool = new Pool(poolConfig);
 
+// Immediate connection test
+pool.connect((err, client, release) => {
+    if (err) {
+        console.error(`[DB] ❌ Connection test failed for host "${poolConfig.host || 'DATABASE_URL'}":`, err.message);
+        console.error(`[DB] Tip: If on Railway, ensure your DB service name matches DB_HOST (e.g., 'db.railway.internal' vs 'postgres.railway.internal').`);
+    } else {
+        console.log(`[DB] ✅ Connection test successful!`);
+        release();
+    }
+});
+
 // Debug log for connection attempts (host only)
-const hostInfo = useDatabaseUrl ? "DATABASE_URL" : process.env.DB_HOST;
+const hostInfo = useDatabaseUrl ? "DATABASE_URL" : (process.env.DB_HOST || "localhost");
 console.log(`[DB] Initializing connection pool to: ${hostInfo}`);
 
 pool.on('error', (err) => {
     console.error('[DB] Unexpected error on idle client', err);
 });
+
 
 
 export const query = (text: string, params?: any[]) => pool.query(text, params);
