@@ -15,6 +15,7 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
+
 subprojects {
     project.evaluationDependsOn(":app")
 }
@@ -26,11 +27,12 @@ subprojects {
                 useVersion("1.8.0")
             }
             if (requested.group == "androidx.core" && (requested.name == "core" || requested.name == "core-ktx")) {
-                useVersion("1.6.0")
+                useVersion("1.13.1")
             }
         }
     }
 }
+
 
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
