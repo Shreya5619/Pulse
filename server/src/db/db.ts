@@ -16,6 +16,7 @@ const poolConfig: any = useDatabaseUrl
         database: process.env.DB_NAME,
         password: process.env.DB_PASSWORD,
         port: Number(process.env.DB_PORT || 5432),
+        ssl: process.env.DB_HOST?.includes('railway.internal') ? false : { rejectUnauthorized: false }
     };
 
 // Railway managed DBs often require SSL if connecting from outside, 
