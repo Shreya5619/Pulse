@@ -24,12 +24,15 @@ class LifeCanvasReasoningPanel extends StatefulWidget {
   final List<AgentStep> steps;
   final bool isActive;
   final String statusText;
+  /// When true (e.g. right rail), fill vertical space instead of a fixed 270px panel.
+  final bool expandVertically;
 
   const LifeCanvasReasoningPanel({
     super.key,
     required this.steps,
     required this.isActive,
     required this.statusText,
+    this.expandVertically = false,
   });
 
   @override
@@ -91,11 +94,13 @@ class _LifeCanvasReasoningPanelState extends State<LifeCanvasReasoningPanel>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 270,
+    final shell = Container(
       decoration: BoxDecoration(
         color: const Color(0xFF07091A),
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.07))),
+        border: Border(
+          left: widget.expandVertically ? BorderSide(color: Colors.white.withOpacity(0.07)) : BorderSide.none,
+          top: widget.expandVertically ? BorderSide.none : BorderSide(color: Colors.white.withOpacity(0.07)),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -183,12 +188,13 @@ class _LifeCanvasReasoningPanelState extends State<LifeCanvasReasoningPanel>
                         key: ValueKey('step_${step.id}'),
                         tween: Tween<double>(begin: 0.0, end: 1.0),
                         duration: const Duration(milliseconds: 450),
-                        curve: Curves.easeOutBack,
+                        curve: Curves.easeOutCubic,
                         builder: (context, val, child) {
+                          final o = val.clamp(0.0, 1.0);
                           return Transform.translate(
-                            offset: Offset(0, 16.0 * (1.0 - val)),
+                            offset: Offset(0, 16.0 * (1.0 - o)),
                             child: Opacity(
-                              opacity: val,
+                              opacity: o,
                               child: child,
                             ),
                           );
@@ -279,5 +285,10 @@ class _LifeCanvasReasoningPanelState extends State<LifeCanvasReasoningPanel>
         ],
       ),
     );
+
+    if (widget.expandVertically) {
+      return SizedBox.expand(child: shell);
+    }
+    return SizedBox(height: 270, child: shell);
   }
 }

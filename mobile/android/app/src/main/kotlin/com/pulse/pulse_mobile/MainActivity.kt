@@ -5,6 +5,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import android.app.AppOpsManager
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Intent
 import android.provider.Settings
@@ -86,6 +87,119 @@ class MainActivity : FlutterActivity() {
                                     } catch (_: Exception) { stat.packageName.split(".").last() }
                                     mapOf("appName" to appName, "totalMinutes" to (stat.totalTimeInForeground / 60_000).toInt())
                                 }
+                            result.success(out)
+                        } catch (e: Exception) {
+                            result.error("ERROR", e.message, null)
+                        }
+                    }
+                    "getHourlyUsageForDay" -> {
+                        if (!hasUsagePermission()) {
+                            startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                            result.error("PERMISSION_DENIED", "Usage access not granted", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            val dayStartMs = (call.arguments as? Map<*, *>)?.get("dayStartMs") as? Long
+                                ?: Calendar.getInstance().apply {
+                                    set(Calendar.HOUR_OF_DAY, 0)
+                                    set(Calendar.MINUTE, 0)
+                                    set(Calendar.SECOND, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }.timeInMillis
+                            val calEnd = Calendar.getInstance().apply { timeInMillis = dayStartMs }
+                            calEnd.add(Calendar.DAY_OF_MONTH, 1)
+                            val dayEndMs = calEnd.timeInMillis
+                            val nowMs = System.currentTimeMillis()
+                            val queryEnd = minOf(dayEndMs, nowMs)
+
+                            val usm = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+                            val usageEvents = usm.queryEvents(dayStartMs, queryEnd)
+                            val pm = packageManager
+
+                            // package -> hour (0-23) -> milliseconds foreground
+                            val buckets = mutableMapOf<String, MutableMap<Int, Long>>()
+                            val lastResume = mutableMapOf<String, Long>()
+
+                            fun labelFor(pkg: String): String = try {
+                                pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+                            } catch (_: Exception) {
+                                pkg.split(".").last()
+                            }
+
+                            val ev = UsageEvents.Event()
+                            while (usageEvents.hasNextEvent()) {
+                                usageEvents.getNextEvent(ev)
+                                val pkg = ev.packageName ?: continue
+                                when (ev.eventType) {
+                                    UsageEvents.Event.ACTIVITY_RESUMED, 1 -> {
+                                        lastResume[pkg] = ev.timeStamp
+                                    }
+                                    UsageEvents.Event.ACTIVITY_PAUSED, 2 -> {
+                                        val start = lastResume.remove(pkg) ?: continue
+                                        val dur = (ev.timeStamp - start).coerceAtLeast(0L)
+                                        if (dur < 5_000L) continue
+                                        var t = start
+                                        while (t < ev.timeStamp) {
+                                            val calH = Calendar.getInstance().apply { timeInMillis = t }
+                                            val hour = calH.get(Calendar.HOUR_OF_DAY)
+                                            val endOfHour = Calendar.getInstance().apply {
+                                                timeInMillis = t
+                                                set(Calendar.MINUTE, 0)
+                                                set(Calendar.SECOND, 0)
+                                                set(Calendar.MILLISECOND, 0)
+                                                add(Calendar.HOUR_OF_DAY, 1)
+                                            }.timeInMillis
+                                            val sliceEnd = minOf(endOfHour, ev.timeStamp)
+                                            val slice = (sliceEnd - t).coerceAtLeast(0L)
+                                            val inner = buckets.getOrPut(pkg) { mutableMapOf() }
+                                            inner[hour] = (inner[hour] ?: 0L) + slice
+                                            t = sliceEnd
+                                        }
+                                    }
+                                }
+                            }
+                            // Close open foreground sessions up to queryEnd
+                            for ((pkg, start) in lastResume) {
+                                val dur = (queryEnd - start).coerceAtLeast(0L)
+                                if (dur < 5_000L) continue
+                                var t = start
+                                while (t < queryEnd) {
+                                    val calH = Calendar.getInstance().apply { timeInMillis = t }
+                                    val hour = calH.get(Calendar.HOUR_OF_DAY)
+                                    val endOfHour = Calendar.getInstance().apply {
+                                        timeInMillis = t
+                                        set(Calendar.MINUTE, 0)
+                                        set(Calendar.SECOND, 0)
+                                        set(Calendar.MILLISECOND, 0)
+                                        add(Calendar.HOUR_OF_DAY, 1)
+                                    }.timeInMillis
+                                    val sliceEnd = minOf(endOfHour, queryEnd)
+                                    val slice = (sliceEnd - t).coerceAtLeast(0L)
+                                    val inner = buckets.getOrPut(pkg) { mutableMapOf() }
+                                    inner[hour] = (inner[hour] ?: 0L) + slice
+                                    t = sliceEnd
+                                }
+                            }
+
+                            val totals = buckets.mapValues { (_, hmap) -> hmap.values.sum() / 60_000.0 }
+                            val topPkgs = totals.entries.sortedByDescending { it.value }.take(8).map { it.key }
+
+                            val out = topPkgs.map { pkg ->
+                                val hmap = buckets[pkg] ?: emptyMap()
+                                val segments = hmap.entries
+                                    .sortedBy { it.key }
+                                    .map { (hour, ms) ->
+                                        mapOf(
+                                            "hour" to hour,
+                                            "minutes" to (ms / 60_000.0)
+                                        )
+                                    }
+                                mapOf(
+                                    "appName" to labelFor(pkg),
+                                    "totalMinutes" to (totals[pkg] ?: 0.0).toInt(),
+                                    "hourlySegments" to segments
+                                )
+                            }
                             result.success(out)
                         } catch (e: Exception) {
                             result.error("ERROR", e.message, null)

@@ -10,6 +10,7 @@ import '../widgets/life_canvas_reasoning_panel.dart';
 import '../widgets/life_canvas_sidebar.dart';
 import '../widgets/life_canvas_gantt.dart';
 import '../widgets/life_canvas_timeline_painter.dart';
+import '../services/life_canvas_timeline_math.dart';
 import 'mind_twin_screen.dart';
 
 enum ViewMode { galaxy, river, timeline }
@@ -22,7 +23,7 @@ class LifeCanvasScreen extends StatefulWidget {
 }
 
 class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProviderStateMixin {
-  ViewMode _viewMode = ViewMode.galaxy;
+  ViewMode _viewMode = ViewMode.timeline;
   InputMode _inputMode = InputMode.ingest;
   DateTime _timelineBaseDate = DateTime.now();
 
@@ -30,13 +31,11 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
   final FocusNode _journalFocus = FocusNode();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey();
   
-  // InteractiveViewer tracking for Gantt sync
   final TransformationController _viewCtrl = TransformationController();
-  double _zoomScale = 1.0;
-  double _viewOffsetHours = 0.0;
 
   late AnimationController _pulse;
-  late AnimationController _orbit;
+  Map<String, Offset>? _galaxyPosCache;
+  String? _galaxyPosSig;
 
   bool _isProcessing = false;
   final List<AgentStep> _steps = [];
@@ -46,15 +45,9 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
   void initState() {
     super.initState();
     _pulse = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat(reverse: true);
-    _orbit = AnimationController(vsync: this, duration: const Duration(seconds: 60))..repeat();
     
     _viewCtrl.addListener(() {
-      final s = _viewCtrl.value.getMaxScaleOnAxis();
-      final dx = _viewCtrl.value.getTranslation().x;
-      setState(() {
-        _zoomScale = s;
-        _viewOffsetHours = -dx / (200.0 * s);
-      });
+      if (mounted) setState(() {});
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -67,8 +60,11 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
     final size = MediaQuery.of(context).size;
     final screenW = size.width;
     final screenH = size.height;
-    final tx = -1000.0 + screenW / 2;
-    final ty = -600.0 + screenH / 2;
+    final nowH = LifeCanvasTimelineMath.nowHourOnDate(_timelineBaseDate);
+    final graphX = LifeCanvasTimelineMath.graphXFromHour(nowH);
+    final childX = LifeCanvasTimelineMath.canvasAnchorX + graphX;
+    final tx = screenW * 0.45 - childX;
+    final ty = screenH * 0.42 - LifeCanvasTimelineMath.canvasAnchorY;
     setState(() {
       _viewCtrl.value = Matrix4.identity()..translate(tx, ty);
     });
@@ -76,28 +72,82 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
 
   @override
   void dispose() {
-    _pulse.dispose(); _orbit.dispose();
+    _pulse.dispose();
     _journal.dispose(); _journalFocus.dispose();
     _viewCtrl.dispose();
     super.dispose();
   }
 
-  // ─── Timeline Mode Positions ────────────────────────────────────────────────
+  /// Life Tree layout — matches web chronoX = 100 + hour * 200.
   Map<String, Offset> _timelinePos(List<LifeCanvasNode> nodes) {
     final pos = <String, Offset>{};
-    final events = nodes.where((n) => n.type == 'LIFE_EVENT').toList();
-    final startOfTodayMs = DateTime(_timelineBaseDate.year, _timelineBaseDate.month, _timelineBaseDate.day).millisecondsSinceEpoch;
-    
-    for (int i = 0; i < events.length; i++) {
+    final events = nodes
+        .where((n) =>
+            n.type != 'THEME' &&
+            n.type != 'START' &&
+            n.type != 'MARK' &&
+            n.type != 'MIN_MARK')
+        .toList()
+      ..sort((a, b) =>
+          (a.timestamp ?? a.createdAt).compareTo(b.timestamp ?? b.createdAt));
+
+    for (var i = 0; i < events.length; i++) {
       final n = events[i];
       final dt = n.timestamp ?? n.createdAt;
-      final msOffset = dt.millisecondsSinceEpoch - startOfTodayMs;
-      final hoursOffset = msOffset / 3600000.0;
-      final graphX = hoursOffset * 200.0;
-      final graphY = (i % 2 == 0 ? -1 : 1) * (40.0 + (i % 3) * 30.0);
-      pos[n.id] = Offset(graphX, graphY);
+      pos[n.id] = LifeCanvasTimelineMath.eventPosition(
+        timestamp: dt,
+        baseDate: _timelineBaseDate,
+        laneIndex: i,
+        nodeType: n.type,
+        importance: n.importance,
+      );
+    }
+
+    final startId =
+        'root_${_timelineBaseDate.toIso8601String().substring(0, 10)}';
+    if (nodes.any((n) => n.id == startId)) {
+      pos[startId] = const Offset(
+        LifeCanvasTimelineMath.timeOriginX,
+        300,
+      );
     }
     return pos;
+  }
+
+  List<LifeCanvasNode> _visibleNodes(LifeCanvasGraph graph) {
+    if (_viewMode != ViewMode.timeline) return graph.nodes;
+    return graph.nodes.where((n) {
+      if (n.type == 'THEME') return false;
+      if (n.type == 'START') return true;
+      if (n.type != 'LIFE_EVENT' &&
+          n.type != 'GOAL' &&
+          n.type != 'HABIT' &&
+          n.type != 'INSIGHT' &&
+          n.type != 'MILESTONE') {
+        return false;
+      }
+      final ts = n.timestamp ?? n.createdAt;
+      return !LifeCanvasTimelineMath.isEventAfterNow(ts, _timelineBaseDate);
+    }).toList();
+  }
+
+  List<LifeCanvasEdge> _visibleEdges(
+    LifeCanvasGraph graph,
+    Set<String> visibleIds,
+  ) {
+    return graph.edges
+        .where((e) =>
+            visibleIds.contains(e.sourceId) && visibleIds.contains(e.targetId))
+        .toList();
+  }
+
+  List<PredictedEvent> _visiblePredictions(List<PredictedEvent> preds) {
+    if (_viewMode != ViewMode.timeline) return [];
+    if (!LifeCanvasTimelineMath.isViewingToday(_timelineBaseDate)) {
+      return [];
+    }
+    final nowH = LifeCanvasTimelineMath.nowHourOnDate(_timelineBaseDate);
+    return preds.where((p) => p.futureHour > nowH).toList();
   }
 
   // ─── Actions ────────────────────────────────────────────────────────────────
@@ -124,15 +174,22 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
     _addStep(3, 'cypher', 'Reasoning (Groq Llama-3.3)', 'Sending dual-graph extraction prompt to cognitive agent.',
         cmd: 'POST /api/lifecanvas/ingest\nModel: llama-3.3-70b-versatile');
     
-    final ok = await appState.ingestLifeCanvasLog(text.trim());
+    final ok = await appState.ingestLifeCanvasLog(
+      text.trim(),
+      dateStr: _timelineBaseDate.toIso8601String().substring(0, 10),
+    );
 
     setState(() => _statusText = 'Applying mutations...');
-    _addStep(4, 'result', 'Proposing Graph Mutations', ok ? 'Validated node + theme edges ready to commit.' : 'Using rule-based fallback extraction.');
+    _addStep(4, 'result', 'Proposing Graph Mutations', ok ? 'Validated node + theme edges ready to commit.' : 'Groq extraction failed — check API key and network.');
     await Future.delayed(const Duration(milliseconds: 500));
 
     _addStep(5, ok ? 'final' : 'error', ok ? 'Galaxy Updated' : 'Partial Update', ok ? 'Memory node persisted. Galaxy is evolving.' : 'JSON store fallback was used.');
     _stopProcessing(ok ? null : 'Failed to ingest properly.');
-    if (ok) appState.fetchLifeCanvasGraph();
+    if (ok) {
+      appState.fetchLifeCanvasGraph(
+        dateStr: _timelineBaseDate.toIso8601String().substring(0, 10),
+      );
+    }
   }
 
   Future<void> _ask(String text) async {
@@ -198,7 +255,8 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
       _statusText = text;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scaffoldKey.currentState?.openEndDrawer();
+      final w = MediaQuery.of(context).size.width;
+      if (w < 760) _scaffoldKey.currentState?.openEndDrawer();
     });
   }
   void _addStep(int id, String type, String title, String detail, {String? cmd}) => setState(() => _steps.add(AgentStep(id: id, type: type, title: title, detail: detail, cmd: cmd)));
@@ -220,10 +278,24 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
     final graph = state.lifeCanvasGraph;
     final isLoading = state.isLifeCanvasLoading;
 
+    final visibleNodes = _visibleNodes(graph);
+    final visibleIds = visibleNodes.map((n) => n.id).toSet();
+    final visibleEdges = _visibleEdges(graph, visibleIds);
+    final visiblePreds = _visiblePredictions(state.predictions);
+
     Map<String, Offset> positions;
-    if (_viewMode == ViewMode.galaxy) positions = _galaxyPos(graph.nodes);
-    else if (_viewMode == ViewMode.river) positions = _riverPos(graph.nodes);
-    else positions = _timelinePos(graph.nodes);
+    if (_viewMode == ViewMode.galaxy) {
+      final sig = '${graph.nodes.length}_${graph.edges.length}_${graph.nodes.map((n) => n.id).join('|')}';
+      if (_galaxyPosCache == null || _galaxyPosSig != sig) {
+        _galaxyPosCache = _computeGalaxyPositions(graph);
+        _galaxyPosSig = sig;
+      }
+      positions = _galaxyPosCache!;
+    } else if (_viewMode == ViewMode.river) {
+      positions = _riverPos(graph.nodes);
+    } else {
+      positions = _timelinePos(graph.nodes);
+    }
 
     return Scaffold(
       key: _scaffoldKey,
@@ -232,7 +304,12 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
         graph: graph,
         isGalaxyView: _viewMode == ViewMode.galaxy,
         onViewToggle: (v) { setState(() => _viewMode = v ? ViewMode.galaxy : ViewMode.river); Navigator.pop(context); },
-        onRefresh: () { context.read<AppState>().fetchLifeCanvasGraph(); Navigator.pop(context); },
+        onRefresh: () {
+          context.read<AppState>().fetchLifeCanvasGraph(
+            dateStr: _timelineBaseDate.toIso8601String().substring(0, 10),
+          );
+          Navigator.pop(context);
+        },
       ),
       endDrawer: Drawer(
         width: 320,
@@ -242,12 +319,15 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
             steps: _steps,
             isActive: _isProcessing,
             statusText: _statusText,
+            expandVertically: true,
           ),
         ),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
+        child: LayoutBuilder(
+          builder: (context, bc) {
+            final mainColumn = Column(
+              children: [
             // ── Top Bar ───────────────────────────────────────────────────────
             Container(
               height: 56, padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -278,95 +358,191 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
               height: 40,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(children: [
+                _viewTab('Life Tree', ViewMode.timeline), const SizedBox(width: 8),
                 _viewTab('Galaxy', ViewMode.galaxy), const SizedBox(width: 8),
-                _viewTab('River', ViewMode.river), const SizedBox(width: 8),
-                _viewTab('Timeline', ViewMode.timeline),
+                _viewTab('River', ViewMode.river),
                 IconButton(icon: const Icon(LucideIcons.zoomIn, size: 16, color: Colors.white54), onPressed: () => setState(() => _viewCtrl.value = _viewCtrl.value.clone()..scale(1.3))),
                 IconButton(icon: const Icon(LucideIcons.zoomOut, size: 16, color: Colors.white54), onPressed: () => setState(() => _viewCtrl.value = _viewCtrl.value.clone()..scale(1 / 1.3))),
                 IconButton(icon: const Icon(LucideIcons.refreshCw, size: 14, color: Colors.white54), tooltip: 'Reset View', onPressed: _resetView),
               ]),
             ),
 
-            // ── Canvas Area ───────────────────────────────────────────────────
+            // ── Canvas Area (Life Tree + Gantt overlay like web prototype) ─────
             Expanded(
-              child: Stack(
-                children: [
-                  Positioned.fill(child: AnimatedBuilder(animation: _pulse, builder: (_, __) => CustomPaint(painter: _StarfieldPainter(_pulse.value)))),
-                  
-                  isLoading
-                      ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          const CircularProgressIndicator(color: Color(0xFF00E5FF), strokeWidth: 1.5),
-                          const SizedBox(height: 14),
-                          Text('Loading cognitive universe...', style: GoogleFonts.outfit(color: Colors.white38, fontSize: 13)),
-                        ]))
-                      : InteractiveViewer(
+              child: LayoutBuilder(
+                builder: (context, canvasConstraints) {
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(
+                        child: AnimatedBuilder(
+                          animation: _pulse,
+                          builder: (_, __) =>
+                              CustomPaint(painter: _StarfieldPainter(_pulse.value)),
+                        ),
+                      ),
+                      if (isLoading)
+                        Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const CircularProgressIndicator(
+                                color: Color(0xFF00E5FF),
+                                strokeWidth: 1.5,
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                'Loading cognitive universe...',
+                                style: GoogleFonts.outfit(
+                                  color: Colors.white38,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else ...[
+                        InteractiveViewer(
                           transformationController: _viewCtrl,
-                          minScale: 0.001, maxScale: 10.0,
+                          minScale: 0.001,
+                          maxScale: 10.0,
                           constrained: false,
                           boundaryMargin: const EdgeInsets.all(4000),
                           child: SizedBox(
-                            width: 2000, height: 1200,
-                            child: Stack(clipBehavior: Clip.none, children: [
-                              // Edges
-                              Positioned.fill(child: AnimatedBuilder(animation: _orbit, builder: (_, __) => CustomPaint(painter: _EdgePainter(graph.edges, graph.nodes, positions, _viewMode == ViewMode.galaxy, _orbit.value)))),
-                              
-                              // Phantoms (Predict mode)
-                              if (_viewMode == ViewMode.timeline)
-                                ...state.predictions.map((pred) {
-                                  final graphX = (pred.futureHour * 200.0);
-                                  final graphY = 80.0 + (pred.name.hashCode % 100);
+                            width: 2000,
+                            height: 1200,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Positioned.fill(
+                                  child: CustomPaint(
+                                    painter: _EdgePainter(
+                                      visibleEdges,
+                                      visibleNodes,
+                                      positions,
+                                      _viewMode == ViewMode.galaxy,
+                                    ),
+                                  ),
+                                ),
+                                ...visibleNodes.map((node) {
+                                  final p = positions[node.id];
+                                  if (p == null) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  final half = _nodeHalfSize(node);
+                                  final isStart = node.type == 'START';
                                   return Positioned(
-                                    left: 1000 + graphX - 20, top: 600 + graphY - 20,
-                                    child: _PhantomNode(pred: pred, pulse: _pulse.value),
+                                    left: LifeCanvasTimelineMath.canvasAnchorX +
+                                        p.dx -
+                                        half,
+                                    top: LifeCanvasTimelineMath.canvasAnchorY +
+                                        p.dy -
+                                        half,
+                                    child: GestureDetector(
+                                      onTap: () => _showDetail(node),
+                                      child: isStart
+                                          ? _StartNode(label: node.label)
+                                          : AnimatedBuilder(
+                                              animation: _pulse,
+                                              builder: (_, __) => _NodeWidget(
+                                                node: node,
+                                                color: _nodeColor(node),
+                                                pulse: _pulse.value,
+                                                isPhantom: false,
+                                              ),
+                                            ),
+                                    ),
                                   );
                                 }),
-
-                              // Nodes
-                              ...graph.nodes.map((node) {
-                                final p = positions[node.id];
-                                if (p == null) return const SizedBox.shrink();
-                                return Positioned(
-                                  left: 1000 + p.dx - 26, top: 600 + p.dy - 26,
-                                  child: GestureDetector(
-                                    onTap: () => _showDetail(node),
-                                    child: AnimatedBuilder(animation: _pulse, builder: (_, __) => _NodeWidget(node: node, color: _emotionColor(node.emotion), pulse: _pulse.value)),
-                                  ),
-                                );
-                              }),
-                            ]),
+                                if (_viewMode == ViewMode.timeline)
+                                  ...visiblePreds.map((pred) {
+                                    final graphX =
+                                        LifeCanvasTimelineMath.graphXFromHour(
+                                      pred.futureHour,
+                                    );
+                                    final graphY = 200.0 +
+                                        (pred.name.hashCode % 120 - 60);
+                                    final tint =
+                                        _themeColorFromLabel(pred.theme);
+                                    return Positioned(
+                                      left: LifeCanvasTimelineMath
+                                              .canvasAnchorX +
+                                          graphX -
+                                          6,
+                                      top: LifeCanvasTimelineMath
+                                              .canvasAnchorY +
+                                          graphY -
+                                          28,
+                                      child: _PhantomNode(
+                                        pred: pred,
+                                        themeTint: tint,
+                                      ),
+                                    );
+                                  }),
+                              ],
+                            ),
                           ),
                         ),
-                  
-                  // Anchored Timeline Axis (renders on top, fixed at the top!)
-                  if (_viewMode == ViewMode.timeline && !isLoading)
-                    Positioned(
-                      top: 0, left: 0, right: 0, height: 40,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF070814).withValues(alpha: 0.85),
-                          border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
-                        ),
-                        child: CustomPaint(
-                          painter: LifeCanvasTimelinePainter(
-                            viewOffsetHours: _viewOffsetHours,
-                            zoomScale: _zoomScale,
+                        if (_viewMode == ViewMode.timeline) ...[
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: 40,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF070814)
+                                    .withValues(alpha: 0.88),
+                                border: Border(
+                                  bottom: BorderSide(
+                                    color: Colors.white.withValues(alpha: 0.05),
+                                  ),
+                                ),
+                              ),
+                              child: CustomPaint(
+                                painter: LifeCanvasTimelinePainter(
+                                  transform: _viewCtrl.value,
+                                  baseDate: _timelineBaseDate,
+                                  viewportWidth: canvasConstraints.maxWidth,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: 40,
+                            left: 0,
+                            right: 0,
+                            height: LifeCanvasGantt.stripHeight,
+                            child: IgnorePointer(
+                              child: LifeCanvasGantt(
+                                stats: state.usageStats,
+                                predictions: visiblePreds,
+                                transform: _viewCtrl.value,
+                                baseDate: _timelineBaseDate,
+                              ),
+                            ),
+                          ),
+                          LifeCanvasNowBar(
+                            transform: _viewCtrl.value,
                             baseDate: _timelineBaseDate,
                           ),
-                        ),
-                      ),
-                    ),
-                ],
+                          const Positioned(
+                            left: 8,
+                            bottom: 8,
+                            child: _EmotionLegend(compact: true),
+                          ),
+                        ] else
+                          const Positioned(
+                            left: 8,
+                            bottom: 12,
+                            child: _EmotionLegend(compact: true),
+                          ),
+                      ],
+                    ],
+                  );
+                },
               ),
             ),
-
-            // ── Gantt Strip ───────────────────────────────────────────────────
-            if (_viewMode == ViewMode.timeline)
-              LifeCanvasGantt(
-                stats: state.usageStats,
-                predictions: state.predictions,
-                viewOffsetHours: _viewOffsetHours,
-                zoomScale: _zoomScale,
-              ),
 
             // ── Input Dock ────────────────────────────────────────────────────
             _InputDock(
@@ -378,6 +554,33 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
               onSubmit: () => _submitInput(_journal.text),
             ),
           ],
+        );
+
+        if (bc.maxWidth >= 760) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: mainColumn),
+              SizedBox(
+                width: 300,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF070814),
+                    border: Border(left: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
+                  ),
+                  child: LifeCanvasReasoningPanel(
+                    steps: _steps,
+                    isActive: _isProcessing,
+                    statusText: _statusText,
+                    expandVertically: true,
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+        return mainColumn;
+          },
         ),
       ),
     );
@@ -395,56 +598,162 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
     ),
   );
 
-  // Layout math...
-  Map<String, Offset> _galaxyPos(List<LifeCanvasNode> nodes) {
+  // Layout math — gravity spiral (static; no orbit spin)
+  Map<String, Offset> _computeGalaxyPositions(LifeCanvasGraph graph) {
+    final nodes = graph.nodes;
     final pos = <String, Offset>{};
     final themes = nodes.where((n) => n.type == 'THEME').toList();
-    final events = nodes.where((n) => n.type == 'LIFE_EVENT').toList();
+    final events = nodes
+        .where((n) => LifeCanvasTimelineMath.isTreeEventType(n.type))
+        .toList();
 
-    // 1. Core Center
-    pos['core_self'] = Offset.zero;
-
-    // 2. Position themes in a close inner ring rotating slowly
     for (int i = 0; i < themes.length; i++) {
-      final angle = (i * 2 * math.pi / themes.length) + (_orbit.value * 2 * math.pi * 0.1);
-      final r = 160.0;
-      pos[themes[i].id] = Offset(r * math.cos(angle), r * math.sin(angle));
+      final angle = i * 2 * math.pi / math.max(themes.length, 1);
+      pos[themes[i].id] = Offset(130 * math.cos(angle), 130 * math.sin(angle));
     }
 
-    // 3. Position events in a breathtaking multi-armed twisted galaxy spiral
     const arms = 3;
     for (int i = 0; i < events.length; i++) {
       final ev = events[i];
-      final armIndex = i % arms;
-      final armAngle = armIndex * (2 * math.pi / arms);
-      
-      final a = 200.0;
-      final b = 40.0;
-      // Spread nodes along the spiral arm
-      final theta = (i ~/ arms) * 0.4 + (_orbit.value * 2 * math.pi * 0.04);
-      final r = a + b * theta;
-      
-      // Introduce twist/spiral angle offsets
-      final finalAngle = armAngle + (theta * 0.95);
-      
-      pos[ev.id] = Offset(r * math.cos(finalAngle), r * math.sin(finalAngle));
+      final arm = i % arms;
+      final armAngle = arm * (2 * math.pi / arms);
+      final t = (i ~/ arms) * 0.55 + 0.35;
+      final r = 175.0 + 42.0 * t;
+      final theta = armAngle + t * 1.15;
+      pos[ev.id] = Offset(r * math.cos(theta), r * math.sin(theta));
     }
+
+    const iterations = 48;
+    const repulsion = 4200.0;
+    const springK = 0.014;
+    const springLen = 95.0;
+    const gravity = 0.012;
+    final velocities = <String, Offset>{};
+    final ids = pos.keys.toList();
+    for (final id in ids) {
+      velocities[id] = Offset.zero;
+    }
+
+    for (var step = 0; step < iterations; step++) {
+      final forces = <String, Offset>{};
+      for (final id in ids) {
+        forces[id] = Offset.zero;
+      }
+
+      for (var i = 0; i < ids.length; i++) {
+        for (var j = i + 1; j < ids.length; j++) {
+          final a = ids[i], b = ids[j];
+          final pa = pos[a]!, pb = pos[b]!;
+          var dx = pa.dx - pb.dx;
+          var dy = pa.dy - pb.dy;
+          var dist = math.sqrt(dx * dx + dy * dy);
+          if (dist < 1) dist = 1;
+          final force = repulsion / (dist * dist);
+          final fx = (dx / dist) * force;
+          final fy = (dy / dist) * force;
+          forces[a] = forces[a]! + Offset(fx, fy);
+          forces[b] = forces[b]! - Offset(fx, fy);
+        }
+      }
+
+      for (final e in graph.edges) {
+        if (!pos.containsKey(e.sourceId) || !pos.containsKey(e.targetId)) continue;
+        final pa = pos[e.sourceId]!, pb = pos[e.targetId]!;
+        var dx = pb.dx - pa.dx;
+        var dy = pb.dy - pa.dy;
+        var dist = math.sqrt(dx * dx + dy * dy);
+        if (dist < 1) dist = 1;
+        final d = dist - springLen;
+        final fx = (dx / dist) * d * springK * e.strength;
+        final fy = (dy / dist) * d * springK * e.strength;
+        forces[e.sourceId] = forces[e.sourceId]! + Offset(fx, fy);
+        forces[e.targetId] = forces[e.targetId]! - Offset(fx, fy);
+      }
+
+      for (final id in ids) {
+        final p = pos[id]!;
+        forces[id] = forces[id]! + Offset(-p.dx * gravity, -p.dy * gravity);
+      }
+
+      for (final id in ids) {
+        var vel = velocities[id]! + forces[id]! * 0.85;
+        final speed = vel.distance;
+        if (speed > 6) vel = vel / speed * 6;
+        velocities[id] = vel;
+        if (speed > 0.04) {
+          pos[id] = pos[id]! + vel;
+        }
+      }
+    }
+
+    // Aggregate connected event clusters toward shared theme hubs
+    for (final theme in themes) {
+      final hub = pos[theme.id];
+      if (hub == null) continue;
+      final linked = graph.edges
+          .where((e) => e.sourceId == theme.id || e.targetId == theme.id)
+          .map((e) => e.sourceId == theme.id ? e.targetId : e.sourceId)
+          .where((id) => events.any((ev) => ev.id == id))
+          .toList();
+      if (linked.length < 2) continue;
+      var cx = 0.0, cy = 0.0;
+      for (final id in linked) {
+        final p = pos[id];
+        if (p != null) { cx += p.dx; cy += p.dy; }
+      }
+      cx /= linked.length;
+      cy /= linked.length;
+      final pull = Offset((hub.dx - cx) * 0.12, (hub.dy - cy) * 0.12);
+      for (final id in linked) {
+        pos[id] = pos[id]! + pull;
+      }
+    }
+
     return pos;
   }
 
   Map<String, Offset> _riverPos(List<LifeCanvasNode> nodes) {
     final pos = <String, Offset>{};
-    final events = nodes.where((n) => n.type == 'LIFE_EVENT').toList()..sort((a, b) => (a.timestamp ?? a.createdAt).compareTo(b.timestamp ?? b.createdAt));
+    final events = nodes.where((n) => n.type == 'LIFE_EVENT').toList()
+      ..sort((a, b) => (a.timestamp ?? a.createdAt).compareTo(b.timestamp ?? b.createdAt));
     final startX = -((events.length - 1) * 240.0) / 2;
     for (int i = 0; i < events.length; i++) {
       final x = startX + i * 240.0;
-      final y = 130.0 * math.sin(i * 0.9 + _orbit.value * 2 * math.pi * 0.15); // Organic wave ripple
+      final y = 130.0 * math.sin(i * 0.9);
       pos[events[i].id] = Offset(x, y);
     }
     return pos;
   }
 
-  // Modals and colors...
+  Color _themeColorFromLabel(String theme) {
+    final t = theme.toLowerCase();
+    if (t.contains('work') || t.contains('coding')) return const Color(0xFF00E5FF);
+    if (t.contains('health') || t.contains('energy')) return const Color(0xFF4EE2C9);
+    if (t.contains('mind')) return const Color(0xFFBF5AF2);
+    if (t.contains('social')) return const Color(0xFFFFB300);
+    if (t.contains('creative')) return const Color(0xFFE040FB);
+    if (t.contains('goal') || t.contains('future')) return const Color(0xFF0A84FF);
+    return const Color(0xFF64D2FF);
+  }
+
+  double _nodeHalfSize(LifeCanvasNode node) {
+    if (node.type == 'THEME') return (48.0 + 20.0 * node.importance) / 2;
+    return (28.0 + 30.0 * node.importance) / 2;
+  }
+
+  Color _nodeColor(LifeCanvasNode node) {
+    switch (node.type) {
+      case 'GOAL':
+        return const Color(0xFFBF5AF2);
+      case 'MILESTONE':
+        return const Color(0xFF64D2FF);
+      case 'INSIGHT':
+        return const Color(0xFF64D2FF);
+      default:
+        return _emotionColor(node.emotion);
+    }
+  }
+
   Color _emotionColor(String? e) {
     switch (e?.toLowerCase()) {
       case 'excited': case 'joy': return const Color(0xFFFFB300);
@@ -544,23 +853,197 @@ class _StarfieldPainter extends CustomPainter {
   @override bool shouldRepaint(_StarfieldPainter o) => o.pulse != pulse;
 }
 class _EdgePainter extends CustomPainter {
-  final List<LifeCanvasEdge> e; final List<LifeCanvasNode> n; final Map<String, Offset> p; final bool g; final double o;
-  _EdgePainter(this.e,this.n,this.p,this.g,this.o);
-  @override void paint(Canvas canvas, Size size) { final pt=Paint()..style=PaintingStyle.stroke; for(var ed in e){ final s=p[ed.sourceId], t=p[ed.targetId]; if(s==null||t==null) continue; pt..color=const Color(0xFF00E5FF).withValues(alpha: 0.15*ed.strength)..strokeWidth=1.3*ed.strength; canvas.drawLine(Offset(1000+s.dx, 600+s.dy), Offset(1000+t.dx, 600+t.dy), pt); } }
-  @override bool shouldRepaint(_EdgePainter old) => true;
+  final List<LifeCanvasEdge> e;
+  final List<LifeCanvasNode> n;
+  final Map<String, Offset> p;
+  final bool galaxyMode;
+  _EdgePainter(this.e, this.n, this.p, this.galaxyMode);
+  @override
+  void paint(Canvas canvas, Size size) {
+    final pt = Paint()..style = PaintingStyle.stroke;
+    for (var ed in e) {
+      final s = p[ed.sourceId], t = p[ed.targetId];
+      if (s == null || t == null) continue;
+      final alpha = galaxyMode ? 0.22 * ed.strength : 0.15 * ed.strength;
+      pt
+        ..color = const Color(0xFF00E5FF).withValues(alpha: alpha)
+        ..strokeWidth = 1.0 + 1.8 * ed.strength;
+      canvas.drawLine(
+        Offset(
+          LifeCanvasTimelineMath.canvasAnchorX + s.dx,
+          LifeCanvasTimelineMath.canvasAnchorY + s.dy,
+        ),
+        Offset(
+          LifeCanvasTimelineMath.canvasAnchorX + t.dx,
+          LifeCanvasTimelineMath.canvasAnchorY + t.dy,
+        ),
+        pt,
+      );
+    }
+  }
+  @override
+  bool shouldRepaint(_EdgePainter old) => old.e.length != e.length || old.p != p;
 }
+
 class _PhantomNode extends StatelessWidget {
-  final PredictedEvent pred; final double pulse; const _PhantomNode({required this.pred, required this.pulse});
-  @override Widget build(BuildContext context) {
-    return Container(
-      width: 40, height: 40,
-      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFFBF5AF2).withValues(alpha: 0.7), width: 1.5, style: BorderStyle.solid)),
-      child: Center(child: Text('?', style: GoogleFonts.outfit(color: const Color(0xFFBF5AF2), fontWeight: FontWeight.bold))),
+  final PredictedEvent pred;
+  final Color themeTint;
+  const _PhantomNode({required this.pred, required this.themeTint});
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 5,
+          height: 52,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(3),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                themeTint.withValues(alpha: 0.55),
+                themeTint.withValues(alpha: 0.08),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Container(
+          constraints: const BoxConstraints(maxWidth: 140),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F1123).withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: themeTint.withValues(alpha: 0.45), width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                pred.name,
+                style: GoogleFonts.outfit(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                pred.theme,
+                style: GoogleFonts.jetBrainsMono(
+                  color: themeTint.withValues(alpha: 0.85),
+                  fontSize: 7,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
+
+class _EmotionLegend extends StatelessWidget {
+  final bool compact;
+  const _EmotionLegend({this.compact = false});
+  @override
+  Widget build(BuildContext context) {
+    const items = [
+      ('Joy / Excited', Color(0xFFFFB300)),
+      ('Calm / Peaceful', Color(0xFF4EE2C9)),
+      ('Stressed / Anxious', Color(0xFFFF5252)),
+      ('Sad', Color(0xFF5C6BC0)),
+      ('Overwhelmed', Color(0xFFE040FB)),
+      ('Neutral', Color(0xFF00E5FF)),
+    ];
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 12, vertical: compact ? 6 : 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF070814).withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'EMOTIONS',
+            style: GoogleFonts.jetBrainsMono(
+              color: Colors.white.withValues(alpha: 0.35),
+              fontSize: 7,
+              letterSpacing: 1.2,
+            ),
+          ),
+          SizedBox(height: compact ? 4 : 6),
+          ...items.map((e) => Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: e.$2),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      e.$1,
+                      style: GoogleFonts.outfit(
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontSize: compact ? 8 : 9,
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+        ],
+      ),
+    );
+  }
+}
+class _StartNode extends StatelessWidget {
+  final String label;
+  const _StartNode({required this.label});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 15,
+      height: 15,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white,
+      ),
+      child: Center(
+        child: Text(
+          label.length > 6 ? label.substring(5) : label,
+          style: GoogleFonts.jetBrainsMono(
+            color: Colors.black,
+            fontSize: 6,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _NodeWidget extends StatelessWidget {
-  final LifeCanvasNode node; final Color color; final double pulse; const _NodeWidget({required this.node, required this.color, required this.pulse});
+  final LifeCanvasNode node;
+  final Color color;
+  final double pulse;
+  final bool isPhantom;
+  const _NodeWidget({
+    required this.node,
+    required this.color,
+    required this.pulse,
+    this.isPhantom = false,
+  });
   @override Widget build(BuildContext context) {
     if (node.type == 'THEME') {
       final sz = 48.0 + 20.0 * node.importance;
@@ -583,25 +1066,34 @@ class _NodeWidget extends StatelessWidget {
       );
     }
 
-    final sz = 28.0 + 30.0 * node.importance;
+    final sz = 15.0 + node.importance * 20.0;
     return Stack(
       alignment: Alignment.center,
       clipBehavior: Clip.none,
       children: [
         // Glistening outer neon ring
         Container(
-          width: sz + 6, height: sz + 6,
+          width: sz + 6,
+          height: sz + 6,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: color.withValues(alpha: 0.35 + 0.25 * math.sin(pulse * math.pi * 2)), width: 1.0),
+            border: Border.all(
+              color: isPhantom
+                  ? const Color(0xFFBF5AF2).withValues(alpha: 0.6)
+                  : color.withValues(
+                      alpha: 0.35 + 0.25 * math.sin(pulse * math.pi * 2),
+                    ),
+              width: isPhantom ? 1.5 : 1.0,
+              style: isPhantom ? BorderStyle.solid : BorderStyle.solid,
+            ),
           ),
         ),
-        // Glow effect
         Container(
-          width: sz, height: sz,
+          width: sz,
+          height: sz,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: color,
+            color: isPhantom ? color.withValues(alpha: 0.25) : color,
             boxShadow: [
               BoxShadow(color: color.withValues(alpha: 0.65), blurRadius: sz * 0.5, spreadRadius: 1),
             ],

@@ -1,45 +1,37 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../services/lifecanvas_service.dart';
+import '../services/life_canvas_timeline_math.dart';
 
-// ─── Gantt screen-time strip (mirrors the web prototype's canvas Gantt) ────────
+/// Gantt overlay synced to Life Tree X scale (lifecanvas/app.js ganttCanvas).
 class LifeCanvasGantt extends StatelessWidget {
   final List<AppUsageStat> stats;
   final List<PredictedEvent> predictions;
-  final double viewOffsetHours; // pan offset from the canvas
-  final double zoomScale;       // zoom level from the canvas
+  final Matrix4 transform;
+  final DateTime baseDate;
 
-  static const double _rowH = 13.0;
-  static const double _labelW = 52.0;
+  static const double stripHeight = 130.0;
 
   const LifeCanvasGantt({
     super.key,
     required this.stats,
     required this.predictions,
-    required this.viewOffsetHours,
-    required this.zoomScale,
+    required this.transform,
+    required this.baseDate,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 88,
-      decoration: BoxDecoration(
-        color: const Color(0xFF020412),
-        border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.07)),
-          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.07)),
-        ),
-      ),
+    return SizedBox(
+      height: stripHeight,
+      width: double.infinity,
       child: CustomPaint(
         painter: _GanttPainter(
           stats: stats,
           predictions: predictions,
-          viewOffsetHours: viewOffsetHours,
-          zoomScale: zoomScale,
+          transform: transform,
+          baseDate: baseDate,
         ),
-        child: const SizedBox.expand(),
       ),
     );
   }
@@ -48,122 +40,180 @@ class LifeCanvasGantt extends StatelessWidget {
 class _GanttPainter extends CustomPainter {
   final List<AppUsageStat> stats;
   final List<PredictedEvent> predictions;
-  final double viewOffsetHours;
-  final double zoomScale;
+  final Matrix4 transform;
+  final DateTime baseDate;
 
   _GanttPainter({
     required this.stats,
     required this.predictions,
-    required this.viewOffsetHours,
-    required this.zoomScale,
+    required this.transform,
+    required this.baseDate,
   });
 
-  static const _labelW = 52.0;
-  static const _rowH = 12.0;
+  static const _labelW = 56.0;
+  static const _rowH = 14.0;
   static const _rowGap = 2.0;
 
-  // Maps hour-of-day to screen X
-  double _hToX(double h, double width) {
-    const pxPerHour = 200.0;
-    final graphX = 100.0 + h * pxPerHour;
-    return (graphX - viewOffsetHours * pxPerHour) * zoomScale + _labelW;
+  static const _ganttApps = [
+    'Screen',
+    'Messages',
+    'Chrome',
+    'Instagram',
+    'YouTube',
+    'WhatsApp',
+    'Spotify',
+  ];
+
+  static const _appColors = {
+    'Screen': Color(0xFF64FFDA),
+    'Messages': Color(0xFF4ADE80),
+    'Chrome': Color(0xFF60A5FA),
+    'Instagram': Color(0xFFA78BFA),
+    'YouTube': Color(0xFFE57373),
+    'WhatsApp': Color(0xFF64B5F6),
+    'Spotify': Color(0xFF81C784),
+  };
+
+  double _hourToScreenX(double h, double width) {
+    final x = LifeCanvasTimelineMath.screenXFromHour(h, transform);
+    return x.clamp(_labelW, width);
+  }
+
+  int _rowForApp(String name) {
+    for (var i = 0; i < _ganttApps.length; i++) {
+      if (_ganttApps[i].toLowerCase() == name.toLowerCase()) return i;
+    }
+    return name.hashCode.abs() % _ganttApps.length;
   }
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rows = stats.take(5).toList();
+    final isToday = LifeCanvasTimelineMath.isViewingToday(baseDate);
+    final nowH = LifeCanvasTimelineMath.nowHourOnDate(baseDate);
+
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, _labelW, size.height),
+      Paint()..color = const Color(0xFF02040E).withValues(alpha: 0.9),
+    );
+
     final labelPaint = TextPainter(textDirection: TextDirection.ltr);
     final barPaint = Paint()..style = PaintingStyle.fill;
 
-    // Background
-    canvas.drawRect(Rect.fromLTWH(0, 0, _labelW, size.height),
-        Paint()..color = const Color(0xFF02040E));
-
-    // Alternating row backgrounds + labels
-    const colors = [
-      Color(0xFF00E5FF), Color(0xFF4EE2C9), Color(0xFFBF5AF2),
-      Color(0xFFFFB300), Color(0xFFFF5252),
-    ];
-
-    for (int i = 0; i < rows.length; i++) {
+    for (var i = 0; i < _ganttApps.length; i++) {
       final y = i * (_rowH + _rowGap) + 6.0;
-      final c = colors[i % colors.length];
-
-      // Alternate row tint
       if (i.isEven) {
         canvas.drawRect(
           Rect.fromLTWH(_labelW, y, size.width - _labelW, _rowH),
           Paint()..color = Colors.white.withValues(alpha: 0.015),
         );
       }
-
-      // Label
       labelPaint
         ..text = TextSpan(
-          text: rows[i].appName.length > 6 ? rows[i].appName.substring(0, 6) : rows[i].appName,
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 7),
+          text: _ganttApps[i],
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.28),
+            fontSize: 7,
+          ),
         )
         ..layout(maxWidth: _labelW - 4);
       labelPaint.paint(canvas, Offset(4, y + 2));
+    }
 
-      // Bar width proportional to usage minutes (capped at 12h)
-      final mins = math.min(rows[i].totalMinutes, 720);
-      final durationH = mins / 60.0;
-      final startH = 8.0 + i * 0.5; // staggered start times
-      final x1 = math.max(_hToX(startH, size.width), _labelW);
-      final x2 = _hToX(startH + durationH, size.width);
-      final w = x2 - x1;
+    final rows = stats.take(8).toList();
+    for (final stat in rows) {
+      final rowIdx = _rowForApp(stat.appName);
+      final y = rowIdx * (_rowH + _rowGap) + 6.0;
+      final c = _appColors[_ganttApps[rowIdx]] ?? const Color(0xFF00E5FF);
 
-      if (w > 2) {
-        barPaint.color = c.withValues(alpha: 0.65);
-        final rrect = RRect.fromRectAndRadius(
-          Rect.fromLTWH(x1, y + 1, math.max(w, 2), _rowH - 2),
-          const Radius.circular(3),
-        );
-        canvas.drawRRect(rrect, barPaint);
+      if (stat.hourlySegments.isNotEmpty) {
+        for (final seg in stat.hourlySegments) {
+          final startH = seg.hour.toDouble();
+          if (isToday && startH >= nowH) continue;
+          var endH = startH + seg.minutes / 60.0;
+          if (isToday) endH = math.min(endH, nowH);
+          if (endH <= startH) continue;
+          final x1 = math.max(_hourToScreenX(startH, size.width), _labelW);
+          final x2 = _hourToScreenX(endH, size.width);
+          final w = x2 - x1;
+          if (w < 1.5) continue;
+          barPaint.color = c.withValues(alpha: stat.appName == 'Screen' ? 0.35 : 0.7);
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromLTWH(x1, y + 1, math.max(w, 2), _rowH - 2),
+              const Radius.circular(3),
+            ),
+            barPaint,
+          );
+        }
+      } else if (isToday) {
+        final durationH = math.min(stat.totalMinutes / 60.0, nowH);
+        if (durationH > 0.05) {
+          final startH = math.max(0.0, nowH - durationH);
+          final x1 = math.max(_hourToScreenX(startH, size.width), _labelW);
+          final x2 = _hourToScreenX(nowH, size.width);
+          final w = x2 - x1;
+          if (w > 1.5) {
+            barPaint.color = c.withValues(alpha: 0.55);
+            canvas.drawRRect(
+              RRect.fromRectAndRadius(
+                Rect.fromLTWH(x1, y + 1, math.max(w, 2), _rowH - 2),
+                const Radius.circular(3),
+              ),
+              barPaint,
+            );
+          }
+        }
       }
     }
 
-    // Phantom (predicted) bars — dashed outline
     for (final pred in predictions) {
-      final rowIdx = math.min(pred.name.hashCode % rows.length, rows.length - 1).abs();
+      if (isToday && pred.futureHour <= nowH) continue;
+      final app = pred.appName ?? '';
+      final rowIdx = app.isNotEmpty ? _rowForApp(app) : (pred.name.hashCode.abs() % 7);
       final y = rowIdx * (_rowH + _rowGap) + 6.0;
-      final x1 = math.max(_hToX(pred.futureHour, size.width), _labelW);
-      final x2 = _hToX(pred.futureHour + pred.durationHours, size.width);
+      final endH = pred.futureHour + pred.durationHours;
+      final x1 = math.max(_hourToScreenX(pred.futureHour, size.width), _labelW);
+      final x2 = _hourToScreenX(endH, size.width);
       final w = x2 - x1;
       if (w < 2) continue;
 
-      final dashPaint = Paint()
+      Color pc;
+      try {
+        pc = Color(int.parse(pred.color.replaceFirst('#', '0xFF')));
+      } catch (_) {
+        pc = const Color(0xFFBF5AF2);
+      }
+      final dash = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.0
-        ..color = const Color(0xFFBF5AF2).withValues(alpha: 0.7);
+        ..color = pc.withValues(alpha: 0.7);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromLTWH(x1, y + 1, math.max(w, 2), _rowH - 2),
           const Radius.circular(3),
         ),
-        dashPaint,
+        dash,
       );
     }
 
-    // NOW line
-    final now = DateTime.now();
-    final nowH = now.hour + now.minute / 60.0;
-    final nowX = _hToX(nowH, size.width);
-    if (nowX > _labelW && nowX < size.width) {
-      canvas.drawLine(
-        Offset(nowX, 0),
-        Offset(nowX, size.height),
-        Paint()
-          ..color = Colors.white.withValues(alpha: 0.55)
-          ..strokeWidth = 1.0,
-      );
+    if (isToday) {
+      final nowX = _hourToScreenX(nowH, size.width);
+      if (nowX > _labelW && nowX < size.width) {
+        canvas.drawLine(
+          Offset(nowX, 0),
+          Offset(nowX, size.height),
+          Paint()
+            ..color = Colors.white.withValues(alpha: 0.55)
+            ..strokeWidth = 1.0,
+        );
+      }
     }
   }
 
   @override
   bool shouldRepaint(_GanttPainter o) =>
-      o.viewOffsetHours != viewOffsetHours ||
-      o.zoomScale != zoomScale ||
+      o.transform != transform ||
+      o.baseDate != baseDate ||
+      o.stats.length != stats.length ||
       o.predictions.length != predictions.length;
 }

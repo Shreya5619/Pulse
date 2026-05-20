@@ -12,6 +12,7 @@ import 'screens/digest_screen.dart';
 import 'screens/day_pulse_screen.dart';
 import 'screens/overlay_screen.dart';
 import 'screens/life_canvas_screen.dart';
+import 'services/lifecanvas_diary.dart';
 import 'theme/colors.dart';
 
 @pragma("vm:entry-point")
@@ -27,6 +28,7 @@ void overlayMain() {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await lifecanvasDiary.ensureGroqApiKey();
   runApp(
     MultiProvider(
       providers: [ChangeNotifierProvider(create: (_) => AppState())],
@@ -171,7 +173,7 @@ class _MainShellState extends State<MainShell> {
             _buildNavItem(2, LucideIcons.trendingUp, "Futures"),
             _buildNavItem(3, LucideIcons.zap, "Actions"),
             _buildNavItem(4, LucideIcons.layout, "Digest"),
-            _buildNavItem(5, LucideIcons.fingerprint, "LifeCanvas"),
+            _buildNavItem(5, LucideIcons.sparkles, "LifeCanvas"),
           ],
         ),
       ),

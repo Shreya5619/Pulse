@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/groq_config.dart';
 import '../models/lifecanvas_graph.dart';
 
 // ─── Local diary + log persistence (SharedPreferences) ────────────────────────
@@ -57,6 +58,26 @@ class LifeCanvasDiary {
     final current = p.getString(_logsKey) ?? '';
     final ts = DateTime.now().toLocal().toString().substring(0, 16);
     await p.setString(_logsKey, '$current\n[$ts] $text');
+  }
+
+  // ── API Key ────────────────────────────────────────────────────────────────
+  static const _apiKey = 'lc_groq_api_key';
+
+  Future<String> getApiKey() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getString(_apiKey) ?? '';
+  }
+
+  Future<void> saveApiKey(String key) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_apiKey, key.trim());
+  }
+
+  /// Ensures Groq is configured from dart-define or [GroqConfig] on every launch.
+  Future<void> ensureGroqApiKey() async {
+    const fromDefine = String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
+    final key = fromDefine.trim().isNotEmpty ? fromDefine.trim() : GroqConfig.apiKey;
+    await saveApiKey(key);
   }
 
   // ── Mind Twin state ────────────────────────────────────────────────────────

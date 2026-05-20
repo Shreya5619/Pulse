@@ -2009,11 +2009,13 @@ class AppState extends ChangeNotifier {
     _isLifeCanvasLoading = true;
     notifyListeners();
 
+    final ds = dateStr ?? DateTime.now().toIso8601String().substring(0, 10);
+
     try {
-      _lifeCanvasGraph = await lifecanvasService.fetchGraph('user123', dateStr: dateStr);
+      _lifeCanvasGraph = await lifecanvasService.fetchGraph('user123', dateStr: ds);
       _lifeCanvasDiaryMd = await lifecanvasDiary.getDiary();
       _lifeCanvasLogs = await lifecanvasDiary.getLogs();
-      _usageStats = await usageStatsService.getTodayUsage();
+      _usageStats = await usageStatsService.getUsageForDay(ds);
     } catch (e) {
       debugPrint('[AppState] Error fetching LifeCanvas components: $e');
       _lifeCanvasGraph = LifeCanvasGraph.empty();
@@ -2023,20 +2025,22 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> ingestLifeCanvasLog(String text) async {
+  Future<bool> ingestLifeCanvasLog(String text, {String? dateStr}) async {
     await lifecanvasDiary.appendLog(text);
-    
-    debugPrint('[AppState] Parsing log using direct Groq Cloud LLM main pipeline.');
-    final parsedNode = await lifecanvasService.parseIngestedLogDirectly(text)
-        ?? lifecanvasService.parseIngestedLogRuleBased(text);
-    
-    lifecanvasService.addNodeToCache(parsedNode);
-    
-    // Sync to local backend in background (non-blocking)
-    lifecanvasService.ingest('user123', text);
-    
-    await fetchLifeCanvasGraph();
-    return true;
+
+    final ds = dateStr ?? DateTime.now().toIso8601String().substring(0, 10);
+
+    try {
+      debugPrint('[AppState] Parsing log via Groq (no fallback).');
+      final parsedNode = await lifecanvasService.parseIngestedLogDirectly(text);
+      await lifecanvasService.addNodeToCache(parsedNode, dateStr: ds);
+      lifecanvasService.ingest('user123', text);
+      await fetchLifeCanvasGraph(dateStr: ds);
+      return true;
+    } catch (e) {
+      debugPrint('[AppState] ingestLifeCanvasLog failed: $e');
+      return false;
+    }
   }
 
   Future<String> askLifeCanvas(String query) async {

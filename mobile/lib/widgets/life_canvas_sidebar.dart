@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../models/lifecanvas_graph.dart';
+import '../services/lifecanvas_diary.dart';
 
-class LifeCanvasSidebar extends StatelessWidget {
+class LifeCanvasSidebar extends StatefulWidget {
   final LifeCanvasGraph graph;
   final bool isGalaxyView;
   final ValueChanged<bool> onViewToggle;
@@ -17,18 +18,52 @@ class LifeCanvasSidebar extends StatelessWidget {
     required this.onRefresh,
   });
 
+  @override
+  State<LifeCanvasSidebar> createState() => _LifeCanvasSidebarState();
+}
+
+class _LifeCanvasSidebarState extends State<LifeCanvasSidebar> {
+  final TextEditingController _apiKeyController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadApiKey();
+  }
+
+  Future<void> _loadApiKey() async {
+    final key = await lifecanvasDiary.getApiKey();
+    if (mounted) {
+      setState(() {
+        _apiKeyController.text = key;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _apiKeyController.dispose();
+    super.dispose();
+  }
+
   Color _themeColor(int index) {
     const colors = [
-      Color(0xFF00E5FF), Color(0xFFBF5AF2), Color(0xFFFFB300),
-      Color(0xFF4EE2C9), Color(0xFF0A84FF), Color(0xFFFF5252),
+      Color(0xFF00E5FF),
+      Color(0xFFBF5AF2),
+      Color(0xFFFFB300),
+      Color(0xFF4EE2C9),
+      Color(0xFF0A84FF),
+      Color(0xFFFF5252),
     ];
     return colors[index % colors.length];
   }
 
   @override
   Widget build(BuildContext context) {
-    final themes = graph.nodes.where((n) => n.type == 'THEME').toList();
-    final events = graph.nodes.where((n) => n.type == 'LIFE_EVENT').toList();
+    final themes = widget.graph.nodes.where((n) => n.type == 'THEME').toList();
+    final events = widget.graph.nodes
+        .where((n) => n.type == 'LIFE_EVENT')
+        .toList();
 
     return Drawer(
       backgroundColor: const Color(0xFF070912),
@@ -81,10 +116,68 @@ class LifeCanvasSidebar extends StatelessWidget {
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      _viewChip('Galaxy', LucideIcons.globe, isGalaxyView, () => onViewToggle(true)),
+                      _viewChip(
+                        'Galaxy',
+                        LucideIcons.globe,
+                        widget.isGalaxyView,
+                        () => widget.onViewToggle(true),
+                      ),
                       const SizedBox(width: 8),
-                      _viewChip('River', LucideIcons.gitCommit, !isGalaxyView, () => onViewToggle(false)),
+                      _viewChip(
+                        'River',
+                        LucideIcons.gitCommit,
+                        !widget.isGalaxyView,
+                        () => widget.onViewToggle(false),
+                      ),
                     ],
+                  ),
+                ],
+              ),
+            ),
+
+            _divider(),
+
+            // ── Groq Config ────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _label('GROQ API KEY'),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _apiKeyController,
+                    obscureText: true,
+                    style: GoogleFonts.jetBrainsMono(
+                      color: Colors.white,
+                      fontSize: 11,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'gsk_...',
+                      hintStyle: GoogleFonts.jetBrainsMono(
+                        color: Colors.white.withOpacity(0.2),
+                        fontSize: 11,
+                      ),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.04),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(
+                          color: Colors.white.withOpacity(0.1),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFF00E5FF)),
+                      ),
+                    ),
+                    onChanged: (val) {
+                      lifecanvasDiary.saveApiKey(val.trim());
+                    },
                   ),
                 ],
               ),
@@ -102,11 +195,23 @@ class LifeCanvasSidebar extends StatelessWidget {
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      _statBox('${graph.nodes.length}', 'NODES', const Color(0xFF00E5FF)),
+                      _statBox(
+                        '${widget.graph.nodes.length}',
+                        'NODES',
+                        const Color(0xFF00E5FF),
+                      ),
                       const SizedBox(width: 10),
-                      _statBox('${graph.edges.length}', 'EDGES', const Color(0xFFBF5AF2)),
+                      _statBox(
+                        '${widget.graph.edges.length}',
+                        'EDGES',
+                        const Color(0xFFBF5AF2),
+                      ),
                       const SizedBox(width: 10),
-                      _statBox('${events.length}', 'EVENTS', const Color(0xFFFFB300)),
+                      _statBox(
+                        '${events.length}',
+                        'EVENTS',
+                        const Color(0xFFFFB300),
+                      ),
                     ],
                   ),
                 ],
@@ -127,7 +232,10 @@ class LifeCanvasSidebar extends StatelessWidget {
                       child: Text(
                         'No themes yet.\nIngest a log to seed themes.',
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(color: Colors.white.withOpacity(0.2), fontSize: 12),
+                        style: GoogleFonts.outfit(
+                          color: Colors.white.withOpacity(0.2),
+                          fontSize: 12,
+                        ),
                       ),
                     )
                   : ListView.builder(
@@ -138,7 +246,10 @@ class LifeCanvasSidebar extends StatelessWidget {
                         final c = _themeColor(i);
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
                             color: c.withOpacity(0.05),
                             borderRadius: BorderRadius.circular(10),
@@ -147,19 +258,30 @@ class LifeCanvasSidebar extends StatelessWidget {
                           child: Row(
                             children: [
                               Container(
-                                width: 6, height: 6,
-                                decoration: BoxDecoration(shape: BoxShape.circle, color: c),
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: c,
+                                ),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   t.label,
-                                  style: GoogleFonts.outfit(color: Colors.white.withOpacity(0.85), fontSize: 13, fontWeight: FontWeight.w500),
+                                  style: GoogleFonts.outfit(
+                                    color: Colors.white.withOpacity(0.85),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
                               Text(
                                 '${(t.importance * 100).toInt()}%',
-                                style: GoogleFonts.jetBrainsMono(color: c.withOpacity(0.7), fontSize: 10),
+                                style: GoogleFonts.jetBrainsMono(
+                                  color: c.withOpacity(0.7),
+                                  fontSize: 10,
+                                ),
                               ),
                             ],
                           ),
@@ -174,7 +296,7 @@ class LifeCanvasSidebar extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(16),
               child: GestureDetector(
-                onTap: onRefresh,
+                onTap: widget.onRefresh,
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
@@ -185,11 +307,20 @@ class LifeCanvasSidebar extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(LucideIcons.refreshCcw, color: const Color(0xFF00E5FF), size: 15),
+                      Icon(
+                        LucideIcons.refreshCcw,
+                        color: const Color(0xFF00E5FF),
+                        size: 15,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'REFRESH GRAPH',
-                        style: GoogleFonts.outfit(color: const Color(0xFF00E5FF), fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1),
+                        style: GoogleFonts.outfit(
+                          color: const Color(0xFF00E5FF),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1,
+                        ),
                       ),
                     ],
                   ),
@@ -202,30 +333,61 @@ class LifeCanvasSidebar extends StatelessWidget {
     );
   }
 
-  Widget _divider() => Container(height: 1, color: Colors.white.withOpacity(0.06));
+  Widget _divider() =>
+      Container(height: 1, color: Colors.white.withOpacity(0.06));
 
   Widget _label(String text) => Text(
-        text,
-        style: GoogleFonts.jetBrainsMono(color: Colors.white.withOpacity(0.3), fontSize: 9, letterSpacing: 1.5),
-      );
+    text,
+    style: GoogleFonts.jetBrainsMono(
+      color: Colors.white.withOpacity(0.3),
+      fontSize: 9,
+      letterSpacing: 1.5,
+    ),
+  );
 
-  Widget _viewChip(String label, IconData icon, bool active, VoidCallback onTap) {
+  Widget _viewChip(
+    String label,
+    IconData icon,
+    bool active,
+    VoidCallback onTap,
+  ) {
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: active ? const Color(0xFF00E5FF).withOpacity(0.1) : Colors.transparent,
+            color: active
+                ? const Color(0xFF00E5FF).withOpacity(0.1)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: active ? const Color(0xFF00E5FF).withOpacity(0.4) : Colors.white.withOpacity(0.08)),
+            border: Border.all(
+              color: active
+                  ? const Color(0xFF00E5FF).withOpacity(0.4)
+                  : Colors.white.withOpacity(0.08),
+            ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 13, color: active ? const Color(0xFF00E5FF) : Colors.white.withOpacity(0.4)),
+              Icon(
+                icon,
+                size: 13,
+                color: active
+                    ? const Color(0xFF00E5FF)
+                    : Colors.white.withOpacity(0.4),
+              ),
               const SizedBox(width: 5),
-              Text(label, style: GoogleFonts.outfit(color: active ? const Color(0xFF00E5FF) : Colors.white.withOpacity(0.4), fontSize: 12, fontWeight: FontWeight.w600)),
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  color: active
+                      ? const Color(0xFF00E5FF)
+                      : Colors.white.withOpacity(0.4),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
@@ -244,8 +406,22 @@ class LifeCanvasSidebar extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Text(value, style: GoogleFonts.outfit(color: color, fontSize: 18, fontWeight: FontWeight.bold)),
-            Text(label, style: GoogleFonts.jetBrainsMono(color: Colors.white.withOpacity(0.3), fontSize: 8, letterSpacing: 1)),
+            Text(
+              value,
+              style: GoogleFonts.outfit(
+                color: color,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              label,
+              style: GoogleFonts.jetBrainsMono(
+                color: Colors.white.withOpacity(0.3),
+                fontSize: 8,
+                letterSpacing: 1,
+              ),
+            ),
           ],
         ),
       ),

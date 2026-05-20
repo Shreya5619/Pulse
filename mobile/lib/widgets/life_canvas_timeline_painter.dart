@@ -1,74 +1,103 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/life_canvas_timeline_math.dart';
 
-// ─── Timeline Header & "NOW" Bar Painter ──────────────────────────────────────
+/// Timeline header ticks + NOW marker (synced with Life Tree pan/zoom).
 class LifeCanvasTimelinePainter extends CustomPainter {
-  final double viewOffsetHours;
-  final double zoomScale;
+  final Matrix4 transform;
   final DateTime baseDate;
+  final double viewportWidth;
 
   LifeCanvasTimelinePainter({
-    required this.viewOffsetHours,
-    required this.zoomScale,
+    required this.transform,
     required this.baseDate,
+    required this.viewportWidth,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Determine zoom tier to set step size and label format
+    final zoom = transform.getMaxScaleOnAxis();
     String mode;
     double stepHours;
 
-    if (zoomScale > 4.0) { mode = 'MINUTE'; stepHours = 5 / 60.0; }
-    else if (zoomScale > 1.5) { mode = '15MIN'; stepHours = 15 / 60.0; }
-    else if (zoomScale > 0.6) { mode = 'HOUR'; stepHours = 1.0; }
-    else if (zoomScale > 0.2) { mode = '3HOUR'; stepHours = 3.0; }
-    else if (zoomScale > 0.1) { mode = '6HOUR'; stepHours = 6.0; }
-    else if (zoomScale > 0.05) { mode = '12HOUR'; stepHours = 12.0; }
-    else if (zoomScale > 0.015) { mode = 'DAY'; stepHours = 24.0; }
-    else if (zoomScale > 0.004) { mode = 'WEEK'; stepHours = 7 * 24.0; }
-    else if (zoomScale > 0.001) { mode = 'MONTH'; stepHours = 30 * 24.0; }
-    else { mode = 'YEAR'; stepHours = 365 * 24.0; }
+    if (zoom > 4.0) {
+      mode = 'MINUTE';
+      stepHours = 5 / 60.0;
+    } else if (zoom > 1.5) {
+      mode = '15MIN';
+      stepHours = 15 / 60.0;
+    } else if (zoom > 0.6) {
+      mode = 'HOUR';
+      stepHours = 1.0;
+    } else if (zoom > 0.2) {
+      mode = '3HOUR';
+      stepHours = 3.0;
+    } else if (zoom > 0.1) {
+      mode = '6HOUR';
+      stepHours = 6.0;
+    } else if (zoom > 0.05) {
+      mode = '12HOUR';
+      stepHours = 12.0;
+    } else {
+      mode = 'DAY';
+      stepHours = 24.0;
+    }
 
-    final startOfTodayMs = DateTime(baseDate.year, baseDate.month, baseDate.day).millisecondsSinceEpoch;
+    final dayStart = DateTime(baseDate.year, baseDate.month, baseDate.day);
 
-    // Convert pixel to hour offset
-    double pxToHour(double px) => (px / zoomScale) / 200.0 + viewOffsetHours - (100.0 / 200.0);
-    // Convert hour offset to pixel
-    double hourToPx(double h) => ((h - viewOffsetHours + (100.0 / 200.0)) * 200.0) * zoomScale;
+    double hourAtScreenX(double screenX) {
+      final scale = transform.getMaxScaleOnAxis();
+      final tx = transform.getTranslation().x;
+      final childX = (screenX - tx) / scale;
+      final graphX = childX - LifeCanvasTimelineMath.canvasAnchorX;
+      return (graphX - LifeCanvasTimelineMath.timeOriginX) /
+          LifeCanvasTimelineMath.pxPerHour;
+    }
 
-    final startH = pxToHour(-50);
-    final endH = pxToHour(size.width + 50);
-
-    // Snap to nearest step
-    double currentH = (startH / stepHours).floorToDouble() * stepHours;
+    final startH = hourAtScreenX(-20);
+    final endH = hourAtScreenX(viewportWidth + 20);
+    var currentH = (startH / stepHours).floorToDouble() * stepHours;
 
     final tickPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.2)
       ..strokeWidth = 1.0;
-
     final textPainter = TextPainter(textDirection: TextDirection.ltr);
 
     while (currentH <= endH) {
-      final x = hourToPx(currentH);
-      final ms = startOfTodayMs + (currentH * 3600000).toInt();
-      final t = DateTime.fromMillisecondsSinceEpoch(ms);
+      final x = LifeCanvasTimelineMath.screenXFromHour(currentH, transform);
+      if (x < -40 || x > size.width + 40) {
+        currentH += stepHours;
+        continue;
+      }
 
-      // Draw Tick
-      canvas.drawLine(Offset(x, size.height - 5), Offset(x, size.height), tickPaint);
+      canvas.drawLine(
+        Offset(x, size.height - 5),
+        Offset(x, size.height),
+        tickPaint,
+      );
 
-      // Label text
+      final t = dayStart.add(
+        Duration(milliseconds: (currentH * 3600000).round()),
+      );
       String label;
-      if (mode == 'MINUTE' || mode == '15MIN') { label = '${t.hour}:${t.minute.toString().padLeft(2, '0')}'; }
-      else if (mode == 'HOUR' || mode == '3HOUR' || mode == '6HOUR' || mode == '12HOUR') { label = '${t.hour}:00'; }
-      else if (mode == 'DAY') { label = '${_weekday(t.weekday)} ${t.day}'; }
-      else if (mode == 'WEEK') { label = 'W${(t.day / 7).ceil()} (${_month(t.month)})'; }
-      else if (mode == 'MONTH') { label = '${_month(t.month)} ${t.year.toString().substring(2)}'; }
-      else { label = '${t.year}'; }
+      if (mode == 'MINUTE' || mode == '15MIN') {
+        label =
+            '${t.hour}:${t.minute.toString().padLeft(2, '0')}';
+      } else if (mode == 'HOUR' ||
+          mode == '3HOUR' ||
+          mode == '6HOUR' ||
+          mode == '12HOUR') {
+        label = '${t.hour}:00';
+      } else {
+        label = '${_weekday(t.weekday)} ${t.day}';
+      }
 
       textPainter.text = TextSpan(
         text: label,
-        style: GoogleFonts.jetBrainsMono(color: Colors.white.withValues(alpha: 0.5), fontSize: 9),
+        style: GoogleFonts.jetBrainsMono(
+          color: Colors.white.withValues(alpha: 0.5),
+          fontSize: 9,
+        ),
       );
       textPainter.layout();
       textPainter.paint(canvas, Offset(x - textPainter.width / 2, 4));
@@ -76,32 +105,95 @@ class LifeCanvasTimelinePainter extends CustomPainter {
       currentH += stepHours;
     }
 
-    // 2. Draw vertical "NOW" bar mapping present moment
-    final today = DateTime.now();
-    final isToday = baseDate.year == today.year && baseDate.month == today.month && baseDate.day == today.day;
-    if (isToday) {
-      final nowH = today.hour + today.minute / 60.0 + today.second / 3600.0;
-      final nowX = hourToPx(nowH);
+    if (LifeCanvasTimelineMath.isViewingToday(baseDate)) {
+      final nowH = LifeCanvasTimelineMath.nowHourOnDate(baseDate);
+      final nowX = LifeCanvasTimelineMath.screenXFromHour(nowH, transform);
       if (nowX >= 0 && nowX <= size.width) {
-        final nowPaint = Paint()
-          ..color = Colors.redAccent.withValues(alpha: 0.6)
-          ..strokeWidth = 1.5;
-        canvas.drawLine(Offset(nowX, 0), Offset(nowX, size.height), nowPaint);
-        
+        canvas.drawLine(
+          Offset(nowX, 0),
+          Offset(nowX, size.height),
+          Paint()
+            ..color = Colors.white.withValues(alpha: 0.65)
+            ..strokeWidth = 1.0,
+        );
         textPainter.text = TextSpan(
           text: 'NOW',
-          style: GoogleFonts.jetBrainsMono(color: Colors.redAccent, fontSize: 8, fontWeight: FontWeight.bold),
+          style: GoogleFonts.jetBrainsMono(
+            color: Colors.white,
+            fontSize: 8,
+            fontWeight: FontWeight.bold,
+          ),
         );
         textPainter.layout();
-        textPainter.paint(canvas, Offset(nowX - textPainter.width / 2, size.height - 13));
+        textPainter.paint(
+          canvas,
+          Offset(nowX + 3, size.height - 13),
+        );
       }
     }
   }
 
-  String _weekday(int w) => const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][w - 1];
-  String _month(int m) => const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1];
+  String _weekday(int w) =>
+      const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][w - 1];
 
   @override
   bool shouldRepaint(LifeCanvasTimelinePainter o) =>
-      o.viewOffsetHours != viewOffsetHours || o.zoomScale != zoomScale || o.baseDate != baseDate;
+      o.transform != transform ||
+      o.baseDate != baseDate ||
+      o.viewportWidth != viewportWidth;
+}
+
+/// Full-height NOW line on the graph (web #nowBarOverlay).
+class LifeCanvasNowBar extends StatelessWidget {
+  final Matrix4 transform;
+  final DateTime baseDate;
+
+  const LifeCanvasNowBar({
+    super.key,
+    required this.transform,
+    required this.baseDate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!LifeCanvasTimelineMath.isViewingToday(baseDate)) {
+      return const SizedBox.shrink();
+    }
+    final nowH = LifeCanvasTimelineMath.nowHourOnDate(baseDate);
+    final left = LifeCanvasTimelineMath.screenXFromHour(nowH, transform);
+    return Positioned(
+      left: left,
+      top: 0,
+      bottom: 0,
+      child: IgnorePointer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 4, left: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(3),
+              ),
+              child: Text(
+                'NOW',
+                style: GoogleFonts.jetBrainsMono(
+                  color: Colors.white,
+                  fontSize: 8,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Container(
+                width: 1,
+                color: Colors.white.withValues(alpha: 0.65),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

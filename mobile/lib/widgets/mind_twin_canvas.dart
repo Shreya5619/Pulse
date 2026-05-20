@@ -39,15 +39,23 @@ class MindTwinCanvasState extends State<MindTwinCanvas>
   void initState() {
     super.initState();
     _seedPositions();
-    _physics = AnimationController(vsync: this, duration: const Duration(days: 1))
-      ..addListener(_tick)
-      ..repeat();
+    _physics = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))
+      ..addListener(_tick);
+    _runLayoutBurst();
+  }
+
+  void _runLayoutBurst() {
+    if (!mounted) return;
+    _physics.forward(from: 0);
   }
 
   @override
   void didUpdateWidget(covariant MindTwinCanvas old) {
     super.didUpdateWidget(old);
-    if (widget.nodes.length != old.nodes.length) _seedPositions();
+    if (widget.nodes.length != old.nodes.length) {
+      _seedPositions();
+      _runLayoutBurst();
+    }
   }
 
   void _seedPositions() {
