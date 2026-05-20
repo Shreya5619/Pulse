@@ -49,6 +49,8 @@ import dayPulseRouter from "./routes/dayPulse";
 app.use("/api", dayPulseRouter);
 import guardianRouter from "./routes/guardian";
 app.use("/api/guardian", guardianRouter);
+import lifecanvasRouter from "./routes/lifecanvas";
+app.use("/api/lifecanvas", lifecanvasRouter);
 
 
 const httpServer = createServer(app);

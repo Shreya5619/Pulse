@@ -11,7 +11,19 @@ import 'screens/intervention_screen.dart';
 import 'screens/digest_screen.dart';
 import 'screens/day_pulse_screen.dart';
 import 'screens/overlay_screen.dart';
+import 'screens/life_canvas_screen.dart';
 import 'theme/colors.dart';
+
+@pragma("vm:entry-point")
+void overlayMain() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(
+    MaterialApp(
+      debugShowCheckedModeBanner: true,
+      home: OverlayScreen(),
+    ),
+  );
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,14 +32,6 @@ void main() async {
       providers: [ChangeNotifierProvider(create: (_) => AppState())],
       child: const PulseApp(),
     ),
-  );
-}
-
-@pragma("vm:entry-point")
-void overlayMain() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(
-    const MaterialApp(debugShowCheckedModeBanner: false, home: OverlayScreen()),
   );
 }
 
@@ -61,6 +65,7 @@ class _MainShellState extends State<MainShell> {
     const FuturesScreen(),
     const InterventionScreen(),
     const DigestScreen(),
+    const LifeCanvasScreen(),
   ];
 
   @override
@@ -166,6 +171,7 @@ class _MainShellState extends State<MainShell> {
             _buildNavItem(2, LucideIcons.trendingUp, "Futures"),
             _buildNavItem(3, LucideIcons.zap, "Actions"),
             _buildNavItem(4, LucideIcons.layout, "Digest"),
+            _buildNavItem(5, LucideIcons.fingerprint, "LifeCanvas"),
           ],
         ),
       ),

@@ -1,0 +1,118 @@
+{
+  "events": [
+    {
+      "id": 7,
+      "user_id": "demo-user",
+      "type": "EVENT",
+      "timestamp": "2026-05-20T10:16:07.995Z",
+      "tags": [
+        "AI",
+        "Systems"
+      ],
+      "entities": {
+        "emotion": "excited",
+        "people": []
+      },
+      "importance": 0.7,
+      "text_content": "Started building the LifeCanvas cognitive memory engine today. Feeling energized and deeply focused on AI systems work.",
+      "created_at": "2026-05-20T10:16:09.325Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": 1,
+      "user_id": "demo-user",
+      "type": "THEME",
+      "label": "AI",
+      "importance": 0.8,
+      "metadata": {},
+      "created_at": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "user_id": "demo-user",
+      "type": "THEME",
+      "label": "Systems",
+      "importance": 0.7,
+      "metadata": {},
+      "created_at": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": 3,
+      "user_id": "demo-user",
+      "type": "THEME",
+      "label": "Health",
+      "importance": 0.6,
+      "metadata": {},
+      "created_at": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": 4,
+      "user_id": "demo-user",
+      "type": "THEME",
+      "label": "Relationships",
+      "importance": 0.7,
+      "metadata": {},
+      "created_at": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": 5,
+      "user_id": "demo-user",
+      "type": "THEME",
+      "label": "Creativity",
+      "importance": 0.65,
+      "metadata": {},
+      "created_at": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": 6,
+      "user_id": "demo-user",
+      "type": "THEME",
+      "label": "Growth",
+      "importance": 0.75,
+      "metadata": {},
+      "created_at": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": 8,
+      "user_id": "demo-user",
+      "type": "LIFE_EVENT",
+      "label": "Building LifeCanvas",
+      "importance": 0.7,
+      "metadata": {
+        "eventId": 7,
+        "emotion": "excited",
+        "themes": [
+          "AI",
+          "Systems"
+        ],
+        "people": [],
+        "summary": "Started building the LifeCanvas cognitive memory engine today",
+        "timestamp": "2026-05-20T10:16:07.995Z"
+      },
+      "created_at": "2026-05-20T10:16:09.325Z"
+    }
+  ],
+  "edges": [
+    {
+      "id": 1,
+      "user_id": "demo-user",
+      "source_id": 8,
+      "target_id": 1,
+      "relation": "thematic_relation",
+      "strength": 1,
+      "created_at": "2026-05-20T10:16:09.325Z"
+    },
+    {
+      "id": 2,
+      "user_id": "demo-user",
+      "source_id": 8,
+      "target_id": 2,
+      "relation": "thematic_relation",
+      "strength": 1,
+      "created_at": "2026-05-20T10:16:09.325Z"
+    }
+  ],
+  "nextNodeId": 9,
+  "nextEdgeId": 3
+}

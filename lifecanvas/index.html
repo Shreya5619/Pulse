@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeCanvas Cognitive Engine</title>
+    <meta name="description" content="A temporal knowledge graph to map your life events chronologically and semantically.">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar / Context Panel -->
+        <aside class="sidebar">
+            <div class="brand">
+                <h1>LIFECANVAS</h1>
+                <p>COGNITIVE ENGINE</p>
+            </div>
+            
+            <div class="context-files">
+                <div class="file-card">
+                    <label>lifecanvas.md</label>
+                    <pre id="lifeCanvasContent"># Life History\nNo data yet.</pre>
+                </div>
+                <div class="file-card">
+                    <label>temporarydetailed.md</label>
+                    <pre id="recentHistoryContent"># Last 3 Days\nNo data yet.</pre>
+                </div>
+                <div class="file-card">
+                    <label class="llm-label">llm_response.json</label>
+                    <pre id="llmResponseContent">Waiting for input...</pre>
+                </div>
+                
+                <!-- Agent Reasoning Steps Timeline (Mirrored from SAN Agent) -->
+                <div class="file-card" style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 20px;">
+                    <label class="llm-label" style="color: var(--neon-cyan);">AGENT REASONING TRACE</label>
+                    <div id="agentStepTimeline" class="agent-timeline">
+                        <div class="no-trace-placeholder" style="font-size: 10px; color: var(--text-dim); font-style: italic;">No active reasoning traces yet. Ingest a log to trigger the cognitive agent loop.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="config">
+                <label style="font-size: 8px; color: var(--text-dim); display: block; margin-bottom: 4px;">DATE NAVIGATOR</label>
+                <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                    <input type="date" id="viewDate" style="flex-grow: 1; background: var(--glass); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 10px; border-radius: 6px;">
+                    <button id="summarizeDayBtn" title="Summarize" style="background: var(--neon-cyan); border: none; border-radius: 6px; padding: 0 10px; cursor: pointer; color: black; font-weight: bold;">Σ</button>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <button id="tidyMindBtn" style="width: 100%; background: var(--neon-purple); border: none; color: white; padding: 10px; border-radius: 6px; font-size: 10px; font-weight: bold; cursor: pointer; letter-spacing: 1px; box-shadow: 0 0 15px rgba(191, 90, 242, 0.3);">SHAKE CLUTTER (MIND)</button>
+                </div>
+
+                <label style="font-size: 8px; color: var(--text-dim); display: block; margin-bottom: 4px;">LLM SOURCE</label>
+                <select id="llmSource" style="width: 100%; background: var(--glass); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+                    <option value="groq">Groq (Cloud)</option>
+                    <option value="ollama">Ollama (Local)</option>
+                </select>
+
+                <div style="margin-bottom: 15px; margin-top: 10px;">
+                    <label style="font-size: 10px; color: var(--neon-cyan); display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: bold;">
+                        <input type="checkbox" id="autoConnect" checked style="accent-color: var(--neon-purple); transform: scale(1.2);">
+                        AUTO-CONNECT ARROWS
+                    </label>
+                </div>
+
+                <div id="groqConfig">
+                    <label style="font-size: 8px; color: var(--text-dim); display: block; margin-bottom: 4px;">GROQ API KEY</label>
+                    <input type="password" id="apiKey" placeholder="gsk_...">
+                </div>
+
+                <div id="ollamaConfig" style="display: none;">
+                    <label style="font-size: 8px; color: var(--text-dim); display: block; margin-bottom: 4px;">OLLAMA MODEL NAME</label>
+                    <input type="text" id="ollamaModel" placeholder="phi3" value="phi3">
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-canvas">
+            <!-- Timeline header bar with embedded clock -->
+            <div id="timelineHeader" class="timeline-header">
+                <div id="liveClock" class="live-clock">00:00:00</div>
+            </div>
+            
+            <div class="view-tabs">
+                <button id="showLifeTree" class="active">LIFE TREE</button>
+                <button id="showMindTwin">MIND TWIN</button>
+            </div>
+
+            <!-- Zoom Controls (bottom-right, clear of clock) -->
+            <div class="controls" id="zoomControls">
+                <button id="predictBtn" title="Predict Future Timeline">🔮 PREDICT</button>
+                <button id="zoomIn" title="Zoom In">+</button>
+                <button id="zoomOut" title="Zoom Out">-</button>
+                <button id="resetView" title="Reset View">⟲</button>
+                <button id="toggleSnap" title="Toggle: Snap to Timeline / Y-Physics" class="active-mode">📌</button>
+            </div>
+
+            <div id="cy" class="cy-container active">
+                <!-- Gantt Chart Overlay: mock app usage, synced to Life Tree X scale -->
+                <canvas id="ganttCanvas" style="position:absolute;top:60px;left:0;right:0;height:130px;width:100%;z-index:200;pointer-events:none;"></canvas>
+            </div>
+            <div id="cyMind" class="cy-container">
+                <div id="mindTodoPanel" class="mind-todo-panel">
+                    <h3>BRAINSTORM LIST</h3>
+                    <div id="todoItemsContainer">
+                        <div class="todo-line">
+                            <input type="text" placeholder="Something to map...">
+                        </div>
+                    </div>
+                    <button id="addTodoLineBtn" class="todo-add-btn">+ ADD LINE</button>
+                    <button id="processTodosBtn" class="todo-process-btn">MIND-MAP WITH AI</button>
+                </div>
+
+                <!-- Mind Palette: right-side vertical toolbar -->
+                <div class="mind-toolbar">
+                    <button id="addMindEvent" title="Add Event Node (Blue)">+🔵</button>
+                    <button id="addMindCat" title="Add Category Node (Pink)">+🌸</button>
+                    <button id="groupNodesBtn" title="Group Selected (AI Cluster)">📦</button>
+                    <button id="deleteMindNodes" title="Delete Selected">🗑️</button>
+                    <button id="resetMindView" title="Reset Zoom">⟲</button>
+                    <div class="mind-toolbar-hint" id="connectHint">CLICK 2<br>NODES TO<br>CONNECT</div>
+                </div>
+            </div>
+            
+            <!-- Input Area (Life Tree only) -->
+            <section class="input-panel" id="lifeTreeInput">
+                <div class="glass-input">
+                    <button id="askToggle" class="ask-toggle-btn">🔮 ASK</button>
+                    <textarea id="logInput" placeholder="What happened today? (e.g. 'Started the Pulse project')"></textarea>
+                    <button id="ingestBtn">INGEST LOG</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Node Detail Modal -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content glass">
+            <span class="close" id="closeDetailModal">&times;</span>
+            <h2 id="nodeTitle">Event Detail</h2>
+            <div id="nodeData"></div>
+        </div>
+    </div>
+
+    <!-- Summarize Modal -->
+    <div id="summarizeModal" class="modal">
+        <div class="modal-content" style="max-width: 580px;">
+            <span class="close" id="closeSummarize">&times;</span>
+            <h2 style="color: var(--neon-cyan); margin-bottom: 20px; letter-spacing: 2px;">SUMMARIZE</h2>
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div class="sum-card" id="sumNewLogsCard">
+                    <h3>📋 NEW LOGS ONLY</h3>
+                    <p>Summarizes only today's recent temporary logs into lifecanvas.md, preserving significant past events.</p>
+                    <button id="sumNewLogsBtn">SUMMARIZE NEW LOGS</button>
+                </div>
+                <div class="sum-card" id="sumRangeCard">
+                    <h3>📅 DATE RANGE SUMMARY</h3>
+                    <p>Select specific days from lifecanvas.md history and create a condensed "summary of summaries".</p>
+                    <div id="dateChecklistContainer" style="max-height: 200px; overflow-y: auto; margin: 10px 0; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px;">
+                        <p style="color: var(--text-dim); font-size: 11px;">Loading day logs...</p>
+                    </div>
+                    <button id="sumRangeBtn">SUMMARIZE SELECTED DAYS</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tidy Modal -->
+    <div id="tidyModal" class="modal">
+        <div class="modal-content" style="max-width: 600px; height: 80vh; display: flex; flex-direction: column;">
+            <span id="closeTidy" class="close">&times;</span>
+            <h2 style="margin: 0 0 10px 0; color: var(--neon-purple); letter-spacing: 2px;">MIND TIDY REVIEW</h2>
+            <p style="font-size: 11px; color: var(--text-dim); margin-bottom: 20px;">Uncheck any nodes you wish to prune from your Mind Twin.</p>
+            <div id="tidyList" style="flex-grow: 1; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 20px;"></div>
+            <div style="margin-top: 20px;">
+                <button id="applyTidyBtn" style="width: 100%; background: var(--neon-purple); border: none; color: white; padding: 15px; border-radius: 8px; cursor: pointer; font-weight: bold;">APPLY PRUNING</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LifeCanvas AI Toast (must be before app.js script) -->
+    <div id="lcToast" class="lc-toast"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

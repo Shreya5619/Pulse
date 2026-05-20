@@ -1,0 +1,43 @@
+AI Usage DISCLOSURE FORM
+
+1. Team Details
+Team Name: Pulse Development Team
+Project / Product Name: Pulse (Predictive Digital Twin)
+Organization / Institution (if any): [Insert Organization]
+Submission Date: May 8, 2026
+
+2. AI Usage Declaration
+Did your team use any Artificial Intelligence (AI) in developing this project? Yes
+The project uses AI both for development (coding assistance) and as a core runtime feature (agent orchestration).
+
+3. Purpose of AI Usage ( Brief Details)
+Idea generation / brainstorming: Defined agent roles (Swarm) and scenario modeling.
+Code generation or assistance: Flutter/Dart and TypeScript development assistance.
+UI / UX design: Theme tokens, layout optimization, and asset generation.
+Content creation: Real-time notification summarization and intervention drafting.
+Data analysis: Predictive risk scoring and context normalization.
+Testing / debugging: Simulation of notification surges and WebSocket event handling.
+Other: Multi-agent system orchestration using the OpenClaw-style pattern.
+
+4. Feature Origin Classification
+1. Feature Name: 5-Agent Neural Swarm (Heartbeat)
+2. Self-Generated/AI-Generated/Both: Both
+3. Description: Developed a custom TypeScript orchestration loop ("Heartbeat") that delegates reasoning to a Llama-3.1-8b swarm (via Groq API). AI performs real-time decision-making, while the logic flow and agent boundaries are self-generated.
+
+2. Feature Name: Predictive Risk Engine & Memory (Neo4j)
+2. Self-Generated/AI-Generated/Both: Both
+3. Description: Integrated Neo4j for historical pattern recognition. AI (Llama-3.1) is used to interpret these patterns alongside live telemetry (GPS, Battery) to predict "failure risks" (e.g., transit delays).
+
+3. Feature Name: Intelligent Notification Surging
+2. Self-Generated/AI-Generated/Both: Both
+3. Description: Built a system to capture high-frequency Android notifications via a Flutter listener. Uses Groq/Llama-3.1 to filter noise and generate natural-language digests and action items.
+
+5. Ethical & Compliance Confirmation
+AI usage complies with guidelines and policies. Yes
+No proprietary or copyrighted data misused. I Agree
+
+6. Declaration & Sign-Off
+Name of Team Representative: Sachetan
+Role: Assistant Developer
+Signature: is333
+Date: May 8, 2026

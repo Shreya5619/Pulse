@@ -1,0 +1,718 @@
+:root {
+    --bg: #020412;
+    --surface: #0a0e21;
+    --glass: rgba(255, 255, 255, 0.05);
+    --neon-purple: #bf5af2;
+    --neon-blue: #0a84ff;
+    --neon-cyan: #64d2ff;
+    --neon-pink: #ff375f;
+    --text: #ffffff;
+    --text-dim: rgba(255, 255, 255, 0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.app-container { display: flex; height: 100%; }
+
+/* Sidebar */
+.sidebar {
+    width: 350px;
+    background: var(--surface);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    padding: 30px;
+    z-index: 100;
+    overflow-y: auto;
+}
+
+.brand h1 {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    background: linear-gradient(to bottom right, var(--neon-purple), var(--neon-blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.brand p {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    margin-bottom: 40px;
+}
+
+.context-files { flex-grow: 1; overflow-y: auto; }
+.file-card { margin-bottom: 25px; }
+
+.file-card label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--neon-cyan);
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.file-card label.llm-label { color: var(--neon-purple); }
+
+pre {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 15px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+    white-space: pre-wrap;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.config input, .config select {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 12px;
+    border-radius: 6px;
+    color: white;
+    font-size: 12px;
+}
+
+/* Main Canvas */
+.main-canvas {
+    flex-grow: 1;
+    position: relative;
+    background: radial-gradient(circle at center, #0a0e21 0%, #020412 100%);
+}
+
+/* Timeline Header Bar (fixed at top, contains clock) */
+.timeline-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 60px;
+    background: linear-gradient(to bottom, rgba(2, 4, 18, 0.95) 0%, rgba(2, 4, 18, 0.6) 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 900;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* Clock embedded inside timeline header */
+.live-clock {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 12px rgba(100, 210, 255, 0.6);
+    z-index: 1001;
+    pointer-events: none;
+    letter-spacing: 2px;
+}
+
+.timeline-tick {
+    position: absolute;
+    bottom: 0;
+    width: 1px;
+}
+
+.timeline-label {
+    position: absolute;
+    bottom: 8px;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+    transform: translateX(-50%);
+    font-weight: 600;
+    letter-spacing: 1px;
+    white-space: nowrap;
+}
+
+.timeline-tick.hour { height: 15px; background: rgba(255, 255, 255, 0.5); }
+.timeline-tick.minute { height: 5px; background: rgba(255, 255, 255, 0.15); }
+
+/* View Tabs */
+.view-tabs {
+    position: absolute;
+    top: 70px;
+    left: 30px;
+    display: flex;
+    gap: 10px;
+    z-index: 1000;
+}
+
+.view-tabs button {
+    background: var(--glass);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-dim);
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+}
+
+.view-tabs button.active {
+    background: var(--neon-cyan);
+    color: black;
+    border-color: transparent;
+    box-shadow: 0 0 20px rgba(100, 210, 255, 0.4);
+}
+
+/* Zoom controls: bottom-right, well away from clock */
+.controls {
+    position: absolute;
+    bottom: 140px;
+    right: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 1000;
+}
+
+.controls button {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    background: var(--glass);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s;
+}
+
+.controls button:hover {
+    background: var(--neon-blue);
+    box-shadow: 0 0 20px var(--neon-blue);
+    border-color: transparent;
+}
+
+.controls button.active-mode {
+    background: rgba(191, 90, 242, 0.3);
+    border: 1px solid var(--neon-purple);
+    box-shadow: 0 0 12px rgba(191, 90, 242, 0.4);
+}
+
+/* Cytoscape containers */
+.cy-container {
+    width: 100%;
+    height: 100%;
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.cy-container.active { display: block; }
+
+/* Neural net deep-space background for Mind Twin */
+#cyMind {
+    background: radial-gradient(ellipse at 30% 40%, rgba(10, 132, 255, 0.06) 0%, transparent 60%),
+                radial-gradient(ellipse at 70% 70%, rgba(191, 90, 242, 0.06) 0%, transparent 55%),
+                radial-gradient(circle at 50% 50%, #050818 0%, #020412 100%);
+}
+
+/* Mind Twin palette toolbar (right-side vertical) */
+.mind-toolbar {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--glass);
+    padding: 15px 10px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    z-index: 1000;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: -5px 0 30px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+}
+
+.mind-toolbar button {
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    width: 44px;
+    height: 44px;
+}
+
+.mind-toolbar button:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.1);
+}
+
+.mind-toolbar button:active { transform: scale(0.9); }
+
+.mind-toolbar button.active-mode {
+    background: rgba(191, 90, 242, 0.3);
+    border: 1px solid var(--neon-purple);
+}
+
+.mind-toolbar-hint {
+    font-size: 8px;
+    color: var(--text-dim);
+    text-align: center;
+    line-height: 1.4;
+    letter-spacing: 0.5px;
+    padding: 4px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding-top: 8px;
+    display: none;
+}
+
+.mind-toolbar-hint.visible { display: block; }
+
+/* Mind Twin To-Do Panel (top-left, below tabs) */
+.mind-todo-panel {
+    position: absolute;
+    top: 120px;
+    left: 20px;
+    width: 260px;
+    background: var(--glass);
+    padding: 20px;
+    border-radius: 8px;
+    z-index: 1000;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 5px 0 30px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(15px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+}
+
+.mind-todo-panel h3 {
+    margin: 0 0 5px 0;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--neon-purple);
+}
+
+.todo-line { display: flex; gap: 5px; }
+
+.todo-line input {
+    flex-grow: 1;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: white;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: 'Inter', sans-serif;
+    /* Prevent Cytoscape from stealing pointer-events */
+    pointer-events: all;
+    position: relative;
+    z-index: 1001;
+}
+
+.todo-line input:focus {
+    outline: none;
+    border-color: var(--neon-purple);
+    background: rgba(191, 90, 242, 0.1);
+}
+
+.todo-add-btn {
+    background: none;
+    border: 1px dashed rgba(255,255,255,0.2);
+    color: var(--text-dim);
+    padding: 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.todo-add-btn:hover { border-color: var(--neon-purple); color: var(--neon-purple); }
+
+.todo-process-btn {
+    background: var(--neon-purple);
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 11px;
+    margin-top: 5px;
+    transition: all 0.2s;
+}
+
+.todo-process-btn:hover { box-shadow: 0 0 20px rgba(191,90,242,0.5); }
+
+/* Input Panel (Life Tree only) */
+.input-panel {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    z-index: 1000;
+}
+
+.glass-input {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 8px;
+    display: flex;
+    gap: 15px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+textarea {
+    flex-grow: 1;
+    background: transparent;
+    border: none;
+    color: white;
+    font-family: inherit;
+    font-size: 14px;
+    resize: none;
+    height: 50px;
+    outline: none;
+}
+
+#ingestBtn {
+    background: var(--neon-purple);
+    color: white;
+    border: none;
+    padding: 0 25px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+#ingestBtn:hover {
+    box-shadow: 0 0 30px var(--neon-purple);
+    transform: translateY(-2px);
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.8);
+    backdrop-filter: blur(10px);
+    justify-content: center;
+    align-items: center;
+}
+
+.modal.open { display: flex; }
+
+.modal-content {
+    background: var(--surface);
+    padding: 40px;
+    border: 1px solid var(--neon-cyan);
+    width: 500px;
+    border-radius: 24px;
+    position: relative;
+    box-shadow: 0 0 50px rgba(100, 210, 255, 0.2);
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+.close {
+    position: absolute;
+    right: 20px;
+    top: 15px;
+    font-size: 28px;
+    cursor: pointer;
+    color: var(--text-dim);
+    z-index: 10;
+}
+
+.close:hover { color: white; }
+
+#nodeTitle {
+    color: var(--neon-cyan);
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+#nodeData pre {
+    margin-top: 15px;
+    color: var(--neon-blue);
+    border-color: var(--neon-blue);
+}
+
+/* Summarize Cards */
+.sum-card {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.sum-card h3 { font-size: 13px; margin-bottom: 8px; color: var(--neon-cyan); }
+.sum-card p { font-size: 11px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6; }
+.sum-card button {
+    background: var(--neon-cyan);
+    color: black;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 1px;
+}
+
+/* Hierarchical Tidy List */
+.tidy-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+}
+
+.tidy-item:hover { background: rgba(255, 255, 255, 0.05); }
+
+.tidy-item.category {
+    font-weight: 600;
+    color: var(--neon-purple);
+    border-bottom: 1px solid rgba(191, 90, 242, 0.1);
+    margin-top: 15px;
+}
+
+.tidy-item.leaf {
+    margin-left: 20px;
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.tidy-item input[type="checkbox"] {
+    accent-color: var(--neon-purple);
+    cursor: pointer;
+}
+
+/* ===== ASK LIFECANVAS TOGGLE ===== */
+.ask-toggle-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--text-dim);
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.25s;
+    flex-shrink: 0;
+}
+
+.ask-toggle-btn.active {
+    background: linear-gradient(135deg, rgba(191,90,242,0.3), rgba(100,210,255,0.2));
+    border-color: var(--neon-purple);
+    color: var(--neon-purple);
+    box-shadow: 0 0 12px rgba(191,90,242,0.3);
+}
+
+.ask-toggle-btn:hover { border-color: var(--neon-purple); color: #fff; }
+
+/* ===== TOAST NOTIFICATION ===== */
+.lc-toast {
+    position: fixed;
+    bottom: 110px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(10,14,33,0.96);
+    border: 1px solid rgba(100,210,255,0.2);
+    border-radius: 12px;
+    padding: 16px 24px;
+    max-width: 520px;
+    width: 90%;
+    color: #fff;
+    font-size: 13px;
+    line-height: 1.6;
+    z-index: 3000;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 20px rgba(100,210,255,0.1);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.lc-toast.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ===== PREDICT BUTTON (in controls) ===== */
+#predictBtn {
+    background: linear-gradient(135deg, rgba(191,90,242,0.2), rgba(10,132,255,0.2));
+    border: 1px solid rgba(191,90,242,0.4);
+    color: var(--neon-purple);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    padding: 0 6px;
+    height: 45px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+#predictBtn:hover {
+    background: rgba(191,90,242,0.3);
+    box-shadow: 0 0 20px rgba(191,90,242,0.5);
+}
+
+/* ===== GANTT OVERLAY (background strip) ===== */
+#ganttCanvas {
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(2,4,18,0.7);
+    backdrop-filter: blur(4px);
+}
+
+/* ===== AGENT STEP TIMELINE STYLE (MIRRORED FROM SAN AGENT) ===== */
+.agent-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding: 10px 0;
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+.agent-step {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    animation: reveal 0.3s ease-out;
+}
+
+@keyframes reveal {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.agent-step-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    width: 22px;
+    flex-shrink: 0;
+}
+
+.agent-step-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255,255,255,0.08);
+    font-size: 11px;
+    z-index: 2;
+}
+
+.agent-step-icon--thinking { background: rgba(191, 90, 242, 0.15); border-color: var(--neon-purple); }
+.agent-step-icon--command { background: rgba(10, 132, 255, 0.15); border-color: var(--neon-blue); }
+.agent-step-icon--cypher { background: rgba(100, 210, 255, 0.15); border-color: var(--neon-cyan); }
+.agent-step-icon--result { background: rgba(78, 226, 201, 0.15); border-color: #4EE2C9; }
+.agent-step-icon--final { background: rgba(78, 226, 201, 0.25); border-color: #4EE2C9; }
+
+.agent-step-line {
+    width: 1px;
+    background: rgba(255,255,255,0.08);
+    flex-grow: 1;
+    position: absolute;
+    top: 22px;
+    bottom: -15px;
+    z-index: 1;
+}
+
+.agent-step-body {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.agent-step-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.agent-step-num {
+    font-size: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-dim);
+    text-transform: uppercase;
+}
+
+.agent-step-title {
+    font-weight: 600;
+    color: white;
+    letter-spacing: 0.5px;
+}
+
+.agent-step-time {
+    font-size: 8px;
+    color: var(--text-dim);
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.agent-step-detail {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1.4;
+}
+
+.agent-step-cmd {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255,255,255,0.06);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--neon-cyan);
+    white-space: pre-wrap;
+    margin-top: 4px;
+    max-height: 150px;
+    overflow-y: auto;
+}
