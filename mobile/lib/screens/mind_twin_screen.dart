@@ -350,7 +350,7 @@ class _MindTwinScreenState extends State<MindTwinScreen> {
         }
       });
       await _save();
-      _canvasKey.currentState?._runLayoutBurst();
+      _canvasKey.currentState?.runLayoutBurst();
       _showSnack('✨ ${result.summary}');
     } catch (e) {
       _showSnack('Map & Reduce failed: $e');

@@ -43,10 +43,10 @@ class MindTwinCanvasState extends State<MindTwinCanvas>
     super.initState();
     _physics = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))
       ..addListener(_tick);
-    _runLayoutBurst();
+    runLayoutBurst();
   }
 
-  void _runLayoutBurst() {
+  void runLayoutBurst() {
     if (!mounted) return;
     _physics.forward(from: 0);
   }
@@ -56,7 +56,7 @@ class MindTwinCanvasState extends State<MindTwinCanvas>
     super.didUpdateWidget(old);
     if (widget.nodes.length != old.nodes.length) {
       _seedPositions();
-      _runLayoutBurst();
+      runLayoutBurst();
     }
   }
 
@@ -223,7 +223,7 @@ class MindTwinCanvasState extends State<MindTwinCanvas>
           onScaleEnd: (_) {
             if (_draggedNode != null) {
               _draggedNode = null;
-              _runLayoutBurst();
+              runLayoutBurst();
             }
           },
           child: CustomPaint(
