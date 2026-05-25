@@ -111,7 +111,7 @@ export class GraphAdapter {
       });
       console.log(`[Neo4j Adapter] Successfully synced snapshot for ${userId}`);
     } catch (error) {
-      console.error('[Neo4j Adapter] Error applying snapshot:', error);
+      GraphAdapter.handleNeo4jError('applying snapshot', error);
     } finally {
       await session.close();
     }
@@ -146,7 +146,7 @@ export class GraphAdapter {
         }
       });
     } catch (error) {
-      console.error('[Neo4j Adapter] Error updating risks:', error);
+      GraphAdapter.handleNeo4jError('updating risks', error);
     } finally {
       await session.close();
     }
@@ -170,7 +170,7 @@ export class GraphAdapter {
         confidence: r.get('confidence')
       }));
     } catch (error) {
-      console.error('[Neo4j Adapter] Error fetching user preferences:', error);
+      GraphAdapter.handleNeo4jError('fetching user preferences', error);
       return [];
     } finally {
       await session.close();
@@ -205,7 +205,7 @@ export class GraphAdapter {
         sentiment: record.get('sentiment') || "Neutral"
       };
     } catch (error) {
-      console.error('[Neo4j Adapter] Error fetching user personality:', error);
+      GraphAdapter.handleNeo4jError('fetching user personality', error);
       return { traits: [], interests: [], sentiment: "Neutral" };
     } finally {
       await session.close();
@@ -250,7 +250,7 @@ export class GraphAdapter {
         }
       });
     } catch (error) {
-      console.error('[Neo4j Adapter] Error applying preferences:', error);
+      GraphAdapter.handleNeo4jError('applying preferences', error);
     } finally {
       await session.close();
     }
@@ -301,7 +301,7 @@ export class GraphAdapter {
         }
       });
     } catch (error) {
-      console.error('[Neo4j Adapter] Error applying personality:', error);
+      GraphAdapter.handleNeo4jError('applying personality', error);
     } finally {
       await session.close();
     }
@@ -347,7 +347,7 @@ export class GraphAdapter {
 
       return this.formatNodesAndEdges(result, userId);
     } catch (error) {
-        console.error('[Neo4j Adapter] Error fetching subgraph:', error);
+        GraphAdapter.handleNeo4jError('fetching subgraph', error);
         return { nodes: [], edges: [] };
     } finally {
       await session.close();
@@ -507,5 +507,18 @@ export class GraphAdapter {
     }
 
     return { nodes, edges };
+  }
+
+  private static handleNeo4jError(context: string, error: any) {
+    if (
+      error.code === 'ServiceUnavailable' ||
+      error.message?.includes('Failed to connect') ||
+      error.message?.includes('discovery') ||
+      error.message?.includes('ENOTFOUND')
+    ) {
+      console.log(`[Neo4j Adapter] Database is offline (ServiceUnavailable/ENOTFOUND) during: ${context}`);
+    } else {
+      console.error(`[Neo4j Adapter] Error during ${context}:`, error);
+    }
   }
 }

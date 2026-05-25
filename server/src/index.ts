@@ -315,4 +315,4 @@ setInterval(() => {
 httpServer.listen(PORT, HOST, () => {
     console.log(`[Pulse] Server running on http://${HOST}:${PORT}`);
     console.log(`[Pulse] WebSocket available at ws://${HOST}:${PORT}/ws`);
-});
+});

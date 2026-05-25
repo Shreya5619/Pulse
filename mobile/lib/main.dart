@@ -14,6 +14,7 @@ import 'screens/day_pulse_screen.dart';
 import 'screens/overlay_screen.dart';
 import 'screens/life_canvas_screen.dart';
 import 'services/lifecanvas_diary.dart';
+import 'screens/chat_screen.dart';
 import 'theme/colors.dart';
 
 @pragma("vm:entry-point")
@@ -189,11 +190,12 @@ class _MainShellState extends State<MainShell> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildNavItem(0, LucideIcons.home, "Home"),
-            _buildNavItem(1, LucideIcons.activity, "Pulse"),
-            _buildNavItem(2, LucideIcons.trendingUp, "Futures"),
-            _buildNavItem(3, LucideIcons.zap, "Actions"),
-            _buildNavItem(4, LucideIcons.layout, "Digest"),
+            _buildNavItem(context, 0, LucideIcons.home, "Home"),
+            _buildNavItem(context, 1, LucideIcons.activity, "Pulse"),
+            _buildNavItem(context, 2, LucideIcons.trendingUp, "Futures"),
+            _buildNavItem(context, 3, LucideIcons.zap, "Actions"),
+            _buildNavItem(context, 4, LucideIcons.messageSquare, "Ask"),
+            _buildNavItem(context, 5, LucideIcons.layout, "Digest"),
           ],
         ),
       ),

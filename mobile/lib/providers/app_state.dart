@@ -24,6 +24,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http_parser/http_parser.dart';
 import '../services/llm_service.dart';
 
+import '../services/lifecanvas_service.dart';
+import '../services/usage_stats_service.dart';
+import '../services/lifecanvas_diary.dart';
+
 class ChatMessage {
   final String text;
   final bool isUser;
@@ -39,9 +43,6 @@ class ChatMessage {
     this.actions = const [],
   });
 }
-import '../services/lifecanvas_service.dart';
-import '../services/usage_stats_service.dart';
-import '../services/lifecanvas_diary.dart';
 
 class TimelineEvent {
   final String id;
@@ -2397,6 +2398,122 @@ class AppState extends ChangeNotifier {
       name: 'PulseWidgetProvider',
       androidName: 'PulseWidgetProvider',
     );
+  }
+
+  Future<void> _safeInit(Function func, String label) async {
+    try {
+      debugPrint('[Pulse AppState] Initializing $label...');
+      await func();
+      debugPrint('[Pulse AppState] $label initialized successfully.');
+    } catch (e) {
+      debugPrint('[Pulse AppState] Error initializing $label: $e');
+    }
+  }
+
+  Future<void> _initOverlay() async {
+    if (_isOverlayInitializing) return;
+    _isOverlayInitializing = true;
+    
+    try {
+      final bool isAllowed = await FlutterOverlayWindow.isPermissionGranted();
+      debugPrint('[Pulse AppState] Overlay permission granted: $isAllowed');
+      
+      if (isAllowed) {
+        final bool isRunning = await FlutterOverlayWindow.isActive();
+        debugPrint('[Pulse AppState] Overlay already active: $isRunning');
+        
+        if (!isRunning) {
+          debugPrint('[Pulse AppState] Showing overlay bubble...');
+          await FlutterOverlayWindow.showOverlay(
+            enableDrag: true,
+            overlayTitle: "Pulse Bubble",
+            overlayContent: "Pulse is active",
+            flag: OverlayFlag.focusPointer,
+            alignment: OverlayAlignment.centerLeft,
+            visibility: NotificationVisibility.visibilityPublic,
+            positionGravity: PositionGravity.none,
+            height: 140,
+            width: 140,
+          );
+        }
+      } else {
+        debugPrint('[Pulse AppState] Overlay permission NOT granted. User must enable it in settings.');
+      }
+    } finally {
+      _isOverlayInitializing = false;
+    }
+  }
+
+  // ─── LifeCanvas Variables & Methods ─────────────────────────────────────────
+  bool _isLifeCanvasLoading = false;
+  LifeCanvasGraph _lifeCanvasGraph = LifeCanvasGraph.empty();
+  String _lifeCanvasDiaryMd = '';
+  String _lifeCanvasLogs = '';
+  List<AppUsageStat> _usageStats = [];
+  List<PredictedEvent> _predictions = [];
+
+  bool get isLifeCanvasLoading => _isLifeCanvasLoading;
+  LifeCanvasGraph get lifeCanvasGraph => _lifeCanvasGraph;
+  String get lifeCanvasDiaryMd => _lifeCanvasDiaryMd;
+  String get lifeCanvasLogs => _lifeCanvasLogs;
+  List<AppUsageStat> get usageStats => _usageStats;
+  List<PredictedEvent> get predictions => _predictions;
+
+  Future<void> fetchLifeCanvasGraph({String? dateStr}) async {
+    _isLifeCanvasLoading = true;
+    notifyListeners();
+
+    final ds = dateStr ?? DateTime.now().toIso8601String().substring(0, 10);
+
+    try {
+      _lifeCanvasGraph = await lifecanvasService.fetchGraph('user123', dateStr: ds);
+      _lifeCanvasDiaryMd = await lifecanvasDiary.getDiary();
+      _lifeCanvasLogs = await lifecanvasDiary.getLogs();
+      _usageStats = await usageStatsService.getUsageForDay(ds);
+    } catch (e) {
+      debugPrint('[AppState] Error fetching LifeCanvas components: $e');
+      _lifeCanvasGraph = LifeCanvasGraph.empty();
+    }
+
+    _isLifeCanvasLoading = false;
+    notifyListeners();
+  }
+
+  Future<bool> ingestLifeCanvasLog(String text, {String? dateStr}) async {
+    await lifecanvasDiary.appendLog(text);
+
+    final ds = dateStr ?? DateTime.now().toIso8601String().substring(0, 10);
+
+    try {
+      debugPrint('[AppState] Parsing log via Groq (no fallback).');
+      final parsedNode = await lifecanvasService.parseIngestedLogDirectly(text);
+      await lifecanvasService.addNodeToCache(parsedNode, dateStr: ds);
+      lifecanvasService.ingest('user123', text);
+      await fetchLifeCanvasGraph(dateStr: ds);
+      return true;
+    } catch (e) {
+      debugPrint('[AppState] ingestLifeCanvasLog failed: $e');
+      return false;
+    }
+  }
+
+  Future<String> askLifeCanvas(String query) async {
+    return await lifecanvasService.ask(
+      query: query,
+      graph: _lifeCanvasGraph,
+      diaryMd: _lifeCanvasDiaryMd,
+      recentLogs: _lifeCanvasLogs,
+      usageStats: _usageStats,
+    );
+  }
+
+  Future<void> predictLifeCanvasTimeline() async {
+    _predictions = await lifecanvasService.predict(
+      graph: _lifeCanvasGraph,
+      diaryMd: _lifeCanvasDiaryMd,
+      usageStats: _usageStats,
+    );
+    notifyListeners();
   }
 
   String _getBackendHost() {
