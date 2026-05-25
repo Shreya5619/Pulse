@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/device_context.dart';
+import '../config/backend_config.dart';
 
 class LlmService {
   Future<Map<String, dynamic>> summarizeSurge(List<NotificationInfo> notifications) async {
@@ -17,7 +18,18 @@ class LlmService {
     try {
       debugPrint('[LlmService] Summarizing ${notifications.length} notifications via API...');
       
-      final url = Uri.parse('http://10.166.208.141:8080/api/summarize-notifications');
+      const host = BackendConfig.host;
+      final String baseUrl;
+      if (host.startsWith('http://') || host.startsWith('https://')) {
+        baseUrl = host;
+      } else if (host.contains(':')) {
+        baseUrl = 'http://$host';
+      } else if (host.contains('192.168.') || host == 'localhost' || host == '127.0.0.1' || host == '10.0.2.2' || host.startsWith('10.')) {
+        baseUrl = 'http://$host:8080';
+      } else {
+        baseUrl = 'https://$host';
+      }
+      final url = Uri.parse('$baseUrl/api/summarize-notifications');
       
       // Convert NotificationInfo objects to maps for the JSON body
       final body = jsonEncode({

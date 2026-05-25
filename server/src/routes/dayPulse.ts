@@ -9,6 +9,17 @@ import { broadcast } from "../index";
 
 const router = Router();
 
+function toRoutineClockTime(value: string | undefined): string | undefined {
+    if (!value) return undefined;
+
+    const parsed = new Date(value);
+    if (isNaN(parsed.getTime())) return undefined;
+
+    const istMillis = parsed.getTime() + (5.5 * 60 * 60 * 1000);
+    const istDate = new Date(istMillis);
+    return `${String(istDate.getUTCHours()).padStart(2, '0')}:${String(istDate.getUTCMinutes()).padStart(2, '0')}`;
+}
+
 router.get("/day-pulse", async (req: Request, res: Response) => {
     try {
         const userId = req.header("X-User-Id") || req.query.userId as string || req.query.deviceId as string || "user1";
@@ -82,6 +93,30 @@ router.post("/day-pulse/modify", async (req: Request, res: Response) => {
         // Apply modification in memory
         const block = timeline.blocks.find(b => b.eventId === eventId);
         if (block) {
+            if (isRecurring && (block.type === 'routine' || eventId.startsWith('routine_'))) {
+                const startTime = toRoutineClockTime(updates.startTime || updates.start_time) || block.startTime;
+                const endTime = toRoutineClockTime(updates.endTime || updates.end_time) || block.endTime;
+
+                await routineRepo.updateRoutine(userId, eventId, {
+                    title: updates.title || block.title,
+                    startTime,
+                    endTime,
+                    category: updates.category || block.category || 'buffer',
+                    days: Array.isArray(days) ? days : (Array.isArray(updates.days) ? updates.days : block.days || []),
+                    startLocation: updates.start_location || updates.startLocation || block.startLocation,
+                    destinationLocation: updates.destination_location || updates.destinationLocation,
+                    eta: block.etaMinutes,
+                } as any);
+
+                const refreshed = await dayPulseService.getDailyTimeline(userId, date);
+                res.json({
+                    ok: true,
+                    data: { ...refreshed, isProposed: false },
+                    message: "Recurring routine updated."
+                });
+                return;
+            }
+
             Object.assign(block, updates);
             block.isProposed = true;
             // Re-resolve location and ETA in memory
@@ -108,7 +143,7 @@ router.post("/day-pulse/modify", async (req: Request, res: Response) => {
 
 router.post("/day-pulse/add", async (req: Request, res: Response) => {
     try {
-        const { userId: bodyUserId, deviceId, event, category, date: reqDate } = req.body;
+        const { userId: bodyUserId, deviceId, event, category, date: reqDate, isRecurring, days } = req.body;
         const userId = req.header("X-User-Id") || bodyUserId || deviceId || "user1";
         
         const date = reqDate || new Date().toISOString().split('T')[0];
@@ -119,6 +154,27 @@ router.post("/day-pulse/add", async (req: Request, res: Response) => {
             event.location_text || event.locationText,
             event.destination_location || event.destinationLocation
         );
+
+        if (isRecurring && Array.isArray(days) && days.length > 0) {
+            await routineRepo.addRoutine(userId, {
+                title: event.title,
+                startTime: toRoutineClockTime(event.start_time || event.startTime) || '09:00',
+                endTime: toRoutineClockTime(event.end_time || event.endTime) || '10:00',
+                category: category || 'buffer',
+                days,
+                startLocation: startLocation || event.start_location || event.startLocation || null,
+                destinationLocation: destinationLocation || event.destination_location || event.destinationLocation || null,
+                eta: eta ?? null,
+            });
+
+            const refreshed = await dayPulseService.getDailyTimeline(userId, date);
+            res.json({
+                ok: true,
+                data: { ...refreshed, isProposed: false },
+                message: "Recurring routine saved."
+            });
+            return;
+        }
 
         const newBlock: any = {
             eventId: event.id || `manual_${Date.now()}`,

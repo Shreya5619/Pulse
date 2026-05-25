@@ -396,7 +396,7 @@ class _DayPulseScreenState extends State<DayPulseScreen> {
       ),
       body: Consumer<AppState>(
         builder: (context, state, child) {
-          final blocks = state.dayPulseBlocks;
+          final blocks = state.dayPulseBlocks.where((b) => !b.isDeleted).toList();
 
           return Column(
             children: [

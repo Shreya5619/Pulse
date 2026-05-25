@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../providers/app_state.dart';
 import '../widgets/glass_card.dart';
 import '../theme/colors.dart';
+import '../config/backend_config.dart';
 
 class MultiModeEtaScreen extends StatefulWidget {
   const MultiModeEtaScreen({super.key});
@@ -97,8 +98,9 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
       // Extract dynamic backend configuration from AppState
       final host = _getBackendHost(state);
       final userId = state.userId;
+      final baseUrl = _baseUrl(host);
       final url = Uri.parse(
-        'http://$host:8080/api/routing/multi-mode-eta?userId=$userId&deviceId=$userId&fromLat=$fromLat&fromLon=$fromLon&toLat=$toLat&toLon=$toLon${force ? "&force=true" : ""}',
+        '$baseUrl/api/routing/multi-mode-eta?userId=$userId&deviceId=$userId&fromLat=$fromLat&fromLon=$fromLon&toLat=$toLat&toLon=$toLon${force ? "&force=true" : ""}',
       );
 
       debugPrint('[MultiMode ETA] Fetching routes from: $url');
@@ -134,7 +136,20 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
   }
 
   String _getBackendHost(AppState state) {
-    return '192.168.1.14';
+    return BackendConfig.host;
+  }
+
+  String _baseUrl(String host) {
+    if (host.startsWith('http://') || host.startsWith('https://')) {
+      return host;
+    }
+    if (host.contains(':')) {
+      return 'http://$host';
+    }
+    if (host.contains('192.168.') || host == 'localhost' || host == '127.0.0.1' || host == '10.0.2.2' || host.startsWith('10.')) {
+      return 'http://$host:8080';
+    }
+    return 'https://$host';
   }
 
   String _formatDuration(int seconds) {

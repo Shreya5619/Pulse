@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -23,6 +24,7 @@ import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http_parser/http_parser.dart';
 import '../services/llm_service.dart';
+import '../config/backend_config.dart';
 
 import '../services/lifecanvas_service.dart';
 import '../services/usage_stats_service.dart';
@@ -155,6 +157,7 @@ class DayPulseBlock {
   final Map<String, dynamic>? suggestion;
   final Map<String, dynamic>? startLocation;
   final bool isDeleted;
+  final bool isProposed;
 
   DayPulseBlock({
     required this.eventId,
@@ -171,6 +174,7 @@ class DayPulseBlock {
     this.suggestion,
     this.startLocation,
     this.isDeleted = false,
+    this.isProposed = false,
   });
 
   factory DayPulseBlock.fromJson(Map<String, dynamic> json) {
@@ -191,6 +195,7 @@ class DayPulseBlock {
       suggestion: json['suggestion'],
       startLocation: json['startLocation'],
       isDeleted: json['isDeleted'] ?? false,
+      isProposed: json['isProposed'] ?? false,
     );
   }
 }
@@ -387,6 +392,7 @@ class AppState extends ChangeNotifier {
   TwinGraph? _twinGraph;
   String? _twinSummary;
   bool _isTwinSummarizing = false;
+  String? _twinGraphError;
 
   int _currentTabIndex = 0;
   int get currentTabIndex => _currentTabIndex;
@@ -406,6 +412,7 @@ class AppState extends ChangeNotifier {
   TwinGraph? get twinGraph => _twinGraph;
   String? get twinSummary => _twinSummary;
   bool get isTwinSummarizing => _isTwinSummarizing;
+  String? get twinGraphError => _twinGraphError;
   Map<String, dynamic>? get proposedCommAction => _proposedCommAction;
   List<DayPulseBlock> get dayPulseBlocks => _dayPulseBlocks;
 
@@ -488,7 +495,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/chat/transcribe');
+      final url = Uri.parse('${_baseUrl(host)}/api/chat/transcribe');
 
       final request = http.MultipartRequest('POST', url);
       request.headers.addAll(_authHeaders);
@@ -567,7 +574,7 @@ class AppState extends ChangeNotifier {
     try {
       final host = _getBackendHost();
       final url = Uri.parse(
-        'http://$host:8080/api/planner/interventions/status',
+        '${_baseUrl(host)}/api/planner/interventions/status',
       );
       await http.post(
         url,
@@ -599,7 +606,7 @@ class AppState extends ChangeNotifier {
 
       // 1. Persist selection
       final selectUrl = Uri.parse(
-        'http://$host:8080/api/planner/scenario/select',
+        '${_baseUrl(host)}/api/planner/scenario/select',
       );
       await http.post(
         selectUrl,
@@ -614,7 +621,7 @@ class AppState extends ChangeNotifier {
       // 2. Fetch updated decision/actions based on this scenario
       // Map A/B/C to internal IDs if necessary, but the screen already passes RECOMMENDED etc.
       final scenarioUrl = Uri.parse(
-        'http://$host:8080/api/planner/scenario/$scenarioId?userId=$_userId&deviceId=$_userId',
+        '${_baseUrl(host)}/api/planner/scenario/$scenarioId?userId=$_userId&deviceId=$_userId',
       );
       final response = await http.get(scenarioUrl, headers: _authHeaders);
 
@@ -636,7 +643,7 @@ class AppState extends ChangeNotifier {
       final host = _getBackendHost();
       final date = DateTime.now().toIso8601String().split('T')[0];
       final url = Uri.parse(
-        'http://$host:8080/api/day-pulse?userId=$_userId&deviceId=$_userId&date=$date',
+        '${_baseUrl(host)}/api/day-pulse?userId=$_userId&deviceId=$_userId&date=$date',
       );
       final response = await http.get(url, headers: _authHeaders);
 
@@ -645,10 +652,10 @@ class AppState extends ChangeNotifier {
         final List blocks = data['data']['blocks'];
         _dayPulseBlocks = blocks
             .map((b) => DayPulseBlock.fromJson(b))
-            .where((b) => !b.isDeleted)
             .toList();
         _isDayPulseProposed = data['data']['isProposed'] ?? false;
         notifyListeners();
+        await fetchDayPulse();
       }
     } catch (e) {
       debugPrint('[Pulse AppState] Error fetching daily pulse: $e');
@@ -661,7 +668,7 @@ class AppState extends ChangeNotifier {
   ) async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/day-pulse/modify');
+      final url = Uri.parse('${_baseUrl(host)}/api/day-pulse/modify');
       final date = DateTime.now().toIso8601String().split('T')[0];
       final response = await http.post(
         url,
@@ -682,10 +689,10 @@ class AppState extends ChangeNotifier {
         final List blocks = data['data']['blocks'];
         _dayPulseBlocks = blocks
             .map((b) => DayPulseBlock.fromJson(b))
-            .where((b) => !b.isDeleted)
             .toList();
         _isDayPulseProposed = data['data']['isProposed'] ?? false;
         notifyListeners();
+        await fetchDayPulse();
 
         fetchTwinGraph();
       }
@@ -707,7 +714,7 @@ class AppState extends ChangeNotifier {
   }) async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/day-pulse/add');
+      final url = Uri.parse('${_baseUrl(host)}/api/day-pulse/add');
 
       final date = DateTime.now().toIso8601String().split('T')[0];
       final response = await http.post(
@@ -738,6 +745,7 @@ class AppState extends ChangeNotifier {
         _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
         _isDayPulseProposed = data['data']['isProposed'] ?? false;
         notifyListeners();
+        await fetchDayPulse();
         fetchTwinGraph();
       }
     } catch (e) {
@@ -811,7 +819,7 @@ class AppState extends ChangeNotifier {
   Future<void> deleteDayPulseItem(String eventId, bool isRoutine) async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/day-pulse/delete');
+      final url = Uri.parse('${_baseUrl(host)}/api/day-pulse/delete');
       final date = DateTime.now().toIso8601String().split('T')[0];
       final response = await http.post(
         url,
@@ -830,7 +838,7 @@ class AppState extends ChangeNotifier {
         final List blocks = data['data']['blocks'];
         _dayPulseBlocks = blocks
             .map((b) => DayPulseBlock.fromJson(b))
-            .where((b) => !b.isDeleted)
+
             .toList();
         _isDayPulseProposed = data['data']['isProposed'] ?? false;
         notifyListeners();
@@ -844,7 +852,7 @@ class AppState extends ChangeNotifier {
   Future<void> optimizeDayPulse() async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/day-pulse/optimize');
+      final url = Uri.parse('${_baseUrl(host)}/api/day-pulse/optimize');
       final response = await http.post(
         url,
         headers: _authHeaders,
@@ -871,7 +879,7 @@ class AppState extends ChangeNotifier {
   Future<void> persistDayPulse() async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/day-pulse/persist');
+      final url = Uri.parse('${_baseUrl(host)}/api/day-pulse/persist');
       final date = DateTime.now().toIso8601String().split('T')[0];
 
       final response = await http.post(
@@ -882,6 +890,7 @@ class AppState extends ChangeNotifier {
           'deviceId': _userId,
           'date': date,
           'blocks': _dayPulseBlocks
+              .where((b) => b.isProposed || b.isDeleted)
               .map(
                 (b) => {
                   'eventId': b.eventId,
@@ -890,7 +899,7 @@ class AppState extends ChangeNotifier {
                   'endTime': b.endTime.toIso8601String(),
                   'locationText': b.locationText,
                   'isProposed': true,
-                  'isDeleted': false,
+                  'isDeleted': b.isDeleted,
                 },
               )
               .toList(),
@@ -903,6 +912,7 @@ class AppState extends ChangeNotifier {
         _dayPulseBlocks = blocks.map((b) => DayPulseBlock.fromJson(b)).toList();
         _isDayPulseProposed = false;
         notifyListeners();
+        await fetchDayPulse();
         fetchTwinGraph();
       }
     } catch (e) {
@@ -929,7 +939,7 @@ class AppState extends ChangeNotifier {
 
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/chat/message');
+      final url = Uri.parse('${_baseUrl(host)}/api/chat/message');
 
       final history = _chatMessages
           .take(_chatMessages.length - 1)
@@ -952,6 +962,7 @@ class AppState extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body)['data'];
         final rawText = data['text'] as String;
+          await fetchDayPulse();
 
         // Parse actions: [Action: Title | ID | Description? | Impact?]
         final actionRegex = RegExp(r'\[Action: (.*?)\]');
@@ -1191,8 +1202,11 @@ class AppState extends ChangeNotifier {
           final data = Map<String, dynamic>.from(event);
           final notif = NotificationInfo.fromMap(data);
 
-          // Ignore system UI updates
-          if (notif.packageName == 'com.android.systemui') return;
+          // Ignore system UI updates and Pulse's own notifications
+          if (notif.packageName == 'com.android.systemui' || 
+              notif.packageName == 'com.pulse.pulse_mobile') return;
+
+          debugPrint('[Pulse AppState] Intercepted Notification: ${notif.appName} | ${notif.title} | ${notif.text}');
 
           _deviceContext.notifications.insert(0, notif);
           if (_deviceContext.notifications.length > 100) {
@@ -1547,7 +1561,7 @@ class AppState extends ChangeNotifier {
   void _connectWebSocket() {
     try {
       final host = _getBackendHost();
-      final wsUrl = 'ws://$host:8080/ws';
+      final wsUrl = '${_wsUrl(host)}/ws';
       debugPrint('[Pulse WS] Connecting to: $wsUrl');
 
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
@@ -1885,12 +1899,12 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _sendContextSnapshot(String reason) async {
+    final host = _getBackendHost();
+    final url = Uri.parse('${_baseUrl(host)}/api/snapshots');
+
     try {
       final now = DateTime.now();
       // Use the instance userId
-
-      final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/snapshots');
 
       // Construct payload matching the requested schema
       final payload = {
@@ -1990,7 +2004,7 @@ class AppState extends ChangeNotifier {
         url,
         headers: _authHeaders,
         body: jsonEncode(payload),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         debugPrint('[Pulse API] Success: Snapshot ingested by backend.');
@@ -2013,6 +2027,16 @@ class AppState extends ChangeNotifier {
         );
         debugPrint('[Pulse API] Response: ${response.body}');
       }
+    } on TimeoutException catch (e) {
+      debugPrint('[Pulse API] Snapshot request timed out after 15s: $e');
+      debugPrint(
+        '[Pulse API] Check backend reachability at $url and confirm adb reverse tcp:8080 tcp:8080 (or set PULSE_BACKEND_HOST).',
+      );
+    } on SocketException catch (e) {
+      debugPrint('[Pulse API] Network error while sending snapshot: $e');
+      debugPrint(
+        '[Pulse API] Target was $url. Ensure backend is running and reachable from device.',
+      );
     } catch (e) {
       debugPrint('[Pulse API] Exception sending snapshot: $e');
     }
@@ -2022,7 +2046,7 @@ class AppState extends ChangeNotifier {
     try {
       final host = _getBackendHost();
       final url = Uri.parse(
-        'http://$host:8080/api/futures?userId=$_userId&deviceId=$_userId',
+        '${_baseUrl(host)}/api/futures?userId=$_userId&deviceId=$_userId',
       );
       final response = await http.get(url, headers: _authHeaders);
 
@@ -2040,7 +2064,7 @@ class AppState extends ChangeNotifier {
     try {
       final host = _getBackendHost();
       final url = Uri.parse(
-        'http://$host:8080/api/routing/next-appointment-eta?userId=$_userId&deviceId=$_userId',
+        '${_baseUrl(host)}/api/routing/next-appointment-eta?userId=$_userId&deviceId=$_userId',
       );
       final response = await http.get(url, headers: _authHeaders);
 
@@ -2058,17 +2082,26 @@ class AppState extends ChangeNotifier {
     try {
       final host = _getBackendHost();
       final url = Uri.parse(
-        'http://$host:8080/api/twin/graph?userId=$_userId&deviceId=$_userId',
+        '${_baseUrl(host)}/api/twin/graph?userId=$_userId&deviceId=$_userId',
       );
+      debugPrint('[Pulse AppState] Fetching twin graph from $url');
       final response = await http.get(url, headers: _authHeaders);
+      debugPrint('[Pulse AppState] Twin graph response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        debugPrint('[Pulse AppState] Twin graph nodes: ${(data["nodes"] as List?)?.length ?? 0}');
         _twinGraph = TwinGraph.fromJson(data);
+        _twinGraphError = null;
+        notifyListeners();
+      } else {
+        _twinGraphError = 'Server returned ${response.statusCode}';
         notifyListeners();
       }
     } catch (e) {
       debugPrint('[Pulse AppState] Error fetching twin graph: $e');
+      _twinGraphError = e.toString();
+      notifyListeners();
     }
   }
 
@@ -2080,7 +2113,7 @@ class AppState extends ChangeNotifier {
     try {
       final host = _getBackendHost();
       final url = Uri.parse(
-        'http://$host:8080/api/twin/summary?userId=$_userId&deviceId=$_userId',
+        '${_baseUrl(host)}/api/twin/summary?userId=$_userId&deviceId=$_userId',
       );
       final response = await http.get(url, headers: _authHeaders);
 
@@ -2102,7 +2135,7 @@ class AppState extends ChangeNotifier {
   Future<void> triggerSelfReflection() async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/twin/reflect');
+      final url = Uri.parse('${_baseUrl(host)}/api/twin/reflect');
       final response = await http.post(
         url,
         headers: _authHeaders,
@@ -2122,7 +2155,7 @@ class AppState extends ChangeNotifier {
   Future<Map<String, dynamic>?> fetchGraphExplanation(String nodeId) async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/graph/explain/$nodeId');
+      final url = Uri.parse('${_baseUrl(host)}/api/graph/explain/$nodeId');
       final response = await http.get(url, headers: _authHeaders);
 
       if (response.statusCode == 200) {
@@ -2142,7 +2175,7 @@ class AppState extends ChangeNotifier {
     try {
       final host = _getBackendHost();
       final url = Uri.parse(
-        'http://$host:8080/api/planner/suggested-actions?riskType=$riskType&nodeId=$nodeId',
+        '${_baseUrl(host)}/api/planner/suggested-actions?riskType=$riskType&nodeId=$nodeId',
       );
       final response = await http.get(url, headers: _authHeaders);
 
@@ -2177,7 +2210,7 @@ class AppState extends ChangeNotifier {
   Future<void> dispatchPulseAction(Map<String, dynamic> action) async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/pulse/action');
+      final url = Uri.parse('${_baseUrl(host)}/api/pulse/action');
       debugPrint(
         '[Pulse] Dispatching action: ${action['type']} id=${action['id']}',
       );
@@ -2229,7 +2262,7 @@ class AppState extends ChangeNotifier {
   }) async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/comm/prepare');
+      final url = Uri.parse('${_baseUrl(host)}/api/comm/prepare');
       final response = await http.post(
         url,
         headers: _authHeaders,
@@ -2286,7 +2319,7 @@ class AppState extends ChangeNotifier {
   Future<void> completeCommAction(String actionId) async {
     try {
       final host = _getBackendHost();
-      final url = Uri.parse('http://$host:8080/api/comm/send');
+      final url = Uri.parse('${_baseUrl(host)}/api/comm/send');
       await http.post(
         url,
         headers: _authHeaders,
@@ -2517,7 +2550,7 @@ class AppState extends ChangeNotifier {
   }
 
   String _getBackendHost() {
-    return '192.168.1.14';
+    return BackendConfig.host;
   }
 
   Map<String, String> get _authHeaders => {
@@ -2531,4 +2564,31 @@ class AppState extends ChangeNotifier {
     _channel?.sink.close();
     super.dispose();
   }
+
+  String _baseUrl(String host) {
+    if (host.startsWith('http://') || host.startsWith('https://')) {
+      return host;
+    }
+    if (host.contains(':')) {
+      return 'http://$host';
+    }
+    if (host.contains('192.168.') || host == 'localhost' || host == '127.0.0.1' || host == '10.0.2.2' || host.startsWith('10.')) {
+      return 'http://$host:8080';
+    }
+    return 'https://$host';
+  }
+
+  String _wsUrl(String host) {
+    if (host.startsWith('ws://') || host.startsWith('wss://')) {
+      return host;
+    }
+    if (host.contains(':')) {
+      return 'ws://$host';
+    }
+    if (host.contains('192.168.') || host == 'localhost' || host == '127.0.0.1' || host == '10.0.2.2' || host.startsWith('10.')) {
+      return 'ws://$host:8080';
+    }
+    return 'wss://$host';
+  }
+
 }

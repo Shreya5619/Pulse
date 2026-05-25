@@ -662,7 +662,7 @@ async function ingestLog() {
         
         // 2. Update Files (Simulated)
         recentHistoryMd += `\n[${timestamp}] ${text}`;
-        localStorage.setItem('recentHistoryMd', recentHistoryMd);
+        lifeCanvasMd += `\n\n## ${viewDateEl.value}\n- [${timestamp}] ${text}`;
         
         // 3. Update Life Tree (Chronological)
         if (extraction.lifeTreeUpdate) {
@@ -684,6 +684,7 @@ async function ingestLog() {
         
         // 5. Cleanup
         logInput.value = "";
+        saveDayData();
         updateContextDisplay();
     } catch (e) {
         console.error(e);
@@ -1022,8 +1023,7 @@ function updateCurrentTimeBar() {
 }
 
 function saveGraph() {
-    const data = cy.json().elements;
-    localStorage.setItem('graphData', JSON.stringify(data));
+    saveDayData();
 }
 
 function updateContextDisplay() {

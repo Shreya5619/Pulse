@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/groq_config.dart';
+import '../config/backend_config.dart';
 import '../models/lifecanvas_graph.dart';
 import 'life_canvas_timeline_math.dart';
 import 'lifecanvas_diary.dart';
@@ -16,9 +17,20 @@ class LifeCanvasLlmException implements Exception {
 
 // ─── Central LifeCanvas API service ───────────────────────────────────────────
 class LifeCanvasService {
-  static const String _base = kIsWeb
-      ? 'http://127.0.0.1:8080/api/lifecanvas'
-      : 'http://10.0.2.2:8080/api/lifecanvas';
+  String get _base {
+    const host = BackendConfig.host;
+    if (host.startsWith('http://') || host.startsWith('https://')) {
+      return '$host/api/lifecanvas';
+    }
+    if (host.contains(':')) {
+      return 'http://$host/api/lifecanvas';
+    }
+    if (host.contains('192.168.') || host == 'localhost' || host == '127.0.0.1' || host == '10.0.2.2' || host.startsWith('10.')) {
+      return kIsWeb ? 'http://127.0.0.1:8080/api/lifecanvas' : 'http://$host:8080/api/lifecanvas';
+    } else {
+      return 'https://$host/api/lifecanvas';
+    }
+  }
   static const String _groqUrl =
       'https://api.groq.com/openai/v1/chat/completions';
   static const String _model = 'llama-3.3-70b-versatile';
