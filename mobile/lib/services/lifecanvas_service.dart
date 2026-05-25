@@ -50,7 +50,29 @@ class LifeCanvasService {
         }
       }
     } catch (e) {
-      debugPrint('[LifeCanvasService] fetchServerGroqKey failed: $e');
+      debugPrint('[LifeCanvasService] fetchServerGroqKey failed: $e. Trying local server fallbacks...');
+      final fallbacks = [
+        'http://10.0.2.2:8080/api/lifecanvas/config',
+        'http://127.0.0.1:8080/api/lifecanvas/config',
+        'http://localhost:8080/api/lifecanvas/config',
+      ];
+      for (final url in fallbacks) {
+        try {
+          final r = await http
+              .get(Uri.parse(url))
+              .timeout(const Duration(seconds: 2));
+          if (r.statusCode == 200) {
+            final j = jsonDecode(r.body);
+            if (j['ok'] == true && j['data'] != null) {
+              final key = j['data']['groqApiKey'] as String?;
+              if (key != null && key.isNotEmpty) {
+                debugPrint('[LifeCanvasService] Fetched Groq key from local fallback: $url');
+                return key;
+              }
+            }
+          }
+        } catch (_) {}
+      }
     }
     return '';
   }

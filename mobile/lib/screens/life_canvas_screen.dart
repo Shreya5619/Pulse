@@ -367,23 +367,26 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
             Container(
               height: 40,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(children: [
-                _viewTab('Life Tree', ViewMode.timeline), const SizedBox(width: 8),
-                _viewTab('Galaxy', ViewMode.galaxy), const SizedBox(width: 8),
-                _viewTab('River', ViewMode.river),
-                IconButton(icon: const Icon(LucideIcons.zoomIn, size: 16, color: Colors.white54), onPressed: () => setState(() => _viewCtrl.value = _viewCtrl.value.clone()..scale(1.3))),
-                IconButton(icon: const Icon(LucideIcons.zoomOut, size: 16, color: Colors.white54), onPressed: () => setState(() => _viewCtrl.value = _viewCtrl.value.clone()..scale(1 / 1.3))),
-                IconButton(icon: const Icon(LucideIcons.refreshCw, size: 14, color: Colors.white54), tooltip: 'Reset View', onPressed: _resetView),
-                IconButton(
-                  icon: const Icon(LucideIcons.rotateCw, size: 14, color: Color(0xFF00E5FF)),
-                  tooltip: 'Refresh Data',
-                  onPressed: () {
-                    context.read<AppState>().fetchLifeCanvasGraph(
-                      dateStr: _timelineBaseDate.toIso8601String().substring(0, 10),
-                    );
-                  },
-                ),
-              ]),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(children: [
+                  _viewTab('Life Tree', ViewMode.timeline), const SizedBox(width: 8),
+                  _viewTab('Galaxy', ViewMode.galaxy), const SizedBox(width: 8),
+                  _viewTab('River', ViewMode.river),
+                  IconButton(icon: const Icon(LucideIcons.zoomIn, size: 16, color: Colors.white54), onPressed: () => setState(() => _viewCtrl.value = _viewCtrl.value.clone()..scale(1.3))),
+                  IconButton(icon: const Icon(LucideIcons.zoomOut, size: 16, color: Colors.white54), onPressed: () => setState(() => _viewCtrl.value = _viewCtrl.value.clone()..scale(1 / 1.3))),
+                  IconButton(icon: const Icon(LucideIcons.refreshCw, size: 14, color: Colors.white54), tooltip: 'Reset View', onPressed: _resetView),
+                  IconButton(
+                    icon: const Icon(LucideIcons.rotateCw, size: 14, color: Color(0xFF00E5FF)),
+                    tooltip: 'Refresh Data',
+                    onPressed: () {
+                      context.read<AppState>().fetchLifeCanvasGraph(
+                        dateStr: _timelineBaseDate.toIso8601String().substring(0, 10),
+                      );
+                    },
+                  ),
+                ]),
+              ),
             ),
 
             // ── Canvas Area (Life Tree + Gantt overlay like web prototype) ─────
