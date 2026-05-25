@@ -73,6 +73,7 @@ exports.ContextSnapshotSchema = zod_1.z.object({
         top_threads: zod_1.z.array(zod_1.z.object({
             sender: zod_1.z.string(),
             count: zod_1.z.number(),
+            app_package: zod_1.z.string().optional(),
         })),
     }).optional(),
     device_state: zod_1.z.object({

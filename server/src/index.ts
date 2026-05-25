@@ -72,6 +72,8 @@ app.get("/api/control/user-profile-text", (_req: Request, res: Response) => {
         res.status(500).json({ ok: false, error: "Failed to read USER.md" });
     }
 });
+import lifecanvasRouter from "./routes/lifecanvas";
+app.use("/api/lifecanvas", lifecanvasRouter);
 
 
 const httpServer = createServer(app);

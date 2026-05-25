@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'dart:convert';
 
@@ -11,194 +10,234 @@ class OverlayScreen extends StatefulWidget {
 }
 
 class _OverlayScreenState extends State<OverlayScreen> {
-  String highlight = "";
+  String highlight = "Pulse Active";
   List<String> actionItems = [];
-  String digest = "";
+  String digest = "Monitoring your notifications...";
   bool isSurge = false;
+  bool _isExpanded = false;
 
   @override
   void initState() {
     super.initState();
+    debugPrint("------------------------------------------");
+    debugPrint("[OverlayScreen] INIT STATE CALLED");
+    debugPrint("------------------------------------------");
+    
     FlutterOverlayWindow.overlayListener.listen((event) {
       try {
         final data = jsonDecode(event.toString());
+        final bool incomingSurge = data['isSurge'] ?? false;
+        
         setState(() {
-          highlight = data['highlight'] ?? "";
-          actionItems = List<String>.from(data['actionItems'] ?? []);
-          digest = data['digest'] ?? "";
-          isSurge = data['isSurge'] ?? false;
+          highlight = data['highlight'] ?? highlight;
+          actionItems = List<String>.from(data['actionItems'] ?? actionItems);
+          digest = data['digest'] ?? digest;
+          isSurge = incomingSurge;
         });
+
+        // Auto-expand on Surge if not already expanded
+        if (incomingSurge && !_isExpanded) {
+          _toggleExpand();
+        }
       } catch (e) {
         debugPrint("[Overlay] Error parsing data: $e");
       }
     });
   }
 
+  void _toggleExpand() async {
+    debugPrint("[OverlayScreen] Toggling expansion. Current state: $_isExpanded");
+    if (_isExpanded) {
+      await FlutterOverlayWindow.resizeOverlay(140, 140, true);
+    } else {
+      await FlutterOverlayWindow.resizeOverlay(WindowSize.matchParent, 600, true);
+    }
+    setState(() {
+      _isExpanded = !_isExpanded;
+    });
+    debugPrint("[OverlayScreen] Expansion toggled to: $_isExpanded");
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Material(
+          color: Colors.transparent,
+          child: _isExpanded ? _buildCard() : _buildBubble(),
+        );
+      },
+    );
+  }
+
+  Widget _buildBubble() {
+    return GestureDetector(
+      onTap: _toggleExpand,
       child: Center(
         child: Container(
-          width: double.infinity,
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          padding: const EdgeInsets.all(20),
+          width: 80,
+          height: 80,
           decoration: BoxDecoration(
-            color: const Color(0xFF1A1D24).withValues(alpha: 0.95),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.1),
-              width: 1,
-            ),
+            color: isSurge ? Colors.red : Colors.blue,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 4),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.5),
-                blurRadius: 20,
-                spreadRadius: 5,
+                color: Colors.black.withOpacity(0.5),
+                blurRadius: 10,
               ),
             ],
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header with Close Button
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: (isSurge ? Colors.redAccent : Colors.blueAccent)
-                              .withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          isSurge ? Icons.bolt : Icons.auto_awesome,
-                          size: 14,
-                          color: isSurge ? Colors.redAccent : Colors.blueAccent,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'AI SUMMARY',
-                        style: GoogleFonts.outfit(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: isSurge ? Colors.redAccent : Colors.blueAccent,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                  GestureDetector(
-                    onTap: () => FlutterOverlayWindow.closeOverlay(),
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.05),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.close, size: 16, color: Colors.white54),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              
-              if (highlight.isNotEmpty)
-                Text(
-                  highlight,
-                  style: GoogleFonts.outfit(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    height: 1.3,
-                  ),
-                ),
-              
-              if (actionItems.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                ...actionItems.map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 5,
-                        height: 5,
-                        margin: const EdgeInsets.only(top: 6, right: 10),
-                        decoration: BoxDecoration(
-                          color: isSurge ? Colors.redAccent : Colors.blueAccent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          item,
-                          style: GoogleFonts.outfit(
-                            fontSize: 13,
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontWeight: FontWeight.w500,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                )),
-              ],
+          child: const Icon(
+            Icons.notifications_active,
+            color: Colors.white,
+            size: 40,
+          ),
+        ),
+      ),
+    );
+  }
 
-              if (digest.isNotEmpty) ...[
-                const SizedBox(height: 12),
+  Widget _buildCard() {
+    return Center(
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF13161A),
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(
+            color: (isSurge ? Colors.redAccent : Colors.blueAccent).withOpacity(0.2),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.6),
+              blurRadius: 30,
+              spreadRadius: 10,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
                 Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.03),
-                    borderRadius: BorderRadius.circular(10),
+                    color: (isSurge ? Colors.redAccent : Colors.blueAccent).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
-                    digest,
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      color: Colors.white.withValues(alpha: 0.5),
-                      height: 1.5,
-                      fontStyle: FontStyle.italic,
-                    ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isSurge ? Icons.bolt : Icons.auto_awesome,
+                        size: 14,
+                        color: isSurge ? Colors.redAccent : Colors.blueAccent,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isSurge ? 'SURGE DETECTED' : 'PULSE AI',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.blueAccent,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                IconButton(
+                  onPressed: _toggleExpand,
+                  icon: const Icon(Icons.close, size: 22, color: Colors.white30),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
               ],
-              
-              const SizedBox(height: 16),
-              // Action Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => FlutterOverlayWindow.closeOverlay(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withValues(alpha: 0.05),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              highlight,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 20),
+            if (actionItems.isNotEmpty)
+              ...actionItems.take(3).map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline,
+                      size: 16,
+                      color: isSurge ? Colors.redAccent : Colors.blueAccent,
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        item,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white.withOpacity(0.8),
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.03),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                digest,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.white.withOpacity(0.5),
+                  height: 1.5,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _toggleExpand,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isSurge ? Colors.redAccent : Colors.blueAccent,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Text(
-                    'Got it',
-                    style: GoogleFonts.outfit(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text(
+                  'Dismiss',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

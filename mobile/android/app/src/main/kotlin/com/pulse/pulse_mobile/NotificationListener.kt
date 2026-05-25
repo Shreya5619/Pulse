@@ -24,12 +24,12 @@ class NotificationListener : NotificationListenerService() {
         try {
             val pm = applicationContext.packageManager
             val ai = pm.getApplicationInfo(sbn.packageName, 0)
-            data["appName"] = pm.getApplicationLabel(ai) as String
+            data["appName"] = pm.getApplicationLabel(ai).toString()
         } catch (e: Exception) {
             data["appName"] = sbn.packageName
         }
 
-        data["title"] = extras.getString("android.title")
+        data["title"] = extras.getCharSequence("android.title")?.toString()
         data["text"] = extras.getCharSequence("android.text")?.toString()
         data["time"] = sbn.postTime
         data["category"] = sbn.notification.category

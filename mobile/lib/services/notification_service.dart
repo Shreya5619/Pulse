@@ -32,6 +32,34 @@ class NotificationService {
     _isInitialized = true;
   }
 
+  Future<void> showDigestNotification({
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    if (!_isInitialized) await init();
+
+    final androidPlatformChannelSpecifics = AndroidNotificationDetails(
+      'pulse_digest_channel',
+      'AI Digest',
+      channelDescription: 'Notifications for AI generated summaries',
+      importance: Importance.high,
+      priority: Priority.high,
+      styleInformation: BigTextStyleInformation(body),
+    );
+
+    final platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
+
+    await _flutterLocalNotificationsPlugin.show(
+      1, // Using ID 1 for digest so it doesn't overwrite the persistent one
+      title,
+      body,
+      platformChannelSpecifics,
+      payload: payload,
+    );
+  }
+
   Future<void> showPulseNotification({
     required String title,
     required String body,

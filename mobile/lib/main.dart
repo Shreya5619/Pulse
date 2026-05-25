@@ -12,24 +12,29 @@ import 'screens/intervention_screen.dart';
 import 'screens/digest_screen.dart';
 import 'screens/day_pulse_screen.dart';
 import 'screens/overlay_screen.dart';
-import 'screens/chat_screen.dart';
+import 'screens/life_canvas_screen.dart';
+import 'services/lifecanvas_diary.dart';
 import 'theme/colors.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(
-    MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => AppState())],
-      child: const PulseApp(),
-    ),
-  );
-}
 
 @pragma("vm:entry-point")
 void overlayMain() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
-    const MaterialApp(debugShowCheckedModeBanner: false, home: OverlayScreen()),
+    MaterialApp(
+      debugShowCheckedModeBanner: true,
+      home: OverlayScreen(),
+    ),
+  );
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await lifecanvasDiary.ensureGroqApiKey();
+  runApp(
+    MultiProvider(
+      providers: [ChangeNotifierProvider(create: (_) => AppState())],
+      child: const PulseApp(),
+    ),
   );
 }
 
@@ -62,6 +67,7 @@ class _MainShellState extends State<MainShell> {
     const InterventionScreen(),
     const ChatScreen(),
     const DigestScreen(),
+    const LifeCanvasScreen(),
   ];
 
   @override
@@ -183,12 +189,11 @@ class _MainShellState extends State<MainShell> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildNavItem(context, 0, LucideIcons.home, "Home"),
-            _buildNavItem(context, 1, LucideIcons.activity, "Pulse"),
-            _buildNavItem(context, 2, LucideIcons.trendingUp, "Futures"),
-            _buildNavItem(context, 3, LucideIcons.zap, "Actions"),
-            _buildNavItem(context, 4, LucideIcons.messageSquare, "Ask"),
-            _buildNavItem(context, 5, LucideIcons.layout, "Digest"),
+            _buildNavItem(0, LucideIcons.home, "Home"),
+            _buildNavItem(1, LucideIcons.activity, "Pulse"),
+            _buildNavItem(2, LucideIcons.trendingUp, "Futures"),
+            _buildNavItem(3, LucideIcons.zap, "Actions"),
+            _buildNavItem(4, LucideIcons.layout, "Digest"),
           ],
         ),
       ),

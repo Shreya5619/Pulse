@@ -14,6 +14,7 @@ import '../services/local_repository.dart';
 import '../services/notification_service.dart';
 import '../models/risk_snapshot.dart';
 import '../models/twin_graph.dart';
+import '../models/lifecanvas_graph.dart';
 import '../services/storage_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
@@ -38,6 +39,9 @@ class ChatMessage {
     this.actions = const [],
   });
 }
+import '../services/lifecanvas_service.dart';
+import '../services/usage_stats_service.dart';
+import '../services/lifecanvas_diary.dart';
 
 class TimelineEvent {
   final String id;
@@ -338,7 +342,9 @@ class AppState extends ChangeNotifier {
   bool _isLive = true;
   WebSocketChannel? _channel;
 
-  // ETA State
+  bool _isOverlayInitializing = false;
+  
+  // LLM / Insight State
   AppointmentEtaInfo _etaInfo = AppointmentEtaInfo.empty();
   AppointmentEtaInfo get etaInfo => _etaInfo;
 
@@ -1042,16 +1048,24 @@ class AppState extends ChangeNotifier {
     _userId = "31d1ff89-6b28-44e0-bea3-7c61debfd1b6";
     notifyListeners();
 
-    _startListeningNotifications();
-    _initLocalData();
-    _generateMockData();
-    _initNotificationService();
-    _connectWebSocket();
-    _initContextIngestion();
-    _startPeriodicSummarization();
-
-    // Initial ETA fetch
-    fetchAppointmentEta();
+      // Stage 1: Core Essentials
+      await _safeInit(_initLocalData, "Local Data");
+      await _safeInit(_initNotificationService, "Notification Service");
+      
+      // Stage 2: Background Connectivity (Delayed)
+      await Future.delayed(const Duration(milliseconds: 800));
+      await _safeInit(_startListeningNotifications, "Notification Listener");
+      await _safeInit(_connectWebSocket, "WebSocket");
+      
+      // Stage 3: Data & Ingestion (Delayed)
+      await Future.delayed(const Duration(milliseconds: 800));
+      await _safeInit(_generateMockData, "Mock Data");
+      await _safeInit(_initContextIngestion, "Context Ingestion");
+      await _safeInit(_startPeriodicSummarization, "Periodic Summarization");
+      
+      // Stage 4: UI Extensions (Last)
+      await Future.delayed(const Duration(milliseconds: 1500));
+      await _safeInit(_initOverlay, "Overlay Window");
 
     // Periodic ETA refresh
     Timer.periodic(const Duration(minutes: 2), (timer) {
@@ -1200,8 +1214,33 @@ class AppState extends ChangeNotifier {
   }
 
   // Permission handling methods from testing app
+  Future<void> testOverlay() async {
+    debugPrint('[Pulse AppState] testOverlay() triggered');
+    final bool isAllowed = await FlutterOverlayWindow.isPermissionGranted();
+    debugPrint('[Pulse AppState] Overlay permission status: $isAllowed');
+    if (!isAllowed) {
+      debugPrint('[Pulse AppState] Requesting overlay permission...');
+      await FlutterOverlayWindow.requestPermission();
+      return;
+    }
+    debugPrint('[Pulse AppState] Calling FlutterOverlayWindow.showOverlay...');
+    await FlutterOverlayWindow.showOverlay(
+      enableDrag: true,
+      overlayTitle: "DEBUG OVERLAY",
+      overlayContent: "Testing visibility",
+      flag: OverlayFlag.defaultFlag,
+      alignment: OverlayAlignment.center,
+      visibility: NotificationVisibility.visibilityPublic,
+      positionGravity: PositionGravity.none,
+      height: 1000,
+      width: 1000,
+    );
+    debugPrint('[Pulse AppState] showOverlay call completed.');
+  }
+
   Future<void> requestOverlayPermission() async {
     await FlutterOverlayWindow.requestPermission();
+    _initOverlay();
   }
 
   Future<void> requestBatteryOptimizationDisable() async {
@@ -1317,30 +1356,41 @@ class AppState extends ChangeNotifier {
       _llmTimestamp = now;
       _lastSummarizedAt = now;
 
+      // Show AI Summary as a Push Notification
+      final bulletPoints = _llmActionItems.map((item) => "• $item").join("\n");
+      final fullSummary = "${_llmHighlight}\n\n$bulletPoints\n\n${_llmDigest}";
+      
+      NotificationService().showDigestNotification(
+        title: "Pulse AI Digest",
+        body: fullSummary,
+      );
+
       final bool isOverlayAllowed =
           await FlutterOverlayWindow.isPermissionGranted();
-      if (isOverlayAllowed && (surgeOnly || _isSurgeActive)) {
-        await FlutterOverlayWindow.showOverlay(
-          enableDrag: true,
-          overlayTitle: "Pulse Digest",
-          overlayContent: _llmHighlight,
-          flag: OverlayFlag.focusPointer,
-          alignment: OverlayAlignment.center,
-          visibility: NotificationVisibility.visibilityPublic,
-          positionGravity: PositionGravity.none,
-          height: WindowSize.matchParent,
-          width: WindowSize.matchParent,
-          startPosition: const OverlayPosition(0, 0),
-        );
+      if (isOverlayAllowed) {
+        // Ensure overlay is running
+        final bool isRunning = await FlutterOverlayWindow.isActive();
+        if (!isRunning) {
+          await FlutterOverlayWindow.showOverlay(
+            enableDrag: true,
+            overlayTitle: "Pulse Bubble",
+            overlayContent: "Tap to expand AI summary",
+            flag: OverlayFlag.defaultFlag,
+            alignment: OverlayAlignment.centerLeft,
+            visibility: NotificationVisibility.visibilityPublic,
+            positionGravity: PositionGravity.none,
+            height: 140, 
+            width: 140,   
+          );
+        }
 
-        await FlutterOverlayWindow.shareData(
-          jsonEncode({
-            'highlight': _llmHighlight,
-            'actionItems': _llmActionItems,
-            'digest': _llmDigest,
-            'isSurge': surgeOnly || _isSurgeActive,
-          }),
-        );
+        // Share data with overlay
+        await FlutterOverlayWindow.shareData(jsonEncode({
+          'highlight': _llmHighlight,
+          'actionItems': _llmActionItems,
+          'digest': _llmDigest,
+          'isSurge': _isSurgeActive,
+        }));
       }
     } catch (e) {
       debugPrint('[Pulse AppState] Summarization failed: $e');

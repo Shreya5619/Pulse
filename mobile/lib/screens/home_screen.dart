@@ -14,6 +14,7 @@ import '../screens/graph_explanation_screen.dart';
 import '../screens/multi_mode_eta_screen.dart';
 import '../screens/twin_graph_screen.dart';
 import '../screens/timeline_screen.dart';
+import '../screens/life_canvas_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -103,6 +104,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: LucideIcons.layers,
                 label: "System Overlay",
                 onPressed: () => state.requestOverlayPermission(),
+              ),
+              const SizedBox(height: 12),
+              _integrationButton(
+                icon: LucideIcons.eye,
+                label: "FORCE SHOW OVERLAY (DEBUG)",
+                onPressed: () => state.testOverlay(),
               ),
             ],
           ),
@@ -239,58 +246,62 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         const SizedBox(width: 8),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(
-                LucideIcons.mapPin,
-                size: 18,
-                color: Colors.white30,
-              ),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MultiModeEtaScreen(),
+        Expanded(
+          child: Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 0,
+            runSpacing: 0,
+            children: [
+              IconButton(
+                icon: const Icon(
+                  LucideIcons.mapPin,
+                  size: 17,
+                  color: Colors.white30,
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MultiModeEtaScreen(),
+                  ),
                 ),
               ),
-            ),
-            IconButton(
-              icon: const Icon(
-                LucideIcons.calendar,
-                size: 18,
-                color: Colors.white30,
-              ),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const GanttScreen()),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(
-                LucideIcons.list,
-                size: 18,
-                color: Colors.white30,
-              ),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const TimelineScreen()),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(
-                LucideIcons.gitBranch,
-                size: 18,
-                color: Colors.white30,
-              ),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const TwinGraphScreen(),
+              IconButton(
+                icon: const Icon(
+                  LucideIcons.calendar,
+                  size: 17,
+                  color: Colors.white30,
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const GanttScreen()),
                 ),
               ),
-            ),
-          ],
+              IconButton(
+                icon: const Icon(
+                  LucideIcons.list,
+                  size: 17,
+                  color: Colors.white30,
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const TimelineScreen()),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(
+                  LucideIcons.gitBranch,
+                  size: 17,
+                  color: Colors.white30,
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TwinGraphScreen(),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
