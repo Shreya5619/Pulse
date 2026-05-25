@@ -35,12 +35,38 @@ class LifeCanvasService {
       'https://api.groq.com/openai/v1/chat/completions';
   static const String _model = 'llama-3.3-70b-versatile';
 
+  Future<String> fetchServerGroqKey() async {
+    try {
+      final r = await http
+          .get(Uri.parse('$_base/config'))
+          .timeout(const Duration(seconds: 4));
+      if (r.statusCode == 200) {
+        final j = jsonDecode(r.body);
+        if (j['ok'] == true && j['data'] != null) {
+          final key = j['data']['groqApiKey'] as String?;
+          if (key != null && key.isNotEmpty) {
+            return key;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[LifeCanvasService] fetchServerGroqKey failed: $e');
+    }
+    return '';
+  }
+
   Future<String> _resolveGroqKey() async {
     const fromDefine = String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
     if (fromDefine.trim().isNotEmpty) return fromDefine.trim();
     final stored = await lifecanvasDiary.getApiKey();
     if (stored.trim().isNotEmpty) return stored.trim();
-    return GroqConfig.apiKey;
+    if (GroqConfig.apiKey.trim().isNotEmpty) return GroqConfig.apiKey;
+    final serverKey = await fetchServerGroqKey();
+    if (serverKey.isNotEmpty) {
+      await lifecanvasDiary.saveApiKey(serverKey);
+      return serverKey;
+    }
+    return '';
   }
 
   LifeCanvasGraph? _cachedGraph;
@@ -546,11 +572,15 @@ class LifeCanvasService {
 ENTRY: "$text"
 
 Output ONLY valid JSON matching this schema:
-{"label":"Concise Action/Event Label","type":"GOAL|EVENT|HABIT|INSIGHT","emotion":"excited|joy|calm|peaceful|tired|stressed","importance":0.8,"theme":"Work & Coding|Health & Energy|Mindfulness|Social Connections|Creative Pursuits|Future Goals","summary":"1-sentence summary of the action"}
+{"label":"Concise Action/Event Label","type":"GOAL|EVENT|HABIT|INSIGHT","emotion":"excited|joy|calm|peaceful|tired|stressed|overwhelmed","importance":0.8,"theme":"Work & Coding|Health & Energy|Mindfulness|Social Connections|Creative Pursuits|Future Goals","summary":"1-sentence summary of the action"}
 
 Rules:
 - Match theme strictly to one of the 6 themes listed.
 - Keep importance between 0.1 and 1.0.
+- Classification rules for emotion:
+  - If the log is standard, routine, or neutral, classify it as "calm" or "peaceful".
+  - If the log is positive or energetic, use "excited" or "joy".
+  - Do NOT classify neutral/normal logs as "overwhelmed" or "stressed" unless the text explicitly indicates severe overload, panic, or extreme fatigue.
 - Do not include markdown code block formatting in your output.''';
 
     final raw = await _callGroq(prompt);
@@ -634,6 +664,9 @@ QUESTION: $query''';
     required LifeCanvasGraph graph,
     required String diaryMd,
     required List<AppUsageStat> usageStats,
+    List<String> upcomingEvents = const [],
+    String currentLocation = 'Unknown',
+    String activeRisks = 'None',
   }) async {
     final now = DateTime.now();
     final nowH = now.hour + now.minute / 60.0;
@@ -652,10 +685,19 @@ Current time: ${now.hour}:${now.minute.toString().padLeft(2, '0')} (${nowH.toStr
 Life nodes: $nodeCtx
 Screen time: $usageCtx
 Notes: ${diaryMd.length > 200 ? diaryMd.substring(0, 200) : diaryMd}
+Upcoming Scheduled Events: ${upcomingEvents.join(', ')}
+Current Location: $currentLocation
+Active Failure Risks: $activeRisks
 
 Output ONLY valid JSON:
 {"predictions":[{"name":"Short concrete label","hoursFromNow":1.5,"durationHours":0.5,"type":"HABIT","color":"#hex","ganttApp":"Chrome","theme":"Work & Coding|Health & Energy|Mindfulness|Social Connections|Creative Pursuits|Future Goals"}]}
-Rules: hoursFromNow > 0 and < 12. type = GOAL|EVENT|HABIT|INSIGHT. ganttApp must be one of: Screen,Messages,Chrome,Instagram,YouTube,WhatsApp,Spotify (or omit). theme must be one of the six listed.''';
+Rules:
+- hoursFromNow > 0 and < 12.
+- type = GOAL|EVENT|HABIT|INSIGHT.
+- ganttApp must be one of: Screen,Messages,Chrome,Instagram,YouTube,WhatsApp,Spotify (or omit).
+- theme must be one of the six listed.
+- Placements must be highly realistic, matching routine times (e.g. do NOT schedule work tasks during late night hours like 11 PM to 7 AM unless specifically supported by app usage or calendar, assume sleeping at night).
+- Take into consideration the upcoming calendar events, active risks, and current location context.''';
 
     final raw = await _callGroq(prompt);
     final cleaned = raw.replaceAll(RegExp(r'```json|```'), '').trim();
@@ -699,6 +741,35 @@ Output ONLY valid JSON:
     return ((j['updates'] as List?) ?? [])
         .map((u) => MindNodeUpdate.fromJson(u))
         .toList();
+  }
+
+  // ── Map & Reduce Mind Graph ────────────────────────────────────────────────────
+  /// AI-powered consolidation: merges redundant nodes, prunes orphans, clusters by theme.
+  Future<MapReduceResult> mapReduceMindGraph({
+    required List<MindNode> nodes,
+    required List<MindEdge> edges,
+  }) async {
+    final nodesCtx = nodes.map((n) => '${n.id}|${n.name}|${n.type}|${n.parentId ?? ""}').join('\n');
+    final edgesCtx = edges.map((e) => '${e.sourceId}->${e.targetId}').join(', ');
+    final prompt = '''You are a mind map optimiser. Analyse this knowledge graph and produce a clean-up plan.
+
+NODES:
+$nodesCtx
+EDGES: $edgesCtx
+
+Tasks:
+1. Identify nodes that are redundant/duplicate (semantically same meaning) → merge them (keep one, delete others, redirect edges to kept node).
+2. Identify nodes that are orphaned or meaningless → recommend deleting them.
+3. Suggest new grouping CATEGORY nodes if several leaf nodes share an obvious parent theme.
+
+Output ONLY valid JSON:
+{"toDelete":["id1","id2"],"toAdd":[{"id":"new_id","name":"Category Name","type":"CATEGORY","parentId":""}],"toRename":[{"id":"existing_id","newName":"Better Name"}],"edgesToAdd":[{"sourceId":"a","targetId":"b"}],"edgesToDelete":[{"sourceId":"a","targetId":"b"}],"summary":"One sentence describing what was done."}''';
+
+    final raw = await _callGroq(prompt);
+    final m = RegExp(r'\{[\s\S]*\}').firstMatch(raw.replaceAll(RegExp(r'```json|```'), '').trim());
+    if (m == null) throw LifeCanvasLlmException('Map-Reduce response was not valid JSON.');
+    final j = jsonDecode(m.group(0)!);
+    return MapReduceResult.fromJson(j);
   }
 
   // ── Groq helper (no silent fallback) ─────────────────────────────────────────
@@ -845,6 +916,49 @@ class MindNodeUpdate {
     parentId: j['parentId'] as String?,
     importance: (j['importance'] as num? ?? 35).toInt(),
   );
+}
+
+class MapReduceResult {
+  final List<String> toDelete;
+  final List<MindNode> toAdd;
+  final Map<String, String> toRename;   // id -> newName
+  final List<MindEdge> edgesToAdd;
+  final List<MindEdge> edgesToDelete;
+  final String summary;
+
+  MapReduceResult({
+    required this.toDelete,
+    required this.toAdd,
+    required this.toRename,
+    required this.edgesToAdd,
+    required this.edgesToDelete,
+    required this.summary,
+  });
+
+  factory MapReduceResult.fromJson(Map<String, dynamic> j) {
+    final rng = DateTime.now().millisecondsSinceEpoch;
+    return MapReduceResult(
+      toDelete: ((j['toDelete'] as List?) ?? []).map((e) => e.toString()).toList(),
+      toAdd: ((j['toAdd'] as List?) ?? []).map((n) => MindNode(
+        id: n['id'] ?? 'cat_${rng}_${(n['name'] ?? '').hashCode}',
+        name: n['name'] ?? 'New Group',
+        type: n['type'] ?? 'CATEGORY',
+        parentId: (n['parentId'] as String?)?.isEmpty == true ? null : n['parentId'] as String?,
+      )).toList(),
+      toRename: Map.fromEntries(((j['toRename'] as List?) ?? []).map((r) =>
+        MapEntry(r['id'].toString(), r['newName'].toString()))),
+      edgesToAdd: ((j['edgesToAdd'] as List?) ?? []).map((e) => MindEdge(
+        sourceId: e['sourceId'].toString(),
+        targetId: e['targetId'].toString(),
+        directed: true,
+      )).toList(),
+      edgesToDelete: ((j['edgesToDelete'] as List?) ?? []).map((e) => MindEdge(
+        sourceId: e['sourceId'].toString(),
+        targetId: e['targetId'].toString(),
+      )).toList(),
+      summary: j['summary'] as String? ?? 'Graph optimised.',
+    );
+  }
 }
 
 final lifecanvasService = LifeCanvasService();

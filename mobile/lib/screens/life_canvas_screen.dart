@@ -44,7 +44,7 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
   @override
   void initState() {
     super.initState();
-    _pulse = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat(reverse: true);
+    _pulse = AnimationController(vsync: this, duration: const Duration(seconds: 60))..repeat();
     
     _viewCtrl.addListener(() {
       if (mounted) setState(() {});
@@ -54,6 +54,16 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
       context.read<AppState>().fetchLifeCanvasGraph();
       _resetView();
     });
+  }
+
+  Offset _getRotatedPosition(Offset basePos, double pulseValue) {
+    if (_viewMode != ViewMode.galaxy) return basePos;
+    final r = basePos.distance;
+    if (r < 20) return basePos; // Don't rotate center/root
+    final baseAngle = math.atan2(basePos.dy, basePos.dx);
+    final orbitSpeed = 40.0 / math.max(math.sqrt(r), 1.0);
+    final currentAngle = baseAngle + pulseValue * 2 * math.pi * orbitSpeed * 0.015;
+    return Offset(r * math.cos(currentAngle), r * math.sin(currentAngle));
   }
 
   void _resetView() {
@@ -364,6 +374,15 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
                 IconButton(icon: const Icon(LucideIcons.zoomIn, size: 16, color: Colors.white54), onPressed: () => setState(() => _viewCtrl.value = _viewCtrl.value.clone()..scale(1.3))),
                 IconButton(icon: const Icon(LucideIcons.zoomOut, size: 16, color: Colors.white54), onPressed: () => setState(() => _viewCtrl.value = _viewCtrl.value.clone()..scale(1 / 1.3))),
                 IconButton(icon: const Icon(LucideIcons.refreshCw, size: 14, color: Colors.white54), tooltip: 'Reset View', onPressed: _resetView),
+                IconButton(
+                  icon: const Icon(LucideIcons.rotateCw, size: 14, color: Color(0xFF00E5FF)),
+                  tooltip: 'Refresh Data',
+                  onPressed: () {
+                    context.read<AppState>().fetchLifeCanvasGraph(
+                      dateStr: _timelineBaseDate.toIso8601String().substring(0, 10),
+                    );
+                  },
+                ),
               ]),
             ),
 
@@ -408,79 +427,85 @@ class _LifeCanvasScreenState extends State<LifeCanvasScreen> with TickerProvider
                           maxScale: 10.0,
                           constrained: false,
                           boundaryMargin: const EdgeInsets.all(4000),
-                          child: SizedBox(
-                            width: 2000,
-                            height: 1200,
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Positioned.fill(
-                                  child: CustomPaint(
-                                    painter: _EdgePainter(
-                                      visibleEdges,
-                                      visibleNodes,
-                                      positions,
-                                      _viewMode == ViewMode.galaxy,
-                                    ),
-                                  ),
-                                ),
-                                ...visibleNodes.map((node) {
-                                  final p = positions[node.id];
-                                  if (p == null) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  final half = _nodeHalfSize(node);
-                                  final isStart = node.type == 'START';
-                                  return Positioned(
-                                    left: LifeCanvasTimelineMath.canvasAnchorX +
-                                        p.dx -
-                                        half,
-                                    top: LifeCanvasTimelineMath.canvasAnchorY +
-                                        p.dy -
-                                        half,
-                                    child: GestureDetector(
-                                      onTap: () => _showDetail(node),
-                                      child: isStart
-                                          ? _StartNode(label: node.label)
-                                          : AnimatedBuilder(
-                                              animation: _pulse,
-                                              builder: (_, __) => _NodeWidget(
-                                                node: node,
-                                                color: _nodeColor(node),
-                                                pulse: _pulse.value,
-                                                isPhantom: false,
-                                              ),
-                                            ),
-                                    ),
-                                  );
-                                }),
-                                if (_viewMode == ViewMode.timeline)
-                                  ...visiblePreds.map((pred) {
-                                    final graphX =
-                                        LifeCanvasTimelineMath.graphXFromHour(
-                                      pred.futureHour,
-                                    );
-                                    final graphY = 200.0 +
-                                        (pred.name.hashCode % 120 - 60);
-                                    final tint =
-                                        _themeColorFromLabel(pred.theme);
-                                    return Positioned(
-                                      left: LifeCanvasTimelineMath
-                                              .canvasAnchorX +
-                                          graphX -
-                                          6,
-                                      top: LifeCanvasTimelineMath
-                                              .canvasAnchorY +
-                                          graphY -
-                                          28,
-                                      child: _PhantomNode(
-                                        pred: pred,
-                                        themeTint: tint,
+                          child: AnimatedBuilder(
+                            animation: _pulse,
+                            builder: (context, _) {
+                              final rotatedPositions = <String, Offset>{};
+                              positions.forEach((id, basePos) {
+                                rotatedPositions[id] = _getRotatedPosition(basePos, _pulse.value);
+                              });
+                              return SizedBox(
+                                width: 2000,
+                                height: 1200,
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Positioned.fill(
+                                      child: CustomPaint(
+                                        painter: _EdgePainter(
+                                          visibleEdges,
+                                          visibleNodes,
+                                          rotatedPositions,
+                                          _viewMode == ViewMode.galaxy,
+                                        ),
                                       ),
-                                    );
-                                  }),
-                              ],
-                            ),
+                                    ),
+                                    ...visibleNodes.map((node) {
+                                      final p = rotatedPositions[node.id];
+                                      if (p == null) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      final half = _nodeHalfSize(node);
+                                      final isStart = node.type == 'START';
+                                      return Positioned(
+                                        left: LifeCanvasTimelineMath.canvasAnchorX +
+                                            p.dx -
+                                            half,
+                                        top: LifeCanvasTimelineMath.canvasAnchorY +
+                                            p.dy -
+                                            half,
+                                        child: GestureDetector(
+                                          onTap: () => _showDetail(node),
+                                          child: isStart
+                                              ? _StartNode(label: node.label)
+                                              : _NodeWidget(
+                                                  node: node,
+                                                  color: _nodeColor(node),
+                                                  pulse: math.sin(_pulse.value * 2 * math.pi).abs(),
+                                                  isPhantom: false,
+                                                ),
+                                        ),
+                                      );
+                                    }),
+                                    if (_viewMode == ViewMode.timeline)
+                                      ...visiblePreds.map((pred) {
+                                        final graphX =
+                                            LifeCanvasTimelineMath.graphXFromHour(
+                                          pred.futureHour,
+                                        );
+                                        final graphY = 200.0 +
+                                            (pred.name.hashCode % 120 - 60);
+                                        final tint =
+                                            _themeColorFromLabel(pred.theme);
+                                        return Positioned(
+                                          left: LifeCanvasTimelineMath
+                                                  .canvasAnchorX +
+                                              graphX -
+                                              6,
+                                          top: LifeCanvasTimelineMath
+                                                  .canvasAnchorY +
+                                              graphY -
+                                              28,
+                                          child: _PhantomNode(
+                                            pred: pred,
+                                            themeTint: tint,
+                                          ),
+                                        );
+                                      }),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
                         ),
                         if (_viewMode == ViewMode.timeline) ...[

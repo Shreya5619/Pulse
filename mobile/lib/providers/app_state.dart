@@ -2541,10 +2541,19 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> predictLifeCanvasTimeline() async {
+    final upcoming = _deviceContext.upcomingEvents.map((e) => e.title).toList();
+    final loc = _deviceContext.location.status.isNotEmpty 
+        ? _deviceContext.location.status 
+        : '${_deviceContext.location.latitude}, ${_deviceContext.location.longitude}';
+    final risks = _activeRiskTypes.isNotEmpty ? _activeRiskTypes.join(', ') : 'None';
+
     _predictions = await lifecanvasService.predict(
       graph: _lifeCanvasGraph,
       diaryMd: _lifeCanvasDiaryMd,
       usageStats: _usageStats,
+      upcomingEvents: upcoming,
+      currentLocation: loc,
+      activeRisks: risks,
     );
     notifyListeners();
   }

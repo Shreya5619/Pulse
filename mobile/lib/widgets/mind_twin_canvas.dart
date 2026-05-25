@@ -1,7 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../services/lifecanvas_service.dart';
 
 // ─── Force-directed Mind Twin canvas ─────────────────────────────────────────
@@ -33,12 +31,16 @@ class MindTwinCanvasState extends State<MindTwinCanvas>
     with SingleTickerProviderStateMixin {
   late AnimationController _physics;
   double _scale = 1.0;
+  double _baseScale = 1.0;
   Offset _pan = Offset.zero;
+  MindNode? _draggedNode;
+  
+  double _canvasW = 400.0;
+  double _canvasH = 600.0;
 
   @override
   void initState() {
     super.initState();
-    _seedPositions();
     _physics = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))
       ..addListener(_tick);
     _runLayoutBurst();
@@ -60,51 +62,55 @@ class MindTwinCanvasState extends State<MindTwinCanvas>
 
   void _seedPositions() {
     final rng = math.Random(42);
-    final size = MediaQueryData.fromView(WidgetsBinding.instance.window);
-    final cx = size.size.width / 2;
-    final cy = size.size.height / 3;
+    final cx = _canvasW / 2;
+    final cy = _canvasH / 2;
     for (final n in widget.nodes) {
       if (n.x == 0 && n.y == 0) {
-        n.x = cx + (rng.nextDouble() - 0.5) * 300;
-        n.y = cy + (rng.nextDouble() - 0.5) * 300;
+        n.x = cx + (rng.nextDouble() - 0.5) * 200;
+        n.y = cy + (rng.nextDouble() - 0.5) * 200;
       }
     }
   }
 
   void _tick() {
-    const repulsion = 2500.0; // Lowered repulsion so nodes don't fly apart
-    const spring = 0.06;      // Stronger spring to keep them connected
-    const damping = 0.82;     // Slightly higher damping for faster stabilization
-    const restLen = 90.0;     // Shorter target length for a neat cluster
-    const gravity = 0.02;     // Pull everything towards center to prevent drifting
+    // If a node is being dragged, we don't apply physics updates to it
+    const repulsion = 2500.0;
+    const spring = 0.06;
+    const damping = 0.82;
+    const restLen = 90.0;
+    const gravity = 0.02;
 
-    final size = MediaQueryData.fromView(WidgetsBinding.instance.window);
-    final cx = size.size.width / 2;
-    final cy = size.size.height / 3;
+    final cx = _canvasW / 2;
+    final cy = _canvasH / 2;
 
     final vx = <String, double>{};
     final vy = <String, double>{};
 
-    // Central gravity (pulls nodes towards center)
+    // Central gravity
     for (final n in widget.nodes) {
+      if (n.id == _draggedNode?.id) continue;
       final dx = cx - n.x, dy = cy - n.y;
       vx[n.id] = (vx[n.id] ?? 0) + dx * gravity;
       vy[n.id] = (vy[n.id] ?? 0) + dy * gravity;
     }
 
-    // Repulsion between all node pairs
+    // Repulsion
     for (int i = 0; i < widget.nodes.length; i++) {
       for (int j = i + 1; j < widget.nodes.length; j++) {
         final a = widget.nodes[i], b = widget.nodes[j];
         final dx = b.x - a.x, dy = b.y - a.y;
         final dist = math.max(math.sqrt(dx * dx + dy * dy), 0.1);
-        if (dist < 400.0) { // Limit repulsion radius
+        if (dist < 400.0) {
           final force = repulsion / (dist * dist);
           final fx = force * dx / dist, fy = force * dy / dist;
-          vx[a.id] = (vx[a.id] ?? 0) - fx;
-          vy[a.id] = (vy[a.id] ?? 0) - fy;
-          vx[b.id] = (vx[b.id] ?? 0) + fx;
-          vy[b.id] = (vy[b.id] ?? 0) + fy;
+          if (a.id != _draggedNode?.id) {
+            vx[a.id] = (vx[a.id] ?? 0) - fx;
+            vy[a.id] = (vy[a.id] ?? 0) - fy;
+          }
+          if (b.id != _draggedNode?.id) {
+            vx[b.id] = (vx[b.id] ?? 0) + fx;
+            vy[b.id] = (vy[b.id] ?? 0) + fy;
+          }
         }
       }
     }
@@ -117,10 +123,14 @@ class MindTwinCanvasState extends State<MindTwinCanvas>
       final dist = math.max(math.sqrt(dx * dx + dy * dy), 0.1);
       final force = spring * (dist - restLen);
       final fx = force * dx / dist, fy = force * dy / dist;
-      vx[src.id] = (vx[src.id] ?? 0) + fx;
-      vy[src.id] = (vy[src.id] ?? 0) + fy;
-      vx[tgt.id] = (vx[tgt.id] ?? 0) - fx;
-      vy[tgt.id] = (vy[tgt.id] ?? 0) - fy;
+      if (src.id != _draggedNode?.id) {
+        vx[src.id] = (vx[src.id] ?? 0) + fx;
+        vy[src.id] = (vy[src.id] ?? 0) + fy;
+      }
+      if (tgt.id != _draggedNode?.id) {
+        vx[tgt.id] = (vx[tgt.id] ?? 0) - fx;
+        vy[tgt.id] = (vy[tgt.id] ?? 0) - fy;
+      }
     }
 
     // Parent-child attraction
@@ -131,14 +141,17 @@ class MindTwinCanvasState extends State<MindTwinCanvas>
           final dx = parent.x - node.x, dy = parent.y - node.y;
           final dist = math.max(math.sqrt(dx * dx + dy * dy), 0.1);
           final force = spring * 0.8 * (dist - 50);
-          vx[node.id] = (vx[node.id] ?? 0) + force * dx / dist;
-          vy[node.id] = (vy[node.id] ?? 0) + force * dy / dist;
+          if (node.id != _draggedNode?.id) {
+            vx[node.id] = (vx[node.id] ?? 0) + force * dx / dist;
+            vy[node.id] = (vy[node.id] ?? 0) + force * dy / dist;
+          }
         }
       }
     }
 
     setState(() {
       for (final n in widget.nodes) {
+        if (n.id == _draggedNode?.id) continue;
         n.x += ((vx[n.id] ?? 0) * damping).clamp(-12.0, 12.0);
         n.y += ((vy[n.id] ?? 0) * damping).clamp(-12.0, 12.0);
       }
@@ -148,7 +161,7 @@ class MindTwinCanvasState extends State<MindTwinCanvas>
   void resetView() => setState(() { _scale = 1.0; _pan = Offset.zero; });
 
   Offset _toGraph(Offset screen) =>
-      (screen - _pan - Offset(200, 300)) / _scale;
+      (screen - _pan - Offset(_canvasW / 2, _canvasH / 2)) / _scale;
 
   MindNode? _hitTest(Offset graphPos) {
     for (final n in widget.nodes.reversed) {
@@ -166,36 +179,65 @@ class MindTwinCanvasState extends State<MindTwinCanvas>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (d) {
-        final hit = _hitTest(_toGraph(d.localPosition));
-        if (hit != null) {
-          widget.onNodeTap(hit);
-        } else {
-          widget.onBackgroundTap?.call();
-        }
-      },
-      onLongPressStart: (d) {
-        final hit = _hitTest(_toGraph(d.localPosition));
-        if (hit != null) widget.onNodeLongPress(hit);
-      },
-      onScaleStart: (_) {},
-      onScaleUpdate: (d) {
-        setState(() {
-          _scale = (_scale * d.scale).clamp(0.3, 3.0);
-          _pan += d.focalPointDelta;
-        });
-      },
-      child: CustomPaint(
-        painter: _MindTwinPainter(
-          nodes: widget.nodes,
-          edges: widget.edges,
-          selectedNode: widget.selectedNode,
-          scale: _scale,
-          pan: _pan,
-        ),
-        child: const SizedBox.expand(),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _canvasW = constraints.maxWidth;
+        _canvasH = constraints.maxHeight;
+        
+        return GestureDetector(
+          onTapDown: (d) {
+            final hit = _hitTest(_toGraph(d.localPosition));
+            if (hit != null) {
+              widget.onNodeTap(hit);
+            } else {
+              widget.onBackgroundTap?.call();
+            }
+          },
+          onLongPressStart: (d) {
+            final hit = _hitTest(_toGraph(d.localPosition));
+            if (hit != null) widget.onNodeLongPress(hit);
+          },
+          onScaleStart: (details) {
+            final hit = _hitTest(_toGraph(details.localFocalPoint));
+            if (hit != null) {
+              _draggedNode = hit;
+            } else {
+              _draggedNode = null;
+              _baseScale = _scale;
+            }
+          },
+          onScaleUpdate: (details) {
+            if (_draggedNode != null) {
+              final graphPos = _toGraph(details.localFocalPoint);
+              setState(() {
+                _draggedNode!.x = graphPos.dx;
+                _draggedNode!.y = graphPos.dy;
+              });
+            } else {
+              setState(() {
+                _scale = (_baseScale * details.scale).clamp(0.15, 6.0);
+                _pan += details.focalPointDelta;
+              });
+            }
+          },
+          onScaleEnd: (_) {
+            if (_draggedNode != null) {
+              _draggedNode = null;
+              _runLayoutBurst();
+            }
+          },
+          child: CustomPaint(
+            painter: _MindTwinPainter(
+              nodes: widget.nodes,
+              edges: widget.edges,
+              selectedNode: widget.selectedNode,
+              scale: _scale,
+              pan: _pan,
+            ),
+            child: const SizedBox.expand(),
+          ),
+        );
+      }
     );
   }
 }
@@ -213,7 +255,7 @@ class _MindTwinPainter extends CustomPainter {
   });
 
   Offset _project(MindNode n, Size size) =>
-      Offset(n.x * scale + pan.dx + 200, n.y * scale + pan.dy + size.height / 2);
+      Offset(n.x * scale + pan.dx + size.width / 2, n.y * scale + pan.dy + size.height / 2);
 
   static const _typeColors = {
     'CATEGORY': Color(0xFF00E5FF),
@@ -233,7 +275,6 @@ class _MindTwinPainter extends CustomPainter {
       canvas.drawLine(sp, tp, Paint()
         ..color = Colors.white.withValues(alpha: 0.12)
         ..strokeWidth = 1.2);
-      // Arrow tip for directed
       if (e.directed) {
         final dir = (tp - sp) / (tp - sp).distance;
         final tip = tp - dir * 20;
@@ -252,12 +293,10 @@ class _MindTwinPainter extends CustomPainter {
       final r = n.type == 'CATEGORY' ? 28.0 : n.type == 'HOLDER' ? 24.0 : 18.0;
       final isSource = selectedNode?.id == n.id;
 
-      // Glow if selected
       if (isSource) {
         canvas.drawCircle(pos, r + 8, Paint()..color = const Color(0xFFFFB300).withValues(alpha: 0.25)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
       }
 
-      // Node circle
       p.color = const Color(0xFF0B0D1E);
       canvas.drawCircle(pos, r, p);
       canvas.drawCircle(pos, r, Paint()
@@ -265,7 +304,6 @@ class _MindTwinPainter extends CustomPainter {
         ..strokeWidth = isSource ? 2.0 : 1.2
         ..color = isSource ? const Color(0xFFFFB300) : c.withValues(alpha: 0.5));
 
-      // Label
       final tp2 = TextPainter(
         text: TextSpan(
           text: n.name.length > 10 ? '${n.name.substring(0, 10)}..' : n.name,

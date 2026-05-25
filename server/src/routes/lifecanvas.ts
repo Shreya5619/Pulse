@@ -106,4 +106,13 @@ router.get("/graph", async (req: Request, res: Response) => {
     }
 });
 
+router.get("/config", (req: Request, res: Response) => {
+    res.json({
+        ok: true,
+        data: {
+            groqApiKey: process.env.GROQ_API_KEY || ""
+        }
+    });
+});
+
 export default router;

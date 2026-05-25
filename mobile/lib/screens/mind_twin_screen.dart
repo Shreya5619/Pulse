@@ -19,6 +19,7 @@ class _MindTwinScreenState extends State<MindTwinScreen> {
   MindNode? _selectedNode;
   bool _brainstormOpen = false;
   bool _aiProcessing = false;
+  bool _mapReducing = false;
   final List<TextEditingController> _brainstormCtrls = [TextEditingController()];
 
   @override
@@ -299,48 +300,178 @@ class _MindTwinScreenState extends State<MindTwinScreen> {
     }
   }
 
+  Future<void> _applyMapReduce() async {
+    if (_nodes.isEmpty) { _showSnack('No nodes to reduce.'); return; }
+    Navigator.pop(context);
+    setState(() => _mapReducing = true);
+    try {
+      final result = await lifecanvasService.mapReduceMindGraph(
+        nodes: _nodes, edges: _edges,
+      );
+      setState(() {
+        // Delete nominated nodes
+        for (final id in result.toDelete) {
+          _nodes.removeWhere((n) => n.id == id);
+          _edges.removeWhere((e) => e.sourceId == id || e.targetId == id);
+        }
+        // Rename nominated nodes
+        result.toRename.forEach((id, newName) {
+          final idx = _nodes.indexWhere((n) => n.id == id);
+          if (idx >= 0) {
+            final old = _nodes[idx];
+            _nodes[idx] = MindNode(
+              id: old.id, name: newName, type: old.type,
+              parentId: old.parentId, x: old.x, y: old.y,
+            );
+          }
+        });
+        // Add new category nodes
+        for (final n in result.toAdd) {
+          if (!_nodes.any((x) => x.id == n.id)) {
+            n.x = (math.Random().nextDouble() - 0.5) * 250;
+            n.y = (math.Random().nextDouble() - 0.5) * 250;
+            _nodes.add(n);
+          }
+        }
+        // Add new edges
+        for (final e in result.edgesToAdd) {
+          final srcExists = _nodes.any((n) => n.id == e.sourceId);
+          final tgtExists = _nodes.any((n) => n.id == e.targetId);
+          final alreadyExists = _edges.any((x) =>
+            (x.sourceId == e.sourceId && x.targetId == e.targetId) ||
+            (x.sourceId == e.targetId && x.targetId == e.sourceId));
+          if (srcExists && tgtExists && !alreadyExists) _edges.add(e);
+        }
+        // Delete nominated edges
+        for (final e in result.edgesToDelete) {
+          _edges.removeWhere((x) =>
+            (x.sourceId == e.sourceId && x.targetId == e.targetId) ||
+            (x.sourceId == e.targetId && x.targetId == e.sourceId));
+        }
+      });
+      await _save();
+      _canvasKey.currentState?._runLayoutBurst();
+      _showSnack('✨ ${result.summary}');
+    } catch (e) {
+      _showSnack('Map & Reduce failed: $e');
+    } finally {
+      setState(() => _mapReducing = false);
+    }
+  }
+
   void _showTidyModal() {
+    final pruned = <String>{};
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        padding: const EdgeInsets.all(20),
-        decoration: const BoxDecoration(
-          color: Color(0xFF0F1123),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Tidy Mind Map', style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _nodes.length,
-                itemBuilder: (context, i) {
-                  final n = _nodes[i];
-                  return CheckboxListTile(
-                    value: true,
-                    activeColor: const Color(0xFF00E5FF),
-                    title: Text(n.name, style: GoogleFonts.outfit(color: Colors.white70, fontSize: 13)),
-                    subtitle: Text(n.type, style: GoogleFonts.jetBrainsMono(color: Colors.white30, fontSize: 9)),
-                    onChanged: (v) {
-                      if (v == false) {
-                        setState(() {
-                          _nodes.removeWhere((x) => x.id == n.id);
-                          _edges.removeWhere((e) => e.sourceId == n.id || e.targetId == n.id);
-                        });
-                        _save();
-                        Navigator.pop(context);
-                      }
-                    },
-                  );
-                },
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) => Container(
+          height: MediaQuery.of(context).size.height * 0.78,
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Color(0xFF0F1123),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Text('Tidy Mind Map', style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                // Map & Reduce button
+                GestureDetector(
+                  onTap: _applyMapReduce,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Color(0xFFBF5AF2), Color(0xFF00E5FF)]),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(children: [
+                      const Icon(LucideIcons.zap, size: 12, color: Colors.white),
+                      const SizedBox(width: 5),
+                      Text('MAP & REDUCE', style: GoogleFonts.outfit(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ]),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 6),
+              Text('Uncheck to prune nodes. Or let AI auto-clean with Map & Reduce.',
+                style: GoogleFonts.outfit(color: Colors.white30, fontSize: 11)),
+              const SizedBox(height: 14),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _nodes.length,
+                  itemBuilder: (context, i) {
+                    final n = _nodes[i];
+                    final isMarked = pruned.contains(n.id);
+                    final color = n.type == 'CATEGORY'
+                        ? const Color(0xFF00E5FF)
+                        : n.type == 'HOLDER'
+                            ? const Color(0xFFBF5AF2)
+                            : const Color(0xFF4EE2C9);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      decoration: BoxDecoration(
+                        color: isMarked ? Colors.red.withValues(alpha: 0.08) : color.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: isMarked ? Colors.red.withValues(alpha: 0.3) : color.withValues(alpha: 0.15)),
+                      ),
+                      child: CheckboxListTile(
+                        value: !isMarked,
+                        activeColor: color,
+                        checkColor: Colors.black,
+                        title: Text(n.name, style: GoogleFonts.outfit(
+                          color: isMarked ? Colors.white38 : Colors.white.withValues(alpha: 0.85),
+                          fontSize: 13,
+                          decoration: isMarked ? TextDecoration.lineThrough : null,
+                        )),
+                        subtitle: Text(n.type, style: GoogleFonts.jetBrainsMono(
+                          color: color.withValues(alpha: 0.5), fontSize: 9)),
+                        onChanged: (v) {
+                          setModal(() {
+                            if (v == false) pruned.add(n.id);
+                            else pruned.remove(n.id);
+                          });
+                        },
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+              if (pruned.isNotEmpty) ...
+              [
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _nodes.removeWhere((n) => pruned.contains(n.id));
+                      for (final id in pruned) {
+                        _edges.removeWhere((e) => e.sourceId == id || e.targetId == id);
+                      }
+                    });
+                    _save();
+                    Navigator.pop(context);
+                    _showSnack('Pruned ${pruned.length} node(s).');
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                    ),
+                    child: Center(child: Text(
+                      'PRUNE ${pruned.length} NODE${pruned.length == 1 ? "" : "S"}',
+                      style: GoogleFonts.outfit(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                    )),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -375,8 +506,11 @@ class _MindTwinScreenState extends State<MindTwinScreen> {
               const Spacer(),
               _iconBtn(LucideIcons.plusCircle, const Color(0xFF4EE2C9), () => _addNode('EVENT'), tooltip: 'Add Event'),
               _iconBtn(LucideIcons.layers, const Color(0xFF00E5FF), () => _addNode('CATEGORY'), tooltip: 'Add Category'),
-              _iconBtn(LucideIcons.listChecks, Colors.white54, _showTidyModal, tooltip: 'Tidy'),
-              _iconBtn(LucideIcons.rotateCcw, Colors.white38, () => _canvasKey.currentState?.resetView(), tooltip: 'Reset'),
+              _iconBtn(LucideIcons.listChecks, Colors.white54, _showTidyModal, tooltip: 'Tidy / Map & Reduce'),
+              if (_mapReducing)
+                const Padding(padding: EdgeInsets.symmetric(horizontal: 4), child: SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFFBF5AF2))))
+              else
+                _iconBtn(LucideIcons.rotateCcw, Colors.white38, () => _canvasKey.currentState?.resetView(), tooltip: 'Reset View'),
             ]),
           ),
 
