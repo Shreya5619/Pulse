@@ -78,7 +78,7 @@ class LifeCanvasService {
     }
 
     final day = DateTime.tryParse('${ds}T12:00:00') ?? DateTime.now();
-    final g = _emptyDayGraph(forDay: day);
+    final g = _mockGraph(forDay: day);
     _cachedGraph = g;
     await lifecanvasDiary.saveDailyGraph(ds, g);
     return g;
