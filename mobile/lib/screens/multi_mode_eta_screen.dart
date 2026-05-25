@@ -134,7 +134,7 @@ class _MultiModeEtaScreenState extends State<MultiModeEtaScreen> {
   }
 
   String _getBackendHost(AppState state) {
-    return '192.168.0.104';
+    return '192.168.1.14';
   }
 
   String _formatDuration(int seconds) {
